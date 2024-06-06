@@ -55,14 +55,23 @@ def cost_function(x, *args):
     diff = np.trace(Delta_p) - nfix_qp
     return diff.real
 
-def find_mu(mu0, R, Lambda, eks, nfix_qp, beta, dmu=0.05, mu_tol=0.001):
+# def find_mu(mu0, R, Lambda, eks, nfix_qp, beta, dmu=0.05, mu_tol=0.001):
+#     """ Find Lambda for given ffdagger
+#     """
+#     print('nfix_qp=',nfix_qp)
+#     args = (R, Lambda, eks, nfix_qp, beta)
+#     sols = scipy.optimize.root_scalar(cost_function,x0=mu0-dmu,x1=mu0+dmu,args=args,method='secant',xtol=mu_tol)
+#     mu = sols.root
+#     print('root solver for mu converged? ',sols.converged, 'mu=',mu)
+#     return mu
+
+def find_mu(mu0, R, Lambda, eks, nfix_qp, beta, dmu=1.0, mu_tol=0.00001):
     """ Find Lambda for given ffdagger
     """
     print('nfix_qp=',nfix_qp)
     args = (R, Lambda, eks, nfix_qp, beta)
-    sols = scipy.optimize.root_scalar(cost_function,x0=mu0-dmu,x1=mu0+dmu,args=args,method='secant',xtol=mu_tol)
-    mu = sols.root
-    print('root solver for mu converged? ',sols.converged, 'mu=',mu)
+    mu = scipy.optimize.bisect(cost_function,mu0-dmu,mu0+dmu,args=args,xtol=mu_tol)
+    print('mu=',mu)
     return mu
 
 class Grisb_muqp(Grisb):
@@ -142,7 +151,7 @@ class Grisb_muqp(Grisb):
         for it in range(itmax):
             # compute qp density matrix
             if canonical:
-                if it > 0 or self.mu == 0:
+                if it > 4 or self.mu == 0:
                     nfix_qp = (self.nbath - self.nimp)/2 + nfix
                     self.mu = find_mu(self.mu, self.R, self.Lambda, self.eks, nfix_qp, beta, dmu=dmu, mu_tol=mu_tol)
                 else:
@@ -194,6 +203,14 @@ class Grisb_muqp(Grisb):
             else:
                 self.R = (1.-mix)*np.copy(self.R) + mix*R_new
                 self.Lambda = (1.-mix)*np.copy(self.Lambda) + mix*Lambda_new
+
+            with HDFArchive('checkpoint%s.h5' % self.suff,'a') as fh5:
+                fh5['R_%d' % it] = self.R
+                fh5['Lambda_%d'% it] = self.Lambda
+                fh5['eks'] = self.eks
+                fh5['Utensor'] = self.Utensor
+                fh5['mu'] = mu
+
             if not silence:
                 print("R_new=")
                 print(R_new)
