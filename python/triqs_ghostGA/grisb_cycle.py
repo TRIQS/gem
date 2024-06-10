@@ -21,7 +21,7 @@ from triqs.gf.tools import inverse
 
 # ghostGA
 from triqs_ghostGA.sumk_grisb import SumkGRISB
-from triqs_ghostGA.utils_TH import funcMat, denR, cut_small
+from triqs_ghostGA.utility.utils_TH import funcMat, denR, cut_small
 from triqs_ghostGA.grisb_tools.observables import (calc_dft_kin_en, add_grisb_observables, calc_bandcorr_man, write_obs,
                                          add_dft_values_as_zeroth_iteration, write_header_to_file, prep_observables)
 from triqs_ghostGA.grisb_tools.solver import SolverStructure
@@ -262,7 +262,7 @@ def grisb_cycle(general_params, solver_params, advanced_params, dft_params,
     sum_k = SumkGRISB(hdf_file=general_params['jobname']+'/'+general_params['seedname']+'.h5',
                       mesh=sumk_mesh, use_dft_blocks=False, h_field=general_params['h_field'],
                       nbaths=general_params['norb_baths'])
-    
+
     iteration_offset = 0
 
     # determine chemical potential for bare DFT sum_k object
@@ -302,7 +302,7 @@ def grisb_cycle(general_params, solver_params, advanced_params, dft_params,
     #    else:
     #        raise NotImplementedError('Slater-type interaction not implemente for gGA!')
     #print(sum_k.dc_imp)
-    
+
     iteration_offset = mpi.bcast(iteration_offset)
     sum_k.chemical_potential = mpi.bcast(sum_k.chemical_potential)
 
@@ -581,7 +581,7 @@ def grisb_cycle(general_params, solver_params, advanced_params, dft_params,
             #    deltaN_old[sp] = [np.zeros([sum_k.n_orbitals[ik, ntoi[sp]], sum_k.n_orbitals[
             #                            ik, ntoi[sp]]], complex) for ik in range(sum_k.n_k)]
 
-    # The not famous GRISB self consistency cycle            
+    # The not famous GRISB self consistency cycle
     for it in range(iteration_offset + 1, iteration_offset + n_iter + 1):
 
         # remove h_field when number of iterations is reached
@@ -603,7 +603,7 @@ def grisb_cycle(general_params, solver_params, advanced_params, dft_params,
                                                  is_converged, is_sampling=False)
         if is_converged:
             break
-        
+
     #load and check charge and energy convergence
 #    if general_params['csc']:
 #        try:
@@ -629,7 +629,7 @@ def grisb_cycle(general_params, solver_params, advanced_params, dft_params,
 #            raise
 #        energy_diff = np.abs(band_en_correction_old -band_en_correction).real
 #        charge_diff = np.max(np.abs(deltaN-deltaN_old))
-#        mpi.report('########################## charge_diff={:.6f}'.format(charge_diff) + 
+#        mpi.report('########################## charge_diff={:.6f}'.format(charge_diff) +
 #                   ' energy_diff={:.6f} #########################'.format(energy_diff))
 #        if ( energy_diff < general_params['charge_tol'] and charge_diff < general_params['energy_tol'] ):
 #            is_charge_converged = True
@@ -815,7 +815,7 @@ def _grisb_step(sum_k, solvers, it, general_params,
             Delta[sp] = Delta_spinful[isp::2,isp::2]
         Lambda_new_icrsh = {}
         for sp, isp in sum_k.spin_names_to_ind[sum_k.SO].items():
-            Lambda_new_icrsh[sp] = sum_k.calc_Lambda_icrsh_isp(R_new_icrsh[sp], sum_k.Lambdac[icrsh][sp], 
+            Lambda_new_icrsh[sp] = sum_k.calc_Lambda_icrsh_isp(R_new_icrsh[sp], sum_k.Lambdac[icrsh][sp],
                                         Delta[sp], sum_k.D[icrsh][sp], sum_k.H_list[icrsh][sp])
         #print('R_pre_icrsh=')
         #print(R_pre_icrsh)
@@ -888,7 +888,7 @@ def _grisb_step(sum_k, solvers, it, general_params,
     if general_params['dc'] and general_params['dc_grisb']:
         sum_k = initial_sigma.calculate_double_counting(sum_k, density_mat,
                                                         general_params, advanced_params)
-    
+
     #The hartree solver computes the DC energy internally, set it in sum_k
     #if general_params['solver_type'] == 'hartree':
     #    for icrsh in range(sum_k.n_inequiv_shells):
@@ -962,7 +962,7 @@ def _grisb_step(sum_k, solvers, it, general_params,
     is_now_converged = convergence.check_convergence(sum_k.n_inequiv_shells, general_params, conv_obs)
     print('is_now_converged=', is_now_converged)
     # use the current simple criterion for one-shot
-    if not general_params['csc'] and diff < general_params['grisb_tol']:  
+    if not general_params['csc'] and diff < general_params['grisb_tol']:
         is_converged =True
     elif is_now_converged is None:
         is_converged = False

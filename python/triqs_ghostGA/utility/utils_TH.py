@@ -18,94 +18,94 @@ from scipy.optimize import bisect
 from scipy.special import factorial as fact
 # from scipy.misc import derivative
 
-def get_1D_e_list(nmesh=500, t=0.5):
-    """
-    get 1D DOS energy list
-    Input:
-        nmesh: number of e points
-        d: half-bandwidth
-    Output:
-        e_list: list of e points
-    """
-    k_list = np.linspace(-pi,pi,nmesh)
-    e_list = 2.*t*np.cos(k_list)
-    return e_list
-
-def get_semicircle_e_list(nmesh=500, d=1.0, plot=False):
-    """
-    get semicircular DOS energy list
-    Input:
-        nmesh: number of e points
-        d: half-bandwidth
-    Output:
-        e_list: list of e points
-    """
-    # dos
-    dos = lambda e: 2./(pi*d**2) * sqrt(d**2-e**2)
-    # cumulent dos
-    # cdos = lambda e: (( e/d**2*sqrt(d**2-e**2) + np.arctan(e/sqrt(d**2-e**2)) )
-    #                   / (pi) + 0.5)
-    cdos = lambda e: ( e/d**2*sqrt(d**2-e**2) + arcsin(e/sqrt(d**2)) ) / (pi) + 0.5
-
-    if plot is True:
-        e_list = np.linspace(-d,d,100)
-        plt.plot(e_list,dos(e_list))
-        plt.plot(e_list,cdos(e_list))
-        plt.plot(e_list,np.linspace(0,1,100))
-        plt.show()
-        quit()
-
-
-    cdos_list = np.linspace(0,1,nmesh+1)
-    e_list = [bisect(lambda x: cdos(x)-a, -d ,d) for a in cdos_list]
-    e_list = np.asarray(e_list)
-    e_list = (e_list[1:] + e_list[0:-1])/2
-
-    if plot is True:
-        plt.plot(e_list,cdos(e_list),'o')
-        plt.plot(e_list,cdos_list,'-')
-        plt.show()
-        quit()
-
-    return e_list
-
-def get_flat_e_list(nmesh=500, d=1.0):
-    """
-    get flat DOS energy list
-    Input:
-        nmesh: number of e points
-        d: half-bandwidth
-    Output:
-        e_list: list of e points
-    """
-    # dos
-    dos = lambda e: 1./(2*d)*hside(e+d,0.5)*hside(-e+d,0.5)
-    # cumulent dos
-    cdos = lambda e: (1./(2*d)*hside(d+e,0.5)*
-                      ((-d+e+2*d*hside(d,0.5))*hside(-d-e,0.5)*hside(d-e,0.5)
-                       +hside(d,0.5)*(2*d+(-d+e)*hside(d-e,0.5))*hside(d+e,0.5)))
-
-    #'''
-    #e_list = np.linspace(-d,d,100)
-    #plt.plot(e_list,dos(e_list))
-    #plt.plot(e_list,cdos(e_list))
-    #plt.plot(e_list,np.linspace(0,1,100))
-    #plt.show()
-    #quit()
-    #'''
-
-    cdos_list = np.linspace(0,1,nmesh+1)
-    e_list = [bisect(lambda x: cdos(x)-a, -d ,d) for a in cdos_list]
-    e_list = np.asarray(e_list)
-    e_list = (e_list[1:] + e_list[0:-1])/2
-
-    '''
-    plt.plot(e_list,cdos(e_list),'o')
-    plt.plot(e_list,cdos_list,'-')
-    plt.show()
-    quit()
-    '''
-    return e_list
+# def get_1D_e_list(nmesh=500, t=0.5):
+#     """
+#     get 1D DOS energy list
+#     Input:
+#         nmesh: number of e points
+#         d: half-bandwidth
+#     Output:
+#         e_list: list of e points
+#     """
+#     k_list = np.linspace(-pi,pi,nmesh)
+#     e_list = 2.*t*np.cos(k_list)
+#     return e_list
+#
+# def get_semicircle_e_list(nmesh=500, d=1.0, plot=False):
+#     """
+#     get semicircular DOS energy list
+#     Input:
+#         nmesh: number of e points
+#         d: half-bandwidth
+#     Output:
+#         e_list: list of e points
+#     """
+#     # dos
+#     dos = lambda e: 2./(pi*d**2) * sqrt(d**2-e**2)
+#     # cumulent dos
+#     # cdos = lambda e: (( e/d**2*sqrt(d**2-e**2) + np.arctan(e/sqrt(d**2-e**2)) )
+#     #                   / (pi) + 0.5)
+#     cdos = lambda e: ( e/d**2*sqrt(d**2-e**2) + arcsin(e/sqrt(d**2)) ) / (pi) + 0.5
+#
+#     if plot is True:
+#         e_list = np.linspace(-d,d,100)
+#         plt.plot(e_list,dos(e_list))
+#         plt.plot(e_list,cdos(e_list))
+#         plt.plot(e_list,np.linspace(0,1,100))
+#         plt.show()
+#         quit()
+#
+#
+#     cdos_list = np.linspace(0,1,nmesh+1)
+#     e_list = [bisect(lambda x: cdos(x)-a, -d ,d) for a in cdos_list]
+#     e_list = np.asarray(e_list)
+#     e_list = (e_list[1:] + e_list[0:-1])/2
+#
+#     if plot is True:
+#         plt.plot(e_list,cdos(e_list),'o')
+#         plt.plot(e_list,cdos_list,'-')
+#         plt.show()
+#         quit()
+#
+#     return e_list
+#
+# def get_flat_e_list(nmesh=500, d=1.0):
+#     """
+#     get flat DOS energy list
+#     Input:
+#         nmesh: number of e points
+#         d: half-bandwidth
+#     Output:
+#         e_list: list of e points
+#     """
+#     # dos
+#     dos = lambda e: 1./(2*d)*hside(e+d,0.5)*hside(-e+d,0.5)
+#     # cumulent dos
+#     cdos = lambda e: (1./(2*d)*hside(d+e,0.5)*
+#                       ((-d+e+2*d*hside(d,0.5))*hside(-d-e,0.5)*hside(d-e,0.5)
+#                        +hside(d,0.5)*(2*d+(-d+e)*hside(d-e,0.5))*hside(d+e,0.5)))
+#
+#     #'''
+#     #e_list = np.linspace(-d,d,100)
+#     #plt.plot(e_list,dos(e_list))
+#     #plt.plot(e_list,cdos(e_list))
+#     #plt.plot(e_list,np.linspace(0,1,100))
+#     #plt.show()
+#     #quit()
+#     #'''
+#
+#     cdos_list = np.linspace(0,1,nmesh+1)
+#     e_list = [bisect(lambda x: cdos(x)-a, -d ,d) for a in cdos_list]
+#     e_list = np.asarray(e_list)
+#     e_list = (e_list[1:] + e_list[0:-1])/2
+#
+#     '''
+#     plt.plot(e_list,cdos(e_list),'o')
+#     plt.plot(e_list,cdos_list,'-')
+#     plt.show()
+#     quit()
+#     '''
+#     return e_list
 
 def funcMat(H, function, pr=False):
     tiny = 1e-8 # use to regularize eigen problem for singular matrix
