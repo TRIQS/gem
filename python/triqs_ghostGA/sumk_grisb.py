@@ -1,5 +1,5 @@
 from triqs_dft_tools.sumk_dft import *
-from triqs_ghostGA.utils_TH import denR, denRm1, ddenRm1, realHcombination, inverse_realHcombination, \
+from triqs_ghostGA.utility.utils_TH import denR, denRm1, ddenRm1, realHcombination, inverse_realHcombination, \
      Hermitian_list, get_blocks, funcMat, calc_nf, dF, cut_small
 
 class SumkGRISB(SumkDFT):
@@ -13,9 +13,9 @@ class SumkGRISB(SumkDFT):
         super().__init__(*args, **kwargs)
         # additional grisb parameters
         self.nbaths = nbaths
-        if mpi.is_master_node():        
+        if mpi.is_master_node():
             print('nbaths=', self.nbaths)
-        
+
         # rotation matrix from Wannier90 convention z^2 xz yz x^2-y^2 xy to z^2 x^2-y^2 xz yz xy convention
         # NOTE: for testing d-shell calculations
         self.u_trans_w90_to_std = np.array([[ 1, 0, 0, 0, 0],
@@ -31,7 +31,7 @@ class SumkGRISB(SumkDFT):
             # additional properties to load
             # soon bz_weights is depraced and replaced by kpt_weights, kpts_basis and kpts will become required to read soon
             additional_things_to_read = ['u_total']
-            subgroup_present_additional, self.additional_values_not_read = self.read_input_from_hdf(subgrp=self.dft_data, 
+            subgroup_present_additional, self.additional_values_not_read = self.read_input_from_hdf(subgrp=self.dft_data,
                                                                                 things_to_read=additional_things_to_read)
         #print(self.hdf_file)
         #print('u_total=')
@@ -59,17 +59,17 @@ class SumkGRISB(SumkDFT):
         self.eloc_orig = [{} for icrsh in range(self.n_corr_shells)]
         for icrsh in range(self.n_corr_shells):
             for sp, isp in self.spin_names_to_ind[self.SO].items():
-                self.eloc_orig[icrsh][sp] = cut_small( np.dot( np.dot( self.rot_mat[icrsh], self.Hsumk[icrsh][sp] ), 
+                self.eloc_orig[icrsh][sp] = cut_small( np.dot( np.dot( self.rot_mat[icrsh], self.Hsumk[icrsh][sp] ),
                                                               self.rot_mat[icrsh].conj().T), tol=1e-8)
                 #if self.corr_shells[icrsh]['dim'] == 5:
                 #    self.eloc_orig[icrsh][sp] = np.dot( np.dot( self.u_trans_w90_to_std, self.eloc_orig[icrsh][sp] ), self.u_trans_w90_to_std.conj().T)
-                
-        if mpi.is_master_node():        
+
+        if mpi.is_master_node():
             print('eloc_orig=')
             print(self.eloc_orig)
             print('Hsumk=')
             print(self.Hsumk)
-        
+
         for sp, isp in self.spin_names_to_ind[self.SO].items():
             for ik in mpi.slice_array(ikarray):
                 n_orb = self.n_orbitals[ik, isp]
@@ -88,7 +88,7 @@ class SumkGRISB(SumkDFT):
                     #self.hopping_nloc[ik, isp, index:index+dim,index:index+dim] = hmat - self.eloc_orig[icrsh][sp]
                     #print(self.hopping_nloc[ik,ind,:,:])
                     projmat = self.proj_mat[ik, isp, icrsh, 0:dim, 0:n_orb]
-                    self.hopping_nloc[ik,isp,:,:] -= np.dot( np.dot(projmat.conj().T, self.eloc_orig[icrsh][sp]),projmat) 
+                    self.hopping_nloc[ik,isp,:,:] -= np.dot( np.dot(projmat.conj().T, self.eloc_orig[icrsh][sp]),projmat)
                     self.hopping_nloc[ik,isp,:,:] = cut_small(self.hopping_nloc[ik,isp,:,:], tol=1e-8)
                     index += dim
                 #rotate back to bloch basis
@@ -210,7 +210,7 @@ class SumkGRISB(SumkDFT):
         # mpi reduce:
         for sp, isp in self.spin_names_to_ind[self.SO].items():
             for icrsh in range(self.n_corr_shells):
-                self.Delta[icrsh][sp][:,:] = mpi.all_reduce(self.Delta[icrsh][sp][:,:])           
+                self.Delta[icrsh][sp][:,:] = mpi.all_reduce(self.Delta[icrsh][sp][:,:])
 
     def calc_D(self, R, Lambda):
         '''
@@ -240,14 +240,14 @@ class SumkGRISB(SumkDFT):
                     tmp = self.bz_weights[ik]*np.dot(np.dot(MMat, R_full.conj().T) , self.rhoks_full[sp][ik,:,:].T)
                     sum_ek_Rdagger_rhoks[:,:] += tmp[indx_phy:indx_phy+dim_phy,indx_qp:indx_qp+dim_qp]
                 sqrt_Delta=funcMat(self.Delta[icrsh][sp], denR)
-                self.D[icrsh][sp] = sqrt_Delta.dot(np.transpose(sum_ek_Rdagger_rhoks)) 
+                self.D[icrsh][sp] = sqrt_Delta.dot(np.transpose(sum_ek_Rdagger_rhoks))
                 self.D[icrsh][sp] = cut_small( self.D[icrsh][sp], tol=1e-8)
             indx_qp += dim_qp
             indx_phy += dim_phy
         # mpi reduce:
         for sp, isp in self.spin_names_to_ind[self.SO].items():
             for icrsh in range(self.n_corr_shells):
-                self.D[icrsh][sp][:,:] = mpi.all_reduce(self.D[icrsh][sp])  
+                self.D[icrsh][sp][:,:] = mpi.all_reduce(self.D[icrsh][sp])
 
     def calc_Lambdac(self, R, Lambda):
         '''
@@ -256,7 +256,7 @@ class SumkGRISB(SumkDFT):
         self.Lambdac = [{} for icrsh in range(self.n_corr_shells)]
         for icrsh in range(self.n_corr_shells):
             for sp, isp in self.spin_names_to_ind[self.SO].items():
-                self.Lambdac[icrsh][sp] = self.calc_Lambdac_icrsh_isp(R[icrsh][sp], Lambda[icrsh][sp], 
+                self.Lambdac[icrsh][sp] = self.calc_Lambdac_icrsh_isp(R[icrsh][sp], Lambda[icrsh][sp],
                                         self.Delta[icrsh][sp], self.D[icrsh][sp], self.H_list[icrsh][sp])
                 self.Lambdac[icrsh][sp] = cut_small(self.Lambdac[icrsh][sp], tol=1e-8)
 
@@ -267,7 +267,7 @@ class SumkGRISB(SumkDFT):
         Lambda = [{} for icrsh in range(self.n_corr_shells)]
         for icrsh in range(self.n_corr_shells):
             for sp, isp in self.spin_names_to_ind[self.SO].items():
-                Lambda[icrsh][sp] = self.calc_Lambda_icrsh_isp(R[icrsh][sp], Lambdac[icrsh][sp], 
+                Lambda[icrsh][sp] = self.calc_Lambda_icrsh_isp(R[icrsh][sp], Lambdac[icrsh][sp],
                                         self.Delta[icrsh][sp], self.D[icrsh][sp], self.H_list[icrsh][sp])
                 Lambda[icrsh][sp] = cut_small(Lambda[icrsh][sp], tol=1e-8)
         return Lambda
@@ -288,10 +288,10 @@ class SumkGRISB(SumkDFT):
             lc[k]=-l[k]-(tt+numpy.conjugate(tt)).real
         Lambda_c=realHcombination(lc,H_list)
         return Lambda_c
-   
-    @staticmethod 
+
+    @staticmethod
     def calc_Lambda_icrsh_isp(R, Lambda_c, Delta_p, D, H_list):
-        """ Compute Lambda matrix for a specific shell icrsh and spin isp 
+        """ Compute Lambda matrix for a specific shell icrsh and spin isp
         """
         no = Lambda_c.shape[0]
         lc=inverse_realHcombination(Lambda_c,H_list)
@@ -320,11 +320,11 @@ class SumkGRISB(SumkDFT):
                      Only relevant for real-frequency GF.
         max_loops : int, optional
                     Number of dichotomy loops maximally performed.
-        
+
         method : string, optional
                     Type of optimization used:
                         * dichotomy: usual bisection algorithm from the TRIQS library
-                        * newton: newton method, faster convergence but more unstable 
+                        * newton: newton method, faster convergence but more unstable
                         * brent: finds bounds and proceeds with hyperbolic brent method, a compromise between speed and ensuring convergence
         beta : float, optional, default = broadening
                 when using MeshReFreq this determines the temperature for the Fermi function
@@ -388,7 +388,7 @@ class SumkGRISB(SumkDFT):
         def F_optimize(mu):
 
             mpi.report("Trying out mu = {}".format(str(mu)))
-            calc_dens = self.total_density_grisb(R, Lambda, beta, mu=mu, broadening=broadening).real - density 
+            calc_dens = self.total_density_grisb(R, Lambda, beta, mu=mu, broadening=broadening).real - density
             mpi.report(f"Target density = {density}; Delta to target = {calc_dens}")
             return calc_dens
 
@@ -429,7 +429,7 @@ class SumkGRISB(SumkDFT):
                 """
                     Please check for typos or select one of the following:
                         * dichotomy: usual bisection algorithm from the TRIQS library
-                        * newton: newton method, fastest convergence but more unstable 
+                        * newton: newton method, fastest convergence but more unstable
                         * brent: finds bounds and proceeds with hyperbolic brent method, a compromise between speed and ensuring convergence
                     """
             )
@@ -464,8 +464,8 @@ class SumkGRISB(SumkDFT):
                    DFT code to write the density correction for. Options:
                    'vasp', 'wien2k', 'elk' or 'qe'. Needs to be set for 'qe'
         spinave : logical
-                   Elk specific and for magnetic calculations in DMFT only. 
-                   It averages the spin to keep the DFT part non-magnetic.            
+                   Elk specific and for magnetic calculations in DMFT only.
+                   It averages the spin to keep the DFT part non-magnetic.
         kpts_to_write : iterable of int
                    Indices of k points that are written to file. If None (default),
                    all k points are written. Only implemented for dm_type 'vasp'
@@ -561,7 +561,7 @@ class SumkGRISB(SumkDFT):
                     nb = self.n_orbitals[ik, ntoi[sp]]
                     diag_inds = np.diag_indices(nb)
                     deltaN[sp][ik][diag_inds] -= dens_mat_dft[sp][ik][:nb]
-            
+
                     if self.charge_mixing and self.deltaNOld is not None:
                         G2 = np.sum(self.kpts_cart[ik,:]**2)
                         # Kerker mixing
@@ -684,7 +684,7 @@ class SumkGRISB(SumkDFT):
         r"""
         Calculates the Quasiparticle lattice Green function for a given k-point from the DFT Hamiltonian and the self energy.
         Currently only consider a single correlated shell and no ghost orbital.
-        
+
         Parameters
         ----------
         ik : integer
@@ -786,13 +786,13 @@ class SumkGRISB(SumkDFT):
 
             if isinstance(mesh, MeshImFreq):
                 gf.data[:, :, :] = (idmat * (mesh_values[:, None, None] + mu) #+ self.h_field*(1-2*ibl))
-                                    - np.dot(R_full, np.dot(MMat, R_full.conj().T ) ) 
-                                    - Lambda_full ) 
+                                    - np.dot(R_full, np.dot(MMat, R_full.conj().T ) )
+                                    - Lambda_full )
             else:
                 gf.data[:, :, :] = (idmat *
                                     (mesh_values[:, None, None] + mu + 1j*broadening)# + self.h_field*(1-2*ibl)
-                                    - np.dot(R_full, np.dot(MMat, R_full.conj().T ) ) 
-                                    - Lambda_full ) 
+                                    - np.dot(R_full, np.dot(MMat, R_full.conj().T ) )
+                                    - Lambda_full )
             #for icrsh in range(self.n_corr_shells):
             #    dim = self.corr_shells[icrsh]['dim']
             #    MMat = self.hopping[
@@ -801,19 +801,19 @@ class SumkGRISB(SumkDFT):
             #    #MMatproj_nloc = np.dot(np.dot(projmat, MMat), projmat.conjugate().transpose()) - self.Hsumk[icrsh][sp]
             #    if isinstance(mesh, MeshImFreq):
             #        gf.data[:, :, :] = (idmat[ibl] * (mesh_values[:, None, None] + mu) #+ self.h_field*(1-2*ibl))
-            #                            - np.dot(R[icrsh][sp], np.dot(MMatproj_nloc, R[icrsh][sp].conj().T ) ) 
-            #                            - Lambda[icrsh][sp] ) 
+            #                            - np.dot(R[icrsh][sp], np.dot(MMatproj_nloc, R[icrsh][sp].conj().T ) )
+            #                            - Lambda[icrsh][sp] )
             #    else:
             #        gf.data[:, :, :] = (idmat[ibl] *
             #                            (mesh_values[:, None, None] + mu + 1j*broadening)# + self.h_field*(1-2*ibl)
-            #                            - np.dot(R[icrsh][sp], np.dot(MMatproj_nloc, R[icrsh][sp].conj().T ) ) 
-            #                            - Lambda[icrsh][sp] ) 
+            #                            - np.dot(R[icrsh][sp], np.dot(MMatproj_nloc, R[icrsh][sp].conj().T ) )
+            #                            - Lambda[icrsh][sp] )
 
         G_latt_qp.invert()
         self.G_latt_qp = G_latt_qp
 
         return G_latt_qp
-    
+
     def extract_G_phy(self, R, Lambda, mu=None, broadening=None, mesh=None, show_warnings=True):
         r"""
         Extracts the local downfolded Green function by the Brillouin-zone integration of the lattice Green's function.

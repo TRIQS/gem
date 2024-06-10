@@ -20,7 +20,7 @@ import numpy as np
 from triqs.gf import *
 import triqs.utility.mpi as mpi
 from h5.formats import register_class
-from .utils import *
+from .utility.utils import *
 
 
 class LatticeSolver(object):

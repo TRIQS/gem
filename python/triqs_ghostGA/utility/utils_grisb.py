@@ -1,5 +1,5 @@
 import numpy as np
-from triqs_ghostGA.utils_TH import denR, denRm1, ddenRm1, realHcombination, inverse_realHcombination, \
+from triqs_ghostGA.utility.utils_TH import denR, denRm1, ddenRm1, realHcombination, inverse_realHcombination, \
      Hermitian_list, get_blocks, funcMat, calc_nf, dF
 
 def calc_rhoks(R, Lambda, eks, T):

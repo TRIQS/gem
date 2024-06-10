@@ -4,7 +4,8 @@ import unittest
 
 from triqs_ghostGA import LatticeSolver
 from triqs_ghostGA.grisb import *
-from triqs_ghostGA.utils_TH import get_semicircle_e_list, U_matrix_kanamori
+from triqs_ghostGA.utility.utils_TH import U_matrix_kanamori
+from triqs_ghostGA.utility.e_list import EList_SemiCircular
 from h5 import *
 import numpy as np
 from triqs.utility import mpi
