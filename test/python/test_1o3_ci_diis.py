@@ -6,15 +6,10 @@ from triqs_ghostGA import LatticeSolver
 from triqs_ghostGA.grisb import *
 from triqs_ghostGA.utility.utils_TH import U_matrix_kanamori
 from triqs_ghostGA.utility.e_list import EList_SemiCircular
-# from triqs.operators.util import U_matrix_kanamori as Umk
 from h5 import *
 import numpy as np
-# from triqs.utility import mpi
-# from triqs.lattice.tight_binding import TBLattice
-# from triqs.gf import *
-# from triqs.lattice import *
-# from triqs.operators import *
 from triqs_ghostGA.ci import CI
+import os
 
 
 class test_hemb_ci_1o3(unittest.TestCase):
@@ -59,7 +54,7 @@ class test_hemb_ci_1o3(unittest.TestCase):
                   silence=True, spin_pen=0.05, diis=True)
 
         name = "1o3_ci_diis"
-        with HDFArchive("result_tests.h5", "r") as A:
+        with HDFArchive(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "r") as A:
 
             print("Compare docc")
             np.testing.assert_allclose(grisb.docc, A[name]["docc"], atol=1e-3)
