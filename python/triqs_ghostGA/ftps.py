@@ -34,14 +34,14 @@ class FTPS(object):
         self.E["dn"] = H1E[1::2,1::2]
 
         # Hybridization matrix
-        self.W = {"up": np.zeros((self.nimp//2, self.nbath//2)),    ##was self.nbath//self.nimp ##but this is not general
-                  "dn": np.zeros((self.nimp//2, self.nbath//2))}
+        self.W = {"up": np.zeros((self.nimp//2, self.nbath//2), dtype=np.complex128),    ##was self.nbath//self.nimp ##but this is not general
+                  "dn": np.zeros((self.nimp//2, self.nbath//2), dtype=np.complex128)}
         self.W["up"][:,:] = D[::2,::2].conj().T
         self.W["dn"][:,:] = D[1::2,1::2].conj().T
 
         # Bath parameters
-        self.B = {"up": np.zeros((self.nbath//self.nimp, self.nbath//self.nimp)),
-                  "dn": np.zeros((self.nbath//self.nimp, self.nbath//self.nimp))}
+        self.B = {"up": np.zeros((self.nbath//self.nimp, self.nbath//self.nimp), dtype=np.complex128),
+                  "dn": np.zeros((self.nbath//self.nimp, self.nbath//self.nimp), dtype=np.complex128)}
         self.B["up"][:,:] = -LAMBDA[::2,::2]
         self.B["dn"][:,:] = -LAMBDA[1::2,1::2]
 
