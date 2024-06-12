@@ -47,7 +47,7 @@ if __name__ == "__main__":
     eloc = promote_to_spinful(eloc_spinless, eloc_spinless)
     print(eloc)
 
-    e_list = get_semicircle_e_list(nmesh=5000)
+    e_list = EList_SemiCircular(nmesh=5000).e_list
     eks = []
     for e in e_list:
         tmp = np.array(e*np.eye(nimp//2), dtype=np.complex128)
