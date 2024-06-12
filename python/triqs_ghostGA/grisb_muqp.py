@@ -209,7 +209,7 @@ class Grisb_muqp(Grisb):
                 fh5['Lambda_%d'% it] = self.Lambda
                 fh5['eks'] = self.eks
                 fh5['Utensor'] = self.Utensor
-                fh5['mu'] = mu
+                fh5['mu'] = self.mu
 
             if not silence:
                 print("R_new=")
