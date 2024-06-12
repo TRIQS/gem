@@ -4,7 +4,7 @@ import triqs.utility.mpi as mpi
 from triqs.gf import Gf, make_hermitian, MeshReFreq, MeshImFreq
 from triqs.gf.tools import inverse
 from triqs_ghostGA.sumk_grisb import SumkGRISB
-from triqs_ghostGA.utils_TH import calc_nf
+from triqs_ghostGA.utility.utils_TH import calc_nf
 from triqs.plot.mpl_interface import oplot
 from h5 import HDFArchive
 from copy import deepcopy
