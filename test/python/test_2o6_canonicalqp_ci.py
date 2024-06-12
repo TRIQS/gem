@@ -9,6 +9,7 @@ from triqs_ghostGA.utility.e_list import EList_SemiCircular
 import numpy as np
 from triqs_ghostGA.version import *
 from triqs_ghostGA.ci import CI
+import os
 
 
 class test_hemb_2o6_canonical_qp_ci(unittest.TestCase):
@@ -53,10 +54,10 @@ class test_hemb_2o6_canonical_qp_ci(unittest.TestCase):
 
         edsolver=CI(ntot, use_Ntot=True, use_Sz=True, dtype=np.complex128)
         grisb = Grisb_muqp(ntot, nimp, nbath, eks, eloc, Utensor, R=R0, Lambda=Lambda0, edsolver=edsolver)
-        grisb.run(mu0=0, nfix=nfix, itmax=100, mix=1, tol=1e-5, beta=500, silence=True, spin_pen=0.10, canonical=True)
+        grisb.run(mu0=0, nfix=nfix, itmax=100, mix=1, tol=1e-5, beta=500, silence=True, spin_pen=0.10, canonical=True, dmu=1)
 
         name = "2o6_canonicalqp_ci"
-        with HDFArchive("result_tests.h5", "r") as A:
+        with HDFArchive(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "r") as A:
 
             print("Compare docc")
             np.testing.assert_allclose(grisb.docc, A[name]["docc"], atol=1e-3)

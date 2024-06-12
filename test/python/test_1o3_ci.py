@@ -8,6 +8,7 @@ from triqs_ghostGA.utility.utils_TH import U_matrix_kanamori
 from triqs_ghostGA.utility.e_list import EList_SemiCircular
 import numpy as np
 from triqs_ghostGA.ci import CI
+import os
 
 
 class test_hemb_ci_1o3(unittest.TestCase):
@@ -52,7 +53,9 @@ class test_hemb_ci_1o3(unittest.TestCase):
                   silence=True, spin_pen=0.05)
 
         name = "1o3_ci"
-        with HDFArchive("result_tests.h5", "r") as A:
+
+
+        with HDFArchive(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "r") as A:
 
             print("Compare docc")
             np.testing.assert_allclose(grisb.docc, A[name]["docc"], atol=1e-3)

@@ -9,6 +9,7 @@ from triqs_ghostGA.utility.e_list import EList_SemiCircular
 import numpy as np
 from triqs_ghostGA.version import *
 from triqs_ghostGA.ftps import FTPS
+import os
 
 
 class test_hemb_1o3_ftps(unittest.TestCase):
@@ -52,7 +53,7 @@ class test_hemb_1o3_ftps(unittest.TestCase):
                   silence=True, spin_pen=0.1)
 
         name = "1o3_ftps"
-        with HDFArchive("result_tests.h5", "r") as A:
+        with HDFArchive(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "r") as A:
             print("Compare denMat")
             ref_denM_eval, ref_denM_evec = np.linalg.eig(A[name]["denMat"])
             idx = ref_denM_eval.argsort()[::-1]
