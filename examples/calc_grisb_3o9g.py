@@ -1,6 +1,6 @@
 #######################################################
 # Example for the degenerate two-orbital Hubbard model
-# Author: Tsung-Han Lee 
+# Author: Tsung-Han Lee
 # Email: henhans74716@gmail.com
 #######################################################
 import unittest
@@ -16,8 +16,9 @@ class TestGrisb(unittest.TestCase):
         nimp = 6
         nbath= 18
         mu=5
-        # construct ek with semicircular DOS 
-        e_list = get_semicircle_e_list(nmesh=5000) 
+
+        # construct ek with semicircular DOS
+        e_list = EList_SemiCircular(nmesh=5000).e_list
         eks = []
         for e in e_list:
             tmp = e*np.eye(nimp//2,dtype=np.complex_)
@@ -28,9 +29,9 @@ class TestGrisb(unittest.TestCase):
         R0 = np.random.rand(nbath//2,nimp//2)
         R0 = np.kron(R0,np.eye(2))
         Lambda0 = np.zeros((nbath//2,nbath//2))
-        Lambda0[0, 0], Lambda0[1, 1], Lambda0[2, 2] = -3.0, -3.0, -3.0                    
-        Lambda0[3, 3], Lambda0[4, 4], Lambda0[5, 5] = 0.0, 0.0, 0.0                    
-        Lambda0[6, 6], Lambda0[7, 7], Lambda0[8, 8] = 3.0, 3.0, 3.0   
+        Lambda0[0, 0], Lambda0[1, 1], Lambda0[2, 2] = -3.0, -3.0, -3.0
+        Lambda0[3, 3], Lambda0[4, 4], Lambda0[5, 5] = 0.0, 0.0, 0.0
+        Lambda0[6, 6], Lambda0[7, 7], Lambda0[8, 8] = 3.0, 3.0, 3.0
         Lambda0 = np.kron(Lambda0,np.eye(2))
 
         U = 12.0
