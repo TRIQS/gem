@@ -2,14 +2,44 @@ import numpy as np
 from triqs_ghostGA.utility.utils_TH import denR, denRm1, ddenRm1, realHcombination, inverse_realHcombination, \
      Hermitian_list, get_blocks, funcMat, calc_nf, dF
 
-def calc_rhoks(R, Lambda, eks, T):
-    return [calc_nf( np.dot(R, np.dot(x, R.conj().T ) ) + Lambda ,T).T for x in eks]
+#########################################
+
+def calc_rhoks(R, Lambda, eks, T, mu=0):
+    r"""Calculate rho_ks, an object that contains elements necessary to compute Delta_p and D.
+    It is given as
+
+    .. math::
+        \rho_k = f(R \ \epsilon_k \ R^\dagger + \lambda - \mu, T)^T
+
+    where :math:`f` is the Fermi-Dirac function, :math:`R, Lambda` are objects used in the ghostGA formalism,
+    :math:`\epsilon_k` is the non-interacting dispersion, :math:`T` is the temperature (necessary for the Fermi-Dirac function)
+    and :math:`\mu` is the chemical potential.
+
+    Now there is an additional transpose here, that is necessary in the equation later but can be performed here already.
+
+    The resulting object is an array of the length of the number of k-points, where each element is a matrix with the shape of Lambda.
+    """
+
+    return [calc_nf( np.dot(R, np.dot(x, R.conj().T ) ) + Lambda - mu*np.eye(Lambda.shape[0]), T).T for x in eks]
+
+#########################################
 
 def calc_Delta_p(rhok_list):
+    r"""Calculate Delta_p from the list of rho_ks. Delta is given by
+
+    .. math::
+        \Delta_{ab} = \frac{1}{N_k} \sum_k [ \rho_k^T ]_{ab}.
+    """
+
     return sum(rhok_list)/len(rhok_list)
 
+#########################################
+
 def calc_D(R, Lambda, Delta_p, eks, rhoks):
-    """ Compute D matrix
+    r"""Compute the D matrix, which is given by
+
+    .. math::
+        D_{d \alpha} = \frac{1}{N_k} \sum_k ([ \Delta ( 1 - \Delta ) ]^{-1/2} ] [ \rho_k^T R^* \epsilon_k^T ]_{d \alpha}
     """
     Left=[np.dot( np.dot(eks[x], R.conj().T ), rhoks[x].T ) for x in range(len(rhoks))]
     Left=sum(Left)/float(len(rhoks))
