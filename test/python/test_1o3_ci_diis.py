@@ -70,7 +70,7 @@ class test_hemb_ci_1o3(unittest.TestCase):
 
             np.testing.assert_allclose(test_denM_eval, ref_denM_eval, atol=1e-3)
 
-        # with HDFArchive("result_tests.h5", "a") as A:
+        # with HDFArchive("os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "a") as A:
         #     tmp_dir = {
         #         'docc': grisb.docc,
         #         'denMat': grisb.denMat,

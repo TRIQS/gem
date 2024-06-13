@@ -54,7 +54,7 @@ class test_hemb_2o6_ci(unittest.TestCase):
 
         edsolver=CI(ntot, use_Ntot=True, use_Sz=True, dtype=np.complex128)
         grisb = Grisb(ntot, nimp, nbath, eks, eloc, Utensor, R=R0, Lambda=Lambda0, edsolver=edsolver)
-        mu = grisb.run_canonical(mu0=0.0, nfix=nfix, itmax=100, mix=1, tol=1e-5, beta=500, silence=True, spin_pen=0.10)
+        mu = grisb.run(mu0=0.0, nfix=nfix, itmax=100, mix=1, tol=1e-5, beta=500, silence=True, spin_pen=0.10)
 
         name = "2o6_canonical_ci"
         with HDFArchive(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "r") as A:
