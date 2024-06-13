@@ -110,6 +110,7 @@ class Grisb(object):
     def solve_embedding(self, mu, num_eig, ed_verbose, spin_pen, sz_pen=0.0):
         """ Solve embedding problem using a variety of impurity solver
         """
+
         fh5 = h5py.File('hemb_test%s.h5' % self.suff,'w')
         fh5['eloc'] = self.eloc
         fh5['D'] = self.D
@@ -117,32 +118,28 @@ class Grisb(object):
         fh5['Utensor'] = self.Utensor
         fh5['mu'] = mu
         fh5.close()
-        #print('Lambda_c=')
-        #print(self.Lambda_c)
-        #print('mu=',mu)
-        #print('eloc=')
-        #print(self.eloc)
+
         if self.edsolver.type == "CI":
             h1e = self.build_h1e(mu)
-            #print('h1e=')
-            #print(h1e)
-            #print('spin_pen=',spin_pen)
             self.edsolver.build_Hemb(h1e, self.Utensor, spin_pen=spin_pen, sz_pen=sz_pen)
+
         elif self.edsolver.type == "FTPS":
             self.edsolver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor, spin_pen=spin_pen)
+
         elif self.edsolver.type == "ITensorMPSSolver":
             self.edsolver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor, spin_pen=spin_pen)
-            #self.edsolver.schedule=[]
-            #self.edsolver.make_schedule()
-            #self.edsolver.set_tolerances(("E","rho"),(1e-5,5e-3))
+
         elif self.edsolver.type == "PySCFCCSD":
             self.edsolver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor, spin_pen=spin_pen)
+
         elif self.edsolver.type == "Block2NSZ":
             self.edsolver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor, spin_pen=spin_pen)
+
         else:
             raise ValueError("only Full ED, CI, and HCI are supported")
             # TODO: Replace whole if-clause by edsolver.prolog(self) implemented by
             # Solver(AbstractSolver)
+
         self.edsolver.solve_Hemb(num_eig=num_eig, verbose=ed_verbose )
         self.denMat = self.edsolver.calc_density_matrix()
         self.E2loc = self.edsolver.compute_E2loc()

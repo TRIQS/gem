@@ -147,25 +147,25 @@ def calc_Lambda(R, Lambda_c, Delta_p, D, H_list):
 #     Lambda = np.kron(realHcombination(result.x, Hspin_list),np.eye(2))
 #     return Lambda
 #
-# def svd_truncate_R(R, eps=0.5):
-#     "perform SVD truncation for the singular value of R greater than 1 and smaller than a threshold eps"
-#
-#     from scipy.linalg import svd
-#     try:
-#         u, s, vh = svd(R)
-#     except ValueError:
-#         print("R")
-#         print(R)
-#         raise
-#
-#     print('singular values of R:', s)
-#     sp = np.zeros(R.shape, dtype=s.dtype)
-#     for i,si in enumerate(s):
-#         if si > 1.0:
-#             sp[i,i] = 1.0
-#         elif si < (1.0 - eps):
-#             sp[i,i] = (1.0 - eps)
-#         else:
-#             sp[i,i] = si
-#     Rp = u @ sp @ vh
-#     return Rp
+def svd_truncate_R(R, eps=0.5):
+    "perform SVD truncation for the singular value of R greater than 1 and smaller than a threshold eps"
+
+    from scipy.linalg import svd
+    try:
+        u, s, vh = svd(R)
+    except ValueError:
+        print("R")
+        print(R)
+        raise
+
+    print('singular values of R:', s)
+    sp = np.zeros(R.shape, dtype=s.dtype)
+    for i,si in enumerate(s):
+        if si > 1.0:
+            sp[i,i] = 1.0
+        elif si < (1.0 - eps):
+            sp[i,i] = (1.0 - eps)
+        else:
+            sp[i,i] = si
+    Rp = u @ sp @ vh
+    return Rp
