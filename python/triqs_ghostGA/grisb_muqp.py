@@ -1,52 +1,6 @@
 from triqs_ghostGA.grisb import *
 from triqs_ghostGA.utility.utils_grisb import calc_rhoks, calc_Delta_p, calc_D, calc_Lambda_c, calc_Lambda
 
-# def calc_rhoks(R, Lambda, eks, T, mu):
-#     return [calc_nf( np.dot(R, np.dot(x , R.conj().T ) ) + Lambda - mu*np.eye(Lambda.shape[0]), T).T for x in eks]
-#
-# def calc_Delta_p(rhok_list):
-#     return sum(rhok_list)/len(rhok_list)
-#
-# def calc_D(R, Lambda, Delta_p, eks, rhoks):
-#     """ Compute D matrix
-#     """
-#     Left=[np.dot( np.dot(eks[x], R.conj().T ), rhoks[x].T ) for x in range(len(rhoks))]
-#     Left=sum(Left)/float(len(rhoks))
-#     Right=funcMat(Delta_p, denR)
-#     return np.dot(Right,np.transpose(Left))
-#
-# def calc_Lambda_c(R, Lambda, Delta_p, D, H_list):
-#     """ Compute Lambda_c matrix
-#     """
-#     no = Lambda.shape[0]
-#     l=inverse_realHcombination(Lambda,H_list)
-#     lc=np.copy(l)*0.0
-#     MM=np.dot(D,np.transpose(R))
-#     for k in range(len(H_list)):
-#         AA=Delta_p
-#         HH=H_list[k].T
-#         derivative=dF(AA,HH, denRm1, ddenRm1)
-#         tt=np.trace(np.dot(MM,derivative))
-#         lc[k]=-l[k]-(tt+np.conjugate(tt)).real
-#     Lambda_c=realHcombination(lc,H_list)
-#     return Lambda_c
-#
-# def calc_Lambda(R, Lambda_c, Delta_p, D, H_list):
-#     """ Compute Lambda_c matrix
-#     """
-#     no = Lambda_c.shape[0]
-#     lc=inverse_realHcombination(Lambda_c,H_list)
-#     l=np.copy(lc)*0.0
-#     MM=np.dot(D,np.transpose(R))
-#     for k in range(len(H_list)):
-#         AA=Delta_p
-#         HH=H_list[k].T
-#         derivative=dF(AA,HH, denRm1, ddenRm1)
-#         tt=np.trace(np.dot(MM,derivative))
-#         l[k]=-lc[k]-(tt+np.conjugate(tt)).real
-#     Lambda=realHcombination(l,H_list)
-#     return Lambda
-
 def cost_function(x, *args):
     ''' Cost function for find Lambda
     '''
@@ -56,18 +10,8 @@ def cost_function(x, *args):
     diff = np.trace(Delta_p) - nfix_qp
     return diff.real
 
-# def find_mu(mu0, R, Lambda, eks, nfix_qp, beta, dmu=0.05, mu_tol=0.001):
-#     """ Find Lambda for given ffdagger
-#     """
-#     print('nfix_qp=',nfix_qp)
-#     args = (R, Lambda, eks, nfix_qp, beta)
-#     sols = scipy.optimize.root_scalar(cost_function,x0=mu0-dmu,x1=mu0+dmu,args=args,method='secant',xtol=mu_tol)
-#     mu = sols.root
-#     print('root solver for mu converged? ',sols.converged, 'mu=',mu)
-#     return mu
-
 def find_mu(mu0, R, Lambda, eks, nfix_qp, beta, dmu=1.0, mu_tol=0.00001):
-    """ Find Lambda for given ffdagger
+    """ Find chemical potential for given ffdagger
     """
     print('nfix_qp=',nfix_qp)
     args = (R, Lambda, eks, nfix_qp, beta)
