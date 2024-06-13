@@ -54,7 +54,7 @@ class test_hemb_1o3_ci(unittest.TestCase):
 
         edsolver=CI(ntot, use_Ntot=True, use_Sz=True, dtype=np.complex128)
         grisb = Grisb(ntot, nimp, nbath, eks, eloc, Utensor, R=R0, Lambda=Lambda0, edsolver=edsolver)
-        mu = grisb.run_canonical(mu0=-0.2, nfix=nfix, itmax=100, mix=1, tol=1e-5, beta=500, silence=True, spin_pen=0.0, mu_tol=0.001)
+        grisb.run(mu0=-0.2, nfix=nfix, itmax=100, mix=1, tol=1e-5, beta=500, silence=True, spin_pen=0.0, mu_tol=1e-8)
 
         name = "1o3_canonical_ci"
         with HDFArchive(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "r") as A:
@@ -76,11 +76,11 @@ class test_hemb_1o3_ci(unittest.TestCase):
             print("Compare mu")
             np.testing.assert_allclose(mu, A[name]["mu"], atol=1e-2)
 
-        # with HDFArchive("result_tests.h5", "a") as A:
+        # with HDFArchive(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "a") as A:
         #     tmp_dir = {
         #         'docc': grisb.docc,
         #         'denMat': grisb.denMat,
-        #         'mu': mu,
+        #         'mu': grisb.mu,
         #     }
         #     A[name] = tmp_dir
 
