@@ -13,10 +13,11 @@ def cost_function(x, *args):
 def find_mu(mu0, R, Lambda, eks, nfix_qp, beta, dmu=1.0, mu_tol=0.00001):
     """ Find chemical potential for given ffdagger
     """
-    print('nfix_qp=',nfix_qp)
+    print('# Optimizing chemical potential: target is nfix_qp = ', nfix_qp)
     args = (R, Lambda, eks, nfix_qp, beta)
     mu = scipy.optimize.bisect(cost_function,mu0-dmu,mu0+dmu,args=args,xtol=mu_tol)
-    print('mu=',mu)
+    print('# Optimal chemical potential: mu = ',mu)
+    print()
     return mu
 
 class Grisb_muqp(Grisb):
@@ -59,12 +60,17 @@ class Grisb_muqp(Grisb):
     def compute_energy(self,beta=200.,mu=0.0):
         """ Compute total energy, kinetic energy, and potential energy
         """
+
+        ###FIXME: Understand how the partitioning here is meant?
+        #self.ekin = [np.sum(self.R.dot( self.eks[x] ).dot( self.R.conj().T )*self.rhok_list[x].T ) for x in range(len(self.rhok_list))]
+        #self.ekin = sum(self.ekin)/float(len(self.rhok_list))
         self.ekin = sum([np.sum( ( np.dot(self.R, np.dot(x, self.R.conj().T )) ) * \
                     calc_nf( np.dot(self.R, np.dot(x, self.R.conj().T) ) + self.Lambda - mu*np.eye(self.Lambda.shape[0]), 1./beta).T ) for x in self.eks] )/float(len(self.eks))
         self.epot = self.E2loc + np.trace(self.eloc.dot(self.denMat[:self.nimp,:self.nimp].T))
         self.etot = self.ekin + self.epot - mu*self.nfill
 
-    def run(self, mu0=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., silence=True, spin_pen=0.0, idx=0, num_eig=2, ed_verbose=0, diis=False, canonical=False, nfix=None, dmu=0.001, mu_tol=0.001):
+
+    def run(self, mu0=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., silence=True, spin_pen=0.0, sz_pen=0.0, idx=0, num_eig=2, ed_verbose=0, diis=False, nfix=None, dmu=0.001, mu_tol=0.001):
         """ Run ghost-RISB self-consistency
 
         :param itmax: Maxiumum iteraction for self-consistency.
@@ -86,26 +92,40 @@ class Grisb_muqp(Grisb):
         :type idx: int
 
         """
-        print("mu0 = ", mu0)
+
+        print("########## STARTING THE GHOST-GA LOOP ##########")
+
         self.mu = mu0
         self.diff = 1e20
+
         if diis is True:
             #RDIIS = DIIS(7)
             LDIIS = DIIS(7)
             numNonDIIS = 4
         for it in range(itmax):
-            # compute qp density matrix
-            if canonical:
-                if it > 4 or self.mu == 0:
+
+            print("### Iteration %d" % it)
+
+            # If number of electron is fixed, recalculate chemical potential to get the right number of electrons
+            if nfix is not None:
+                # Sometimes you want to start from a given chemical potential
+                if it > 1 and self.mu == 0:
+                    # Target number of particle in the embedded space
                     nfix_qp = (self.nbath - self.nimp)/2 + nfix
+                    # Optimize to find chemical potential mu
                     self.mu = find_mu(self.mu, self.R, self.Lambda, self.eks, nfix_qp, beta, dmu=dmu, mu_tol=mu_tol)
                 else:
                     print("Initial chemical potential: ", self.mu)
+                    print()
 
-            self.rhok_list=calc_rhoks(self.R, self.Lambda, self.eks, 1./beta, self.mu)
-            self.Delta_p=calc_Delta_p(self.rhok_list)
-            self.D=calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
-            self.Lambda_c=calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list)
+            # From Lambda and R, calculate Delta_p, D and Lambda_c
+            print("# With Lambda and R, compute Delta_p, D and Lambda_c")
+            self.rhok_list = calc_rhoks(self.R, self.Lambda, self.eks, 1./beta, self.mu)
+            self.Delta_p = calc_Delta_p(self.rhok_list)
+            self.D = calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
+            self.Lambda_c = calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list)
+
+            # TODO: Nicer print and options for verbose
             if not silence:
                 if self.spin_sym:
                     print("Delta_p=")
@@ -121,8 +141,10 @@ class Grisb_muqp(Grisb):
                     print(self.D[:,:])
                     print("Lambda_c=")
                     print(self.Lambda_c[:,:])
+            sys.stdout.flush()
+
             # ED solvers
-            self.solve_embedding(0.0, num_eig, ed_verbose, spin_pen)
+            self.solve_embedding(mu, num_eig, ed_verbose, spin_pen, sz_pen)
             #Update R and Update Lambda
             cdaggerf = self.denMat[:self.nimp,self.nimp:]
             ffdagger = self.denMat[self.nimp:,self.nimp:]
