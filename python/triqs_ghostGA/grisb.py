@@ -10,21 +10,31 @@ from h5 import *
 from triqs_ghostGA.utility.utils_grisb import calc_rhoks, calc_Delta_p, calc_D, calc_Lambda_c, calc_Lambda
 import sys
 
-def cost_function(x, *args):
+def occupation_vs_mu(mu, *args):
     ''' Cost function for find Lambda
     '''
-    R, Lambda, eks, nfix_qp, beta = args
-    rhok_list=calc_rhoks(R, Lambda, eks, 1./beta, x)
+    R, Lambda, eks, beta = args
+    rhok_list=calc_rhoks(R, Lambda, eks, 1./beta, mu)
     Delta_p=calc_Delta_p(rhok_list)
-    diff = np.trace(Delta_p) - nfix_qp
-    return diff.real
+    return np.trace(Delta_p).real
 
-def find_mu(mu0, R, Lambda, eks, nfix_qp, beta, dmu=1.0, mu_tol=0.00001):
+def find_mu(mu0, R, Lambda, eks, nfix_qp, beta, dmu=0.1, mu_tol=1e-8):
     """ Find chemical potential for given ffdagger
     """
     print('# Optimizing chemical potential: target is nfix_qp = ', nfix_qp)
-    args = (R, Lambda, eks, nfix_qp, beta)
-    mu = scipy.optimize.bisect(cost_function,mu0-dmu,mu0+dmu,args=args,xtol=mu_tol)
+    args = (R, Lambda, eks, beta)
+    coeff_dmu = 1
+
+    def cost_function_mu(mu, *args):
+        return occupation_vs_mu(mu, *args) - nfix_qp
+
+    while (True):
+        try:
+            mu = scipy.optimize.bisect(cost_function_mu, mu0-coeff_dmu*dmu, mu0+coeff_dmu*dmu, args=args, xtol=mu_tol)
+            break
+        except ValueError:
+            coeff_dmu *= 2
+
     print('# Optimal chemical potential: mu = ',mu)
     print()
     return mu
@@ -189,7 +199,7 @@ class Grisb(object):
             timestamp = "%d" % datetime.timestamp(datetime.now())
             A[timestamp] = tmp_dict
 
-    def run(self, mu0=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., silence=True, spin_pen=0.0, sz_pen=0.0, idx=0, num_eig=2, ed_verbose=0, diis=False, nfix=None, dmu=0.1, mu_tol=1e-8):
+    def run(self, mu0=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., silence=True, spin_pen=0.0, sz_pen=0.0, idx=0, num_eig=2, ed_verbose=0, diis=False, nfix=None, dmu=0.1, mu_tol=1e-8, nfix_tol=0.01):
         """ Run ghost-RISB self-consistency
 
         :param itmax: Maxiumum iteraction for self-consistency.
@@ -233,16 +243,21 @@ class Grisb(object):
                 # Sometimes you want to start from a given chemical potential
                 if it > 1:
                     # Target number of particle in the embedded space
+                    # TODO: I don't understand this
                     nfix_qp = (self.nbath - self.nimp)/2 + nfix
                     # Optimize to find chemical potential mu
                     self.mu = find_mu(self.mu, self.R, self.Lambda, self.eks, nfix_qp, beta, dmu=dmu, mu_tol=mu_tol)
 
             # From Lambda and R, calculate Delta_p, D and Lambda_c
             print("# With Lambda and R, compute Delta_p, D and Lambda_c")
-            self.rhok_list = calc_rhoks(self.R, self.Lambda, self.eks, 1./beta, self.mu)
-            self.Delta_p = calc_Delta_p(self.rhok_list)
-            self.D = calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
-            self.Lambda_c = calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list)
+            # self.rhok_list = calc_rhoks(self.R, self.Lambda, self.eks, 1./beta, self.mu)
+            self.rhok_list = np.real(calc_rhoks(self.R, self.Lambda, self.eks, 1./beta, self.mu))
+            # self.Delta_p = calc_Delta_p(self.rhok_list)
+            self.Delta_p = np.real(calc_Delta_p(self.rhok_list))
+            # self.D = calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
+            self.D = np.real(calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list))
+            # self.Lambda_c = calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list)
+            self.Lambda_c = np.real(calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list))
 
             # TODO: Nicer print and options for verbose
             if not silence:
@@ -266,8 +281,8 @@ class Grisb(object):
 
             # With Lambda, R, Delta_p, D and Lambda_c, we have constructed the embedding Hamiltonian.
             # We now solve with the solver passed as an argument.
-
-            # Solve the impurity problem
+            print()
+            print("# Solving the embedding Hamiltonian:")
             self.solve_embedding(self.mu, num_eig, ed_verbose, spin_pen, sz_pen)
 
             # Extract relevant quantities from the density matrix, such as Delta_p
@@ -279,21 +294,25 @@ class Grisb(object):
                 print("norm(ffdagger.T-Delta_p)=", np.linalg.norm(ffdagger.T-self.Delta_p))
                 print("new Delta_p =", ffdagger.T)
                 print()
-            self.Delta_p = ffdagger.T
+            # self.Delta_p = ffdagger.T
+            self.Delta_p = np.real(ffdagger.T)
 
+            # TODO: Separate function
             r"""Calculate R matrix, where the element are given by
 
             .. math:
                 R_{b\alpha} = \sum_a \langle \Phi | c^\dagger_\alpha f_a | \Phi \rangle \left[ \Delta ( 1 - \Delta ) \right]^{-1/2}_{ad}
             """
-            R_new = np.transpose(cdaggerf.dot(funcMat(self.Delta_p, denR)))
+            # R_new = np.transpose(cdaggerf.dot(funcMat(self.Delta_p, denR)))
+            R_new = np.real(np.transpose(cdaggerf.dot(funcMat(self.Delta_p, denR))))
 
             # Spin symmetry for R
             if self.spin_sym:
                 R_new = np.kron(R_new[::2,::2],np.eye(2))# symmetrize
 
             # Calculate the new Lambda from R, Lambda_c, Delta_p and D
-            Lambda_new = calc_Lambda(R_new, self.Lambda_c, self.Delta_p, self.D, self.Hfull_list)
+            # Lambda_new = calc_Lambda(R_new, self.Lambda_c, self.Delta_p, self.D, self.Hfull_list)
+            Lambda_new = np.real(calc_Lambda(R_new, self.Lambda_c, self.Delta_p, self.D, self.Hfull_list))
 
             # Spin symmetry for Lambda
             if self.spin_sym:
@@ -338,18 +357,27 @@ class Grisb(object):
                 print(self.denMat[::2,::2])
                 print()
 
-            print("iteration:",it,'diff=',self.diff)
+            if nfix is not None:
+                # occ = occupation_vs_mu(self.mu, self.R, self.Lambda, self.eks, beta)
+                occ = np.trace(self.denMat[:self.nimp, :self.nimp])
+                print(self.denMat[:self.nimp, :self.nimp])
+                print("# New occupation : ", occ, ", nfix : ", nfix)
+                print()
+
+            print("# iteration:",it,'diff=',self.diff)
             print()
+
             if self.diff < tol or it == (itmax-1):
-                print("--------------------- ghost-RISB converged with diff=%g ---------------------"%(self.diff))
-                print("density matrix=")
-                print(self.denMat)
-                self.nfill = np.trace(self.denMat[:self.nimp,:self.nimp])
-                self.docc = []
-                for idx in range(0,self.nimp,2):
-                    self.docc.append(self.edsolver.calc_double_occ(idx))
-                print("double occupancy=", self.docc)
-                break
+                if nfix is None or (nfix is not None and (occ - nfix < nfix_tol)):
+                    print("--------------------- ghost-RISB converged with diff=%g ---------------------"%(self.diff))
+                    print("density matrix=")
+                    print(self.denMat)
+                    self.nfill = np.trace(self.denMat[:self.nimp,:self.nimp])
+                    self.docc = []
+                    for idx in range(0,self.nimp,2):
+                        self.docc.append(self.edsolver.calc_double_occ(idx))
+                    print("double occupancy=", self.docc)
+                    break
 
     # def func_mu(self, mu, *args):
     #     #self.mu_tmp = mu
