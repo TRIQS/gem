@@ -46,7 +46,7 @@ class Pyblock2_N(object):
 
     def solve_Hemb(self, num_eig=10, verbose=0, sweep_iter = [0,10,20], sweep_epsilon = [5e-3,1e-3,5e-4], maxM=1000):
         self.driver = DMRGDriver(scratch="./tmp", symm_type=SymmetryTypes.SGFCPX, stack_mem=50<<30)#, n_threads=6)
-        
+
         self.driver.initialize_system(n_sites=self.ntot, n_elec=self.ntot//2)#, spin=0)
 
         # no order
@@ -62,12 +62,12 @@ class Pyblock2_N(object):
         #print(idx)
         #ordering gaopt
         h1e, g2e = numpy.copy(self.h1), numpy.copy(self.Utensor_full)
-        
+
         xmat = numpy.abs(numpy.einsum("ijji->ij", g2e, optimize=True))
         kmat = numpy.abs(h1e) * 1e-7 + xmat
         kmat = b2.VectorDouble(kmat.ravel())
         idx = b2.OrbitalOrdering.fiedler(len(h1e), kmat)
-        
+
         opts = dict(n_generations=10000, n_configs=len(h1e) * 2, n_elite=8, clone_rate=0.1, mutate_rate=0.1)
         n_tasks = 64
         idxs = []
@@ -82,14 +82,14 @@ class Pyblock2_N(object):
         #print(self.idx)
         h1e = h1e[self.idx][:, self.idx]
         Utensor_full = self.Utensor_full[self.idx][:, self.idx][:, :, self.idx][:, :, :, self.idx]
-        
+
         b = self.driver.expr_builder()
 
         for i in range(self.ntot):
             for j in range(self.ntot):
                 if abs(h1e[i,j])>1e-6:
                     b.add_term("CD", [i,j], h1e[i,j])
-        
+
         for i in range(self.ntot):
             for j in range(self.ntot):
                 for k in range(self.ntot):
@@ -98,13 +98,13 @@ class Pyblock2_N(object):
                             b.add_term("CCDD", [i,j,l,k], 0.5*Utensor_full[i,k,j,l])
 
         mpo = self.driver.get_mpo(b.finalize(), iprint=0)
-      
+
         self.ket = self.driver.get_random_mps(tag="KET", bond_dim=250, nroots=1)
-        
+
         bond_dims = [200,300,400,500]+[500,500,800,800,800]#[maxM] * 8
         noises = [1e-5]*4 + [1e-6]*4 + [0]
         thrds = [1e-10]*9
-        
+
         self.e0 = self.driver.dmrg(mpo, self.ket, n_sweeps=20, bond_dims=bond_dims, noises=noises, thrds=thrds, tol=1e-8,  cutoff=0, iprint=1)
 
     def calc_density_matrix(self):
@@ -161,7 +161,7 @@ class Pyblock2_N_SZ(Pyblock2_N):
 
     def solve_Hemb(self, num_eig=10, verbose=0, sweep_iter = [0,10,20], sweep_epsilon = [5e-3,1e-3,5e-4], maxM=1000):
         self.driver = DMRGDriver(scratch="./tmp", symm_type=SymmetryTypes.SZ | SymmetryTypes.CPX, stack_mem=50<<30)#, n_threads=6)
-        
+
         self.driver.initialize_system(n_sites=self.ntot//2, n_elec=self.ntot//2)#, spin=0)
 
         # no order
@@ -170,22 +170,22 @@ class Pyblock2_N_SZ(Pyblock2_N):
         # lambda_c diagonal gauge
         h1e, self.u_trans = self.gauge_transform(self.h1, self.ntot, self.nimp)
         Utensor_full = self.Utensor_full
-        
+
         b = self.driver.expr_builder()
 
         for i in range(self.ntot):
             for j in range(self.ntot):
-                if abs(h1e[i,j])>1e-6:
+                if abs(h1e[i,j])>1e-8:
                     if i%2 == 0:
                         b.add_term("cd", [i//2,j//2], h1e[i,j])
                     elif i%2 == 1:
                         b.add_term("CD", [i//2,j//2], h1e[i,j])
-        
+
         for i in range(self.ntot):
             for j in range(self.ntot):
                 for k in range(self.ntot):
                     for l in range(self.ntot):
-                        if abs(Utensor_full[i,k,j,l])>1e-6:
+                        if abs(Utensor_full[i,k,j,l])>1e-8:
                             if i%2 ==1 and j%2 ==0 and l%2==1 and k%2==0:
                                b.add_term("CcDd", [i//2,j//2,l//2,k//2], 0.5*Utensor_full[i,k,j,l])
                             elif i%2 ==1 and j%2 ==0 and l%2==0 and k%2==1:
@@ -200,14 +200,19 @@ class Pyblock2_N_SZ(Pyblock2_N):
                                b.add_term("CCDD", [i//2,j//2,l//2,k//2], 0.5*Utensor_full[i,k,j,l])
 
         mpo = self.driver.get_mpo(b.finalize(), iprint=0)
-      
+
         self.ket = self.driver.get_random_mps(tag="KET", bond_dim=250, nroots=1)
-        
+
         bond_dims = [200,300,400,500]+[500,500,self.maxM,self.maxM,self.maxM]#[maxM] * 8
+        # bond_dims = list(np.arange(200, self.maxM, 100)) + [self.maxM,self.maxM,self.maxM]#[maxM] * 8
         noises = [1e-5]*4 + [1e-6]*4 + [0]
+        # noises = ([1e-5 for x in np.arange(200, self.maxM/2, 100)] +
+        #           [1e-6 for x in np.arange(self.maxM/2, self.maxM)] +
+        #           [1e-7, 1e-8, 0])
         thrds = [1e-10]*9
-        
-        self.e0 = self.driver.dmrg(mpo, self.ket, n_sweeps=20, bond_dims=bond_dims, noises=noises, thrds=thrds, tol=1e-8,  cutoff=0, iprint=1)
+        # thrds = [1e-10 for x in bond_dims]
+
+        self.e0 = self.driver.dmrg(mpo, self.ket, n_sweeps=25, bond_dims=bond_dims, noises=noises, thrds=thrds, tol=1e-10,  cutoff=0, iprint=1)
 
     def calc_density_matrix(self):
         dm = self.driver.get_1pdm(self.ket)
