@@ -39,28 +39,10 @@ class TestGrisb(unittest.TestCase):
         R0 = numpy.random.rand(nbath//2,nimp//2)
         R0 = numpy.kron(R0,numpy.eye(2))
         Lambda0 = numpy.zeros((nbath//2,nbath//2))
-        Lambda0[0,0] = 2.0
-        Lambda0[1,1] = 2.0
-        Lambda0[2,2] = 2.0
-        Lambda0[3,3] = 2.0
-        Lambda0[4,4] = 2.0
-        Lambda0[5,5] = 0.0
-        Lambda0[6,6] = 0.0
-        Lambda0[7,7] = 0.0
-        Lambda0[8,8] = 0.0
-        Lambda0[9,9] = 0.0
-        Lambda0[10,10] =-2.0
-        Lambda0[11,11] =-2.0
-        Lambda0[12,12] =-2.0
-        Lambda0[13,13] =-2.0
-        Lambda0[14,14] =-2.0
-        #Lambda0 = numpy.random.rand(nbath//2,nbath//2)
-        #Lambda0 = (Lambda0 + Lambda0.T)/2
+        Lambda0 = np.diag([2.0, 2.0, 2.0, 2.0, 2.0,
+                           0.0, 0.0, 0.0, 0.0, 0.0,
+                          -2.0,-2.0,-2.0,-2.0,-2.0])
         Lambda0 = numpy.kron(Lambda0,numpy.eye(2))
-        #fh5i = h5py.File('sols_backup.h5','r')
-        #R0 = fh5i['U1.50/R'][...]
-        #Lambda0 = fh5i['U1.50/Lambda'][...]
-        #fh5i.close()
 
         U = 1.0
         J = U/4.
@@ -68,10 +50,11 @@ class TestGrisb(unittest.TestCase):
         nnom = 4.0 #nominal occupancy
         mu0 = (U+(nimp//2-1)*(U-2*J)+(nimp//2-1)*(U-3*J))*(nnom-0.5)/(2*nimp//2-1)
         Utensor = U_matrix_kanamori(nimp//2, U, J)
-        #print(Utensor.shape)
+
         maxM = 800
         edsolver=Pyblock2_N_SZ(ntot, nimp, nbath, maxM)
         print(edsolver.type)
+
         grisb = Grisb(ntot, nimp, nbath, eks, eloc, Utensor, R=R0, Lambda=Lambda0, edsolver=edsolver)
         grisb.run(mu=mu0, itmax=100, mix=0.5, tol=2e-3, beta=500, silence=True, spin_pen=0.00)
 
