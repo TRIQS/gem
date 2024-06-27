@@ -18,7 +18,7 @@ include_str="include(\""+julia_project_dir+"/src/driver.jl"+"\")"
 
 from itertools import product as itp
 import triqs_ghostGA
-from triqs_ghostGA.utility.utils_mps import setup_MPS, rotateBath, rotateDensityMatrix, rotateToTsungHanConvention
+from triqs_ghostGA.solvers.utility.utils_mps import setup_MPS, rotateBath, rotateDensityMatrix, rotateToTsungHanConvention
 
 
 

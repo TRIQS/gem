@@ -13,7 +13,7 @@ from forktps.Helpers import getX,MakeGFstruct
 
 from itertools import product as itp
 import triqs_ghostGA
-from triqs_ghostGA.utility.utils_forktps import ConstructBath, setup_forkTPS, rotateBath, rotateDensityMatrix, rotateToTsungHanConvention
+from triqs_ghostGA.solvers.utility.utils_forktps import ConstructBath, setup_forkTPS, rotateBath, rotateDensityMatrix, rotateToTsungHanConvention
 
 class FTPS(object):
     ''' FTPS solver class'''

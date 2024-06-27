@@ -7,7 +7,6 @@ from triqs_ghostGA.grisb import *
 from triqs_ghostGA.utility.utils_TH import U_matrix_kanamori
 from triqs_ghostGA.utility.e_list import EList_SemiCircular
 import numpy as np
-from triqs_ghostGA.ci import CI
 import os
 
 

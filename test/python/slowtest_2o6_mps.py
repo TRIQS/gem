@@ -9,7 +9,7 @@ from triqs_ghostGA.utility.e_list import EList_SemiCircular
 from triqs.operators.util import U_matrix_kanamori as Umk
 import numpy as np
 from triqs_ghostGA.version import *
-from triqs_ghostGA.mps import ITensorMPSSolver
+from triqs_ghostGA.solvers.mps import ITensorMPSSolver
 
 
 class test_hemb_2o6_mps(unittest.TestCase):
