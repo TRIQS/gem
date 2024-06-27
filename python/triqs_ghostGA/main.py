@@ -13,7 +13,7 @@ from timeit import default_timer as timer
 import triqs.utility.mpi as mpi
 
 # own modules
-from solid_dmft.read_config import read_config
+from solid_dmft.read_config_grisb import read_config
 from solid_dmft.dmft_cycle import dmft_cycle
 from solid_dmft.csc_flow import csc_flow_control
 
