@@ -27,6 +27,9 @@
 Contains all functions related to constructing the interaction Hamiltonian.
 """
 
+# TODO: Adopt the solid_dmft/triqs convention for the tensor U!!!
+# Then we can get rid of this file, and also use the other types of interaction.
+
 # system
 import os
 import numpy as np
@@ -213,7 +216,7 @@ def _construct_kanamori(sum_k, general_params, icrsh):
         #                            map_operator_structure=sum_k.sumk_to_solver[icrsh],
         #                            U=Umat, Uprime=Upmat, J_hund=general_params['J'][icrsh],
         #                            H_dump=os.path.join(general_params['jobname'], 'H.txt'))
-        # In ghostGA we return interaction matrix 
+        # In ghostGA we return interaction matrix
         h_int_spinless = util.U_matrix_kanamori(n_orb=n_orb, U_int=general_params['U'][icrsh],
                                                  J_hund=general_params['J'][icrsh],
                                                  Up_int=U_prime, full_Uijkl=True)
@@ -382,7 +385,7 @@ def _generate_four_index_u_matrix(sum_k, general_params, icrsh):
     # the order for the cubic orbitals is given by the convention. The TRIQS
     # convention is as follows ("xy","yz","z^2","xz","x^2-y^2")
     # this is consistent with the order of orbitals in the VASP interface
-    # but not necessarily with wannier90, qe, and wien2k! 
+    # but not necessarily with wannier90, qe, and wien2k!
     # This is also true for the f-shell.
     Umat_full = util.U_matrix_slater(l=sum_k.corr_shells[ish]['l'],
                               radial_integrals=slater_integrals, basis='spherical')
@@ -553,7 +556,7 @@ def construct(sum_k, general_params, advanced_params):
 
             # Rotates the interaction matrix
             Umat_full_rotated = _rotate_four_index_matrix(sum_k, general_params, Umat_full, icrsh)
-    
+
             # construct slater / density density from U tensor
             if general_params['h_int_type'][icrsh] == 'crpa':
                 h_int[icrsh] = _construct_slater(sum_k, general_params, Umat_full_rotated, icrsh)
