@@ -91,7 +91,7 @@ dc_type : int
             * 1: held formula, needs to be used with slater-kanamori h_int_type=2
             * 2: AMF
             * 3: FLL for eg orbitals only with U,J for Kanamori
-dc_grisb : bool
+dc_dmft  : bool
            Whether to use GRSIB or DFT occupations:
 
            * DC with GRISB occupation in each iteration -> True
@@ -110,7 +110,7 @@ solver_type : str
 
 norb_baths: int
             number of bath orbital in gRISB
-            
+
 n_iw : int, optional, default=1025
             number of Matsubara frequencies
 n_tau : int, optional, default=10001
@@ -414,7 +414,7 @@ PROPERTIES_PARAMS = {'general': {'seedname': {'used': True},
 
                                  'prec_mu': {'converter': float, 'valid for': lambda x, _: x > 0, 'used': True},
 
-                                 'dc_grisb': {'converter': BOOL_PARSER,
+                                 'dc_dmft': {'converter': BOOL_PARSER,
                                              'used': lambda params: params['general']['dc']},
 
                                  'cpa_zeta': {'converter': lambda s: list(map(float, s.split(','))),
@@ -482,7 +482,7 @@ PROPERTIES_PARAMS = {'general': {'seedname': {'used': True},
                                  'grisb_mix': {'converter': float,
                                                'valid for': lambda x, params: x >= 0  or np.isclose(x, 1),
                                                'used': True, 'default': 0.5},
-                                            
+
                                 'grisb_tol': {'converter': float,
                                                'valid for': lambda x, _: x >= 0,
                                                'used': True, 'default': 1e-5},
@@ -490,7 +490,7 @@ PROPERTIES_PARAMS = {'general': {'seedname': {'used': True},
                                 'charge_tol': {'converter': float,
                                                'valid for': lambda x, _: x >= 0,
                                                'used': True, 'default': 1e-3},
-                                            
+
                                 'energy_tol': {'converter': float,
                                                'valid for': lambda x, _: x >= 0,
                                                'used': True, 'default': 1e-5},
