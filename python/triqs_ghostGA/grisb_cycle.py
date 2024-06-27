@@ -27,7 +27,7 @@ from triqs_ghostGA.grisb_tools.observables import (calc_dft_kin_en, add_grisb_ob
 from triqs_ghostGA.grisb_tools.solver import SolverStructure
 from triqs_ghostGA.grisb_tools import interaction_hamiltonian
 from triqs_ghostGA.grisb_tools import results_to_archive
-from triqs_ghostGA.grisb_tools import initial_self_energies as initial_sigma
+from solid_dmft.dmft_tools import initial_self_energies as initial_sigma
 from solid_dmft.dmft_tools import convergence
 from solid_dmft.dmft_tools import formatter
 
@@ -772,7 +772,7 @@ def _grisb_step(sum_k, solvers, it, general_params,
 
     # calculate new DC
     # for the hartree solver the DC potential will be formally set to zero as it is already present in the Sigma
-    if general_params['dc'] and general_params['dc_grisb']:
+    if general_params['dc'] and general_params['dc_dmft']:
 #!TODO
         sum_k = initial_sigma.calculate_double_counting(sum_k, density_mat,
                                                         general_params, advanced_params)
