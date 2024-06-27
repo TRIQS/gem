@@ -13,7 +13,7 @@ from timeit import default_timer as timer
 import triqs.utility.mpi as mpi
 
 # own modules
-from triqs_ghostGA.grisb_tools.read_config import read_config
+from solid_dmft.read_config_grisb import read_config
 from triqs_ghostGA.grisb_cycle import grisb_cycle
 #from solid_dmft.csc_flow import csc_flow_control
 
@@ -62,7 +62,7 @@ def main(argv=sys.argv):
     #if general_params['csc']:
     #    # Start CSC calculation, always in same folder as grisb_config
     #    general_params['jobname'] = '.'
-    #    csc_flow_control(general_params, solver_params, dft_params, advanced_params)
+    #    csc_flow_control(general_params, solver_params, dft_params, advanced_params, ghostGA=True)
     #else:
     # Sets up one-shot calculation
     mpi.report('', '#'*80)

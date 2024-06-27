@@ -62,7 +62,7 @@ def main(argv=sys.argv):
     if general_params['csc']:
         # Start CSC calculation, always in same folder as grisb_config
         general_params['jobname'] = '.'
-        csc_flow_control(general_params, solver_params, dft_params, advanced_params)
+        csc_flow_control(general_params, solver_params, dft_params, advanced_params, ghostGA=ghostGA)
     else:
         # Sets up one-shot calculation
         mpi.report('', '#'*80)
