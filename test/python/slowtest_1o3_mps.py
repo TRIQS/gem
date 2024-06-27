@@ -10,7 +10,7 @@ from triqs.operators.util import U_matrix_kanamori as Umk
 from triqs.operators.util import U_matrix_kanamori as Umk
 import numpy as np
 from triqs_ghostGA.version import *
-from triqs_ghostGA.mps import ITensorMPSSolver as MPS
+from triqs_ghostGA.solvers.mps import ITensorMPSSolver as MPS
 
 
 class test_hemb_1o3_mps(unittest.TestCase):

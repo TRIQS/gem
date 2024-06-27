@@ -8,7 +8,7 @@ from triqs_ghostGA.utils_TH import get_semicircle_e_list#, U_matrix_kanamori
 from triqs.operators.util import U_matrix_kanamori
 import numpy as np
 from triqs_ghostGA.version import *
-from triqs_ghostGA.mps import ITensorMPSSolver
+from triqs_ghostGA.solvers.mps import ITensorMPSSolver
 
 
 class test_hemb_3o9_ci(unittest.TestCase):
