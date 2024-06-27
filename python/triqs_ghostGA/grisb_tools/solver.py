@@ -181,7 +181,7 @@ class SolverStructure:
             #self._fci_postprocessing()
 
         elif self.general_params['solver_type'] == 'pyscf_dmrg':
-        
+
             mpi.report('\n Using the pyscf dmrg solver.')
 
             # Solve the impurity problem for icrsh shell
@@ -212,7 +212,7 @@ class SolverStructure:
             self.E2loc = self.triqs_solver.compute_E2loc()
 
         elif self.general_params['solver_type'] == 'pyscf_ccsd':
-        
+
             mpi.report('\n Using the pyscf ccsd solver.')
 
             # Solve the impurity problem for icrsh shell
@@ -270,7 +270,7 @@ class SolverStructure:
         r'''
         Initialize configulration interaction exact-diagonalization solver instance
         '''
-        from triqs_ghostGA.ci import CI
+        from triqs_ghostGA.solvers.ci import CI
         triqs_solver = CI(2*(self.general_params['norb_baths'][self.icrsh]
                              +self.sum_k.corr_shells[self.icrsh]['dim']), use_Ntot=True, use_Sz=True, dtype=np.complex128)
 
@@ -289,9 +289,9 @@ class SolverStructure:
         triqs_solver = Pyscf_dmrg(2*(self.general_params['norb_baths'][self.icrsh]
                             +self.sum_k.corr_shells[self.icrsh]['dim']), 2*self.sum_k.corr_shells[self.icrsh]['dim']
                             , 2*self.general_params['norb_baths'][self.icrsh], self.solver_params["maxM"])
-        
+
         return triqs_solver
-    
+
 
     def _create_pyscf_ccsd_solver(self):
         r'''
@@ -303,7 +303,7 @@ class SolverStructure:
         triqs_solver = Pyscf_ccsd(2*(self.general_params['norb_baths'][self.icrsh]
                             +self.sum_k.corr_shells[self.icrsh]['dim']), 2*self.sum_k.corr_shells[self.icrsh]['dim']
                             , 2*self.general_params['norb_baths'][self.icrsh])
-        
+
         return triqs_solver
 
     def _create_block2_solver(self):
@@ -312,7 +312,7 @@ class SolverStructure:
         '''
         from triqs_cthyb.solver import Solver as cthyb_solver
         raise NotImplementedError("block2 DMRG solver not implemeted!")
-        return 
+        return
 
     #def _make_spin_equal(self, Sigma):
     #
@@ -425,7 +425,7 @@ class SolverStructure:
                                                            mesh=MeshReTime(n_t=time_steps+1,
                                                            window=[0,time_steps*self.solver_params['dt']])
                                                            )
-        
+
     def _init_ReFreq_hartree(self):
         r'''
         Initialize all ReFreq objects
