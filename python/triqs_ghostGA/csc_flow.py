@@ -357,9 +357,14 @@ def csc_flow_control(general_params, solver_params, dft_params, advanced_params,
             print('DMFT cycle took {:10.3f} seconds'.format(end_time_dmft-start_time_dmft))
             print('='*80 + '\n')
 
-        # If all steps are executed or calculation is converged, finish DFT+DMFT loop
-        if is_converged or iter_dmft > general_params['n_iter_dmft'] + iteration_offset:
-            break
+        if not ghostGA:
+            # If all steps are executed or calculation is converged, finish DFT+DMFT loop
+            if is_converged or iter_dmft > general_params['n_iter_dmft'] + iteration_offset:
+                break
+        else:
+            # If all steps are executed or calculation is converged, finish DFT+gGA loop
+            if is_converged or iter_dmft > general_params['n_iter_grisb'] + iteration_offset:
+                break
 
         # Restarts DFT
         mpi.barrier()
