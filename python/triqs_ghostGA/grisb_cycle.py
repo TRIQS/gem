@@ -22,11 +22,11 @@ from triqs.gf.tools import inverse
 # ghostGA
 from triqs_ghostGA.sumk_grisb import SumkGRISB
 from triqs_ghostGA.utility.utils_TH import funcMat, denR, cut_small
-from triqs_ghostGA.grisb_tools.observables import (calc_dft_kin_en, add_grisb_observables, calc_bandcorr_man, write_obs,
-                                         add_dft_values_as_zeroth_iteration, write_header_to_file, prep_observables)
+from solid_dmft.dmft_tools.observables import (calc_dft_kin_en, add_dmft_observables, calc_bandcorr_man, write_obs,
+                                               add_dft_values_as_zeroth_iteration, write_header_to_file, prep_observables)
 from triqs_ghostGA.grisb_tools.solver import SolverStructure
 from triqs_ghostGA.grisb_tools import interaction_hamiltonian
-from triqs_ghostGA.grisb_tools import results_to_archive
+from solid_dmft.dmft_tools import results_to_archive
 from solid_dmft.dmft_tools import initial_self_energies as initial_sigma
 from solid_dmft.dmft_tools import convergence
 from solid_dmft.dmft_tools import formatter
@@ -339,15 +339,15 @@ def grisb_cycle(general_params, solver_params, advanced_params, dft_params,
     observables = None
     conv_obs = None
     if mpi.is_master_node():
-        observables = prep_observables(archive, sum_k)
+        observables = prep_observables(archive, sum_k, ghostGA=True)
         conv_obs = convergence.prep_conv_obs(archive, sum_k, ghostGA=True)
     observables = mpi.bcast(observables)
     conv_obs = mpi.bcast(conv_obs)
 
     if mpi.is_master_node() and iteration_offset == 0:
-        write_header_to_file(general_params, sum_k)
+        write_header_to_file(general_params, sum_k, ghostGA=True)
         observables = add_dft_values_as_zeroth_iteration(observables, general_params, dft_mu, dft_energy, sum_k,
-                                                         G_loc_all_dft, density_mat_dft, shell_multiplicity)
+                                                         G_loc_all_dft, density_mat_dft, shell_multiplicity, ghostGA=True)
 # TODO
         # set up observable R and Lambda
         #print(observables['R'])
@@ -370,16 +370,14 @@ def grisb_cycle(general_params, solver_params, advanced_params, dft_params,
                 Lambda0 = (Lambda0 + Lambda0.T)/2 #+ dft_mu*np.eye(Lambda0.shape[0])
                 observables['Lambda'][icrsh]['up'] = Lambda0
                 observables['Lambda'][icrsh]['down'] = Lambda0
-#!TODO
 
         print('Initial R =')
         print(observables['R'])
         print('Initial Lambda =')
         print(observables['Lambda'])
-        write_obs(observables, sum_k, general_params)
+        write_obs(observables, sum_k, general_params, ghostGA=True)
         # write convergence file
         convergence.prep_conv_file(general_params, sum_k, ghostGA=True)
-# TODO
     elif mpi.is_master_node():
         # read R and Lambda from archive
         observables['R'] = archive['DMFT_results/last_iter/R']
@@ -812,16 +810,15 @@ def _grisb_step(sum_k, solvers, it, general_params,
 # TODO
         #deltaN, dens, E_bandcorr = sum_k.calc_density_correction(density_mat, observables, E_kin_dft, dm_type='qe',#dft_params['dft_code'],
         #                                                         kpts_to_write=dft_irred_kpt_indices)
-        E_bandcorr = calc_bandcorr_man(observables['R'], observables['Lambda'], general_params, sum_k, E_kin_dft)
+        E_bandcorr = calc_bandcorr_man(general_params, sum_k, E_kin_dft,
+                                       R=observables['R'], Lambda=observables['Lambda'], ghostGA=True)
 #!TODO
 
     # Writes results to h5 archive
-# TODO
     if mpi.is_master_node():
         results_to_archive.write(archive, sum_k, general_params, solver_params, solvers, it,
                                  is_sampling, previous_mu, density_mat_pre, density_mat,
-                                 observables['R'], observables['Lambda'], deltaN, dens)
-#!TODO
+                                 deltaN, dens, ghostGA=True, R=observables['R'], Lambda=observables['Lambda'])
 
     mpi.barrier()
 
@@ -829,20 +826,11 @@ def _grisb_step(sum_k, solvers, it, general_params,
     if mpi.is_master_node():
         print('\n *** calculation of observables ***')
 ##TODO
-        observables = add_grisb_observables(observables,
-                                           general_params,
-                                           solver_params,
-                                           dft_energy,
-                                           it,
-                                           solvers,
-                                           h_int,
-                                           previous_mu,
-                                           sum_k,
-                                           density_mat,
-                                           shell_multiplicity,
-                                           E_bandcorr)
+        observables = add_dmft_observables(observables, general_params, solver_params, dft_energy, it,
+                                           solvers, h_int, previous_mu, sum_k, density_mat, shell_multiplicity,
+                                           E_bandcorr, ghostGA=True)
 
-        write_obs(observables, sum_k, general_params)
+        write_obs(observables, sum_k, general_params, ghostGA=True)
 
         # write the new observable array to h5 archive
         archive['DMFT_results']['observables'] = observables
