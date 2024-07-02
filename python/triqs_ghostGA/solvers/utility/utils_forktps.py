@@ -74,8 +74,8 @@ def setup_forkTPS(M, Norb, Nbath, gf_struct, int_params, w_grid, maxm, tw,
     # the bath sites are assigned to an orbital.
     # Since it should be diagonal,
     # there is only one bath orbital, which is (orb, bath).
-    eps = {"up": np.zeros((Norb, Nbath)),
-           "dn": np.zeros((Norb, Nbath))}
+    eps = {"up": np.zeros((Norb, Nbath), dtype=np.complex128),
+           "dn": np.zeros((Norb, Nbath), dtype=np.complex128)}
     # Construct the hybridization:
     # now this couples a bath site and an orbital, so (orb, bath)->(orb).
     hopping = {"up": np.zeros((Norb, Norb, Nbath), dtype=complex),
@@ -126,7 +126,7 @@ def rotateBath(M, Norb, Nbath):
     Diagonalizes the Bath part of the M matrix. Also rotates the hybridization.
     This function returns the rotated M matrix, along with the vectors to
     rotate it back.
-        M : np.array((Norb*(Nbath+1), Norb*(Nbath+1))) : M matrix describing the 
+        M : np.array((Norb*(Nbath+1), Norb*(Nbath+1))) : M matrix describing the
             embedded Hamiltonian.
         Norb : int : Number of orbital degrees of freedom.
         Nbath : int : Number of bath per orbital.

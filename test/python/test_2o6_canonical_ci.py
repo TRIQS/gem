@@ -4,10 +4,12 @@ import unittest
 
 from triqs_ghostGA import LatticeSolver
 from triqs_ghostGA.grisb import *
-from triqs_ghostGA.utils_TH import get_semicircle_e_list, U_matrix_kanamori
+from triqs_ghostGA.utility.utils_TH import U_matrix_kanamori
+from triqs_ghostGA.utility.e_list import EList_SemiCircular
 import numpy as np
 from triqs_ghostGA.version import *
-from triqs_ghostGA.ci import CI
+from triqs_ghostGA.solvers.ci import CI
+import os
 
 
 class test_hemb_2o6_ci(unittest.TestCase):
@@ -28,7 +30,7 @@ class test_hemb_2o6_ci(unittest.TestCase):
         eloc[3,3] = tmp_e
 
         # construct ek with semicircular DOS
-        e_list = get_semicircle_e_list(nmesh=5000)
+        e_list = EList_SemiCircular(nmesh=5000).e_list
         eks = []
         for e in e_list:
             tmp = np.array([[1.0*e, 0.0], [0.0, 1.0*e]], dtype=np.complex128)
@@ -52,10 +54,10 @@ class test_hemb_2o6_ci(unittest.TestCase):
 
         edsolver=CI(ntot, use_Ntot=True, use_Sz=True, dtype=np.complex128)
         grisb = Grisb(ntot, nimp, nbath, eks, eloc, Utensor, R=R0, Lambda=Lambda0, edsolver=edsolver)
-        mu = grisb.run_canonical(mu0=0.0, nfix=nfix, itmax=100, mix=1, tol=1e-5, beta=500, silence=True, spin_pen=0.10)
+        grisb.run(mu0=0.0, nfix=nfix, itmax=100, mix=1, tol=1e-5, beta=500, silence=True, spin_pen=0.10)
 
         name = "2o6_canonical_ci"
-        with HDFArchive("result_tests.h5", "r") as A:
+        with HDFArchive(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "r") as A:
 
             print("Compare docc")
             np.testing.assert_allclose(grisb.docc, A[name]["docc"], atol=1e-3)
@@ -72,13 +74,13 @@ class test_hemb_2o6_ci(unittest.TestCase):
             np.testing.assert_allclose(test_denM_eval, ref_denM_eval, atol=1e-3)
 
             print("Compare mu")
-            np.testing.assert_allclose(mu, A[name]["mu"], atol=1e-3)
+            np.testing.assert_allclose(grisb.mu, A[name]["mu"], atol=1e-3)
 
         # with HDFArchive("result_tests.h5", "a") as A:
         #     tmp_dir = {
         #         'docc': grisb.docc,
         #         'denMat': grisb.denMat,
-        #         'mu': mu,
+        #         'mu': grisb.mu,
         #     }
         #     A[name] = tmp_dir
 

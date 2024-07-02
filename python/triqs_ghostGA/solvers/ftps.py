@@ -13,7 +13,7 @@ from forktps.Helpers import getX,MakeGFstruct
 
 from itertools import product as itp
 import triqs_ghostGA
-from triqs_ghostGA.utils_forktps import ConstructBath, setup_forkTPS, rotateBath, rotateDensityMatrix, rotateToTsungHanConvention
+from triqs_ghostGA.solvers.utility.utils_forktps import ConstructBath, setup_forkTPS, rotateBath, rotateDensityMatrix, rotateToTsungHanConvention
 
 class FTPS(object):
     ''' FTPS solver class'''
@@ -25,7 +25,7 @@ class FTPS(object):
         self.nimp = nimp
         self.nbath = nbath
         self.maxM = maxM
- 
+
     def build_Hemb(self, D, H1E, LAMBDA, V2E, spin_pen=0.0):
         # Local Hamiltonian
         self.E = {"up": np.zeros((self.nimp//2, self.nimp//2)),
@@ -34,17 +34,17 @@ class FTPS(object):
         self.E["dn"] = H1E[1::2,1::2]
 
         # Hybridization matrix
-        self.W = {"up": np.zeros((self.nimp//2, self.nbath//2)),    ##was self.nbath//self.nimp ##but this is not general
-                  "dn": np.zeros((self.nimp//2, self.nbath//2))}
+        self.W = {"up": np.zeros((self.nimp//2, self.nbath//2), dtype=np.complex128),    ##was self.nbath//self.nimp ##but this is not general
+                  "dn": np.zeros((self.nimp//2, self.nbath//2), dtype=np.complex128)}
         self.W["up"][:,:] = D[::2,::2].conj().T
         self.W["dn"][:,:] = D[1::2,1::2].conj().T
-        
+
         # Bath parameters
-        self.B = {"up": np.zeros((self.nbath//self.nimp, self.nbath//self.nimp)),
-                  "dn": np.zeros((self.nbath//self.nimp, self.nbath//self.nimp))}
+        self.B = {"up": np.zeros((self.nbath//self.nimp, self.nbath//self.nimp), dtype=np.complex128),
+                  "dn": np.zeros((self.nbath//self.nimp, self.nbath//self.nimp), dtype=np.complex128)}
         self.B["up"][:,:] = -LAMBDA[::2,::2]
         self.B["dn"][:,:] = -LAMBDA[1::2,1::2]
-   
+
         # Set up the M matrix which has all local Ham, hybridization and bath
         self.M = {"up": np.block([[self.E["up"], self.W["up"]],
                                  [self.W["up"].T, self.B["up"]]]),
@@ -72,16 +72,16 @@ class FTPS(object):
         gfstruct = [("up", self.nimp//2), ("dn", self.nimp//2)] # Structure of the Green's function
         # Interaction parameters for Kanamori
         int_params = {"U": self.U, "J": 0, "Up": 0, "dd": True}
-        
+
         nw = 501 # Number of real frequencies
         window = [-3., 3.] # Bandwidth of the spectral function
         w_grid = {"nw": 3001, "window": [-3., 3.]} # Resulting grid
-        
+
         #maxM = 300 # Maximum dimension bond for DMRG
-        
+
         # Criteria for the bound dimension of the DMRG, just be converged
         tw = 1e-20
-        
+
         # Set up and run ForkTPS using the useful_func.py
         self.singleP_rot, self.EHint = setup_forkTPS(self.M, self.nimp//2, self.nbath//self.nimp, gfstruct, int_params,
                                                    w_grid, self.maxM, tw)
@@ -94,7 +94,7 @@ class FTPS(object):
         self.singleP = rotateDensityMatrix(self.singleP_rot, self.nimp//2, self.nbath//self.nimp, self.v)
         #print(self.singleP)
         self.singleP = rotateToTsungHanConvention(self.singleP, self.nimp//2, self.nbath//self.nimp)
-       
+
         #print('density matrix=')
         #print(self.singleP)
         self.dm = self.singleP
@@ -103,9 +103,9 @@ class FTPS(object):
     def calc_double_occ(self,idx):
         print('warning: double occupancy not implement!')
         return 0.25
- 
+
     def compute_E2loc(self):
         #eone = 2*numpy.einsum('ij,ij',self.h1,self.dm[::2,::2])
         #etwo = self.e0 - eone
         return self.EHint
-    
+

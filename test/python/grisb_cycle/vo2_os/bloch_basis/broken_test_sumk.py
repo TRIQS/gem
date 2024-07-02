@@ -4,7 +4,7 @@ import triqs.utility.mpi as mpi
 from triqs.gf import Gf, make_hermitian, MeshReFreq, MeshImFreq
 from triqs.gf.tools import inverse
 from triqs_ghostGA.sumk_grisb import SumkGRISB
-from triqs_ghostGA.utils_TH import calc_nf
+from triqs_ghostGA.utility.utils_TH import calc_nf
 from triqs.plot.mpl_interface import oplot
 from h5 import HDFArchive
 from copy import deepcopy
@@ -19,8 +19,8 @@ beta = 200.
 #sumk_mesh = MeshReFreq(window=[-20,20], n_w=2000)
 sumk_mesh = None
 
-sumk = SumkGRISB(hdf_file='vo2.h5',
-                mesh=sumk_mesh, use_dft_blocks=False, beta=beta, h_field=0.0, nbath=5)
+sumk = SumkGRISB(hdf_file='quantum_espresso_files/vo2.h5',
+                mesh=sumk_mesh, use_dft_blocks=False, beta=beta, h_field=0.0, nbaths=5)
 sumk.chemical_potential = 11.209421#11.2631
 icrsh = 0
 eloc = [{}]
@@ -43,7 +43,7 @@ for sp, isp in sumk.spin_names_to_ind[sumk.SO].items():
         denmat[sp] += sumk.bz_weights[ik] * calc_nf(sumk.hopping[ik,ind,:,:]-sumk.chemical_potential*np.eye(22), 1/beta).T
         #tmp = sumk.hopping_nloc[ik,isp,:,:].copy()
         #tmp[0:5,0:5] += sumk.Hsumk[0][sp][:,:]
-        #tmp[5:10,5:10] += sumk.Hsumk[1][sp][:,:] 
+        #tmp[5:10,5:10] += sumk.Hsumk[1][sp][:,:]
         #denmat_test[sp] += sumk.bz_weights[ik] * calc_nf(tmp-sumk.chemical_potential*np.eye(22), 1/beta).T
 
 assert(np.allclose(sumk.eloc_orig[0]['up'],sumk.Hsumk[0]['up']))
@@ -103,7 +103,7 @@ if mpi.is_master_node():
 
 #dm_full = np.zeros((22,22),dtype=complex)
 #for ik in range(125):
-#    dm_full += sumk.rhoks_full['up'][ik,:,:] 
+#    dm_full += sumk.rhoks_full['up'][ik,:,:]
 #dm_full/=125
 #print('dm_full=')
 #print(dm_full)

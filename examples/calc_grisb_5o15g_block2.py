@@ -1,6 +1,6 @@
 #######################################################
 # Example for the degenerate two-orbital Hubbard model
-# Author: Tsung-Han Lee 
+# Author: Tsung-Han Lee
 # Email: henhans74716@gmail.com
 #######################################################
 from pyblock2.driver.core import DMRGDriver, SymmetryTypes
@@ -8,7 +8,8 @@ import unittest
 import numpy as np
 import h5py
 from triqs_ghostGA.grisb import *
-from triqs_ghostGA.utils_TH import get_semicircle_e_list,U_matrix_kanamori
+from triqs_ghostGA.utility.utils_TH import U_matrix_kanamori
+from triqs_ghostGA.utility.e_list import EList_SemiCircular
 from triqs_ghostGA.pyblock2_solver import *
 
 class TestGrisb(unittest.TestCase):
@@ -17,9 +18,9 @@ class TestGrisb(unittest.TestCase):
         ntot = 40
         nimp = 10
         nbath= 30
-        
-        # construct ek with semicircular DOS 
-        e_list = get_semicircle_e_list(nmesh=1000)
+
+        # construct ek with semicircular DOS
+        e_list = EList_SemiCircular(nmesh=5000).e_list
         eks = []
         for e in e_list:
             tmp = numpy.array([[ 1.0*e, 0.0  , 0.0  , 0.0  , 0.0  ],
@@ -38,28 +39,10 @@ class TestGrisb(unittest.TestCase):
         R0 = numpy.random.rand(nbath//2,nimp//2)
         R0 = numpy.kron(R0,numpy.eye(2))
         Lambda0 = numpy.zeros((nbath//2,nbath//2))
-        Lambda0[0,0] = 2.0
-        Lambda0[1,1] = 2.0
-        Lambda0[2,2] = 2.0
-        Lambda0[3,3] = 2.0
-        Lambda0[4,4] = 2.0
-        Lambda0[5,5] = 0.0
-        Lambda0[6,6] = 0.0
-        Lambda0[7,7] = 0.0
-        Lambda0[8,8] = 0.0
-        Lambda0[9,9] = 0.0
-        Lambda0[10,10] =-2.0
-        Lambda0[11,11] =-2.0
-        Lambda0[12,12] =-2.0
-        Lambda0[13,13] =-2.0
-        Lambda0[14,14] =-2.0
-        #Lambda0 = numpy.random.rand(nbath//2,nbath//2)
-        #Lambda0 = (Lambda0 + Lambda0.T)/2
+        Lambda0 = np.diag([2.0, 2.0, 2.0, 2.0, 2.0,
+                           0.0, 0.0, 0.0, 0.0, 0.0,
+                          -2.0,-2.0,-2.0,-2.0,-2.0])
         Lambda0 = numpy.kron(Lambda0,numpy.eye(2))
-        #fh5i = h5py.File('sols_backup.h5','r')
-        #R0 = fh5i['U1.50/R'][...]
-        #Lambda0 = fh5i['U1.50/Lambda'][...]
-        #fh5i.close()
 
         U = 1.0
         J = U/4.
@@ -67,9 +50,11 @@ class TestGrisb(unittest.TestCase):
         nnom = 4.0 #nominal occupancy
         mu0 = (U+(nimp//2-1)*(U-2*J)+(nimp//2-1)*(U-3*J))*(nnom-0.5)/(2*nimp//2-1)
         Utensor = U_matrix_kanamori(nimp//2, U, J)
-        #print(Utensor.shape)
+
         maxM = 800
-        edsolver=Pyblock2_N_SZ(ntot, nimp, nbath, maxM) 
+        edsolver=Pyblock2_N_SZ(ntot, nimp, nbath, maxM)
+        print(edsolver.type)
+
         grisb = Grisb(ntot, nimp, nbath, eks, eloc, Utensor, R=R0, Lambda=Lambda0, edsolver=edsolver)
         grisb.run(mu=mu0, itmax=100, mix=0.5, tol=2e-3, beta=500, silence=True, spin_pen=0.00)
 
@@ -93,6 +78,6 @@ class TestGrisb(unittest.TestCase):
         print('occupancy:', 2*dm[0,0], 2*dm[2,2], 2*dm[4,4], 2*dm[6,6], 2*dm[8,8])
         print('total occupancy:', 2*(dm[0,0]+dm[2,2]+dm[4,4]+dm[6,6]+dm[8,8]) )
         print('QP weight:', Z1, Z2, Z3, Z4, Z5)
-        
+
 if __name__ == '__main__':
     unittest.main()

@@ -4,11 +4,13 @@ import unittest
 
 from triqs_ghostGA import LatticeSolver
 from triqs_ghostGA.grisb import *
-from triqs_ghostGA.utils_TH import get_semicircle_e_list, U_matrix_kanamori
+from triqs_ghostGA.utility.utils_TH import U_matrix_kanamori
+from triqs_ghostGA.utility.e_list import EList_SemiCircular
+from triqs.operators.util import U_matrix_kanamori as Umk
 from triqs.operators.util import U_matrix_kanamori as Umk
 import numpy as np
 from triqs_ghostGA.version import *
-from triqs_ghostGA.mps import ITensorMPSSolver as MPS
+from triqs_ghostGA.solvers.mps import ITensorMPSSolver as MPS
 
 
 class test_hemb_1o3_mps(unittest.TestCase):
@@ -19,7 +21,7 @@ class test_hemb_1o3_mps(unittest.TestCase):
         nimp, nbath, ntot = 2, 6, 8
 
         # construct ek with semicircular DOS
-        e_list = get_semicircle_e_list(nmesh=5000)
+        e_list = EList_SemiCircular(nmesh=5000).e_list
         eks = []
         for e in e_list:
             tmp = np.array([[1.0*e]],dtype=np.complex128)

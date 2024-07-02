@@ -4,16 +4,17 @@ import unittest
 
 from triqs_ghostGA import LatticeSolver
 from triqs_ghostGA.grisb import *
-from triqs_ghostGA.utils_TH import get_semicircle_e_list, U_matrix_kanamori
+from triqs_ghostGA.utility.utils_TH import U_matrix_kanamori
+from triqs_ghostGA.utility.e_list import EList_SemiCircular
 import numpy as np
-from triqs_ghostGA.ci import CI
+import os
 
 
 class test_compare_results(unittest.TestCase):
 
     def test_1o3_halffilled(self):
 
-        with HDFArchive("result_tests.h5", "r") as A:
+        with HDFArchive(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "r") as A:
             ci_docc = A["1o3_ci"]["docc"]
             ci_denM = A["1o3_ci"]["denMat"]
             ci_denM_eval, ci_denM_evec = np.linalg.eig(A["1o3_ci"]["denMat"])

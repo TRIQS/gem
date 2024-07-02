@@ -35,31 +35,32 @@ import numpy as np
 from h5 import HDFArchive
 import triqs.utility.mpi as mpi
 
+# TODO: Move to triqs_dft_tools
+from triqs_ghostGA.wannier90 import Wannier90Converter
 from triqs_dft_tools.converters.vasp import VaspConverter
 from triqs_dft_tools.converters.plovasp.vaspio import VaspData
 import triqs_dft_tools.converters.plovasp.converter as plo_converter
 
-from triqs_ghostGA.wannier90 import Wannier90Converter
+# TODO: Move to solid_dmft
 from triqs_ghostGA.grisb_cycle import grisb_cycle
-
 from solid_dmft.dft_managers import vasp_manager as vasp
 from solid_dmft.dft_managers import qe_manager as qe
 
-#def _run_plo_converter(general_params):
-#    if not mpi.is_master_node():
-#        return
-#
-#    # Checks for plo file for projectors
-#    if not os.path.exists(general_params['plo_cfg']):
-#        print('*** Input PLO config file not found! '
-#              + 'I was looking for {} ***'.format(general_params['plo_cfg']))
-#        mpi.MPI.COMM_WORLD.Abort(1)
-#
-#    # Runs plo converter
-#    plo_converter.generate_and_output_as_text(general_params['plo_cfg'], vasp_dir='./')
-#    # Writes new H(k) to h5 archive
-#    converter = VaspConverter(filename=general_params['seedname'])
-#    converter.convert_dft_input()
+def _run_plo_converter(general_params):
+    if not mpi.is_master_node():
+        return
+
+    # Checks for plo file for projectors
+    if not os.path.exists(general_params['plo_cfg']):
+        print('*** Input PLO config file not found! '
+              + 'I was looking for {} ***'.format(general_params['plo_cfg']))
+        mpi.MPI.COMM_WORLD.Abort(1)
+
+    # Runs plo converter
+    plo_converter.generate_and_output_as_text(general_params['plo_cfg'], vasp_dir='./')
+    # Writes new H(k) to h5 archive
+    converter = VaspConverter(filename=general_params['seedname'])
+    converter.convert_dft_input()
 
 def _run_wannier90(general_params, dft_params):
     if not mpi.is_master_node():
@@ -76,7 +77,7 @@ def _run_wannier90(general_params, dft_params):
     subprocess.check_call(command + ['-pp', general_params['seedname']], shell=False)
     subprocess.check_call(command + [general_params['seedname']], shell=False)
 
-def _run_w90converter(seedname, tolerance):
+def _run_w90converter(seedname, tolerance, ghostGA=False):
     if (not os.path.exists(seedname + '.win')
         or not os.path.exists(seedname + '.inp')):
         print('*** Wannier input/converter config file not found! '
@@ -84,9 +85,12 @@ def _run_w90converter(seedname, tolerance):
         mpi.MPI.COMM_WORLD.Abort(1)
 
     #TODO: choose rot_mat_type with general_params['set_rot']
-    #TODO: Here I use rot_mat_type='none' for preliminary defelopment. ghostGA doesn't have sign problem.
-    #converter = Wannier90Converter(seedname, rot_mat_type='hloc_diag', bloch_basis=True, w90zero=tolerance)
-    converter = Wannier90Converter(seedname, rot_mat_type='none', bloch_basis=True, w90zero=tolerance)
+    if not ghostGA:
+        converter = Wannier90Converter(seedname, rot_mat_type='hloc_diag', bloch_basis=True, w90zero=tolerance)
+    else:
+        # TODO: Here I use rot_mat_type='none' for preliminary defelopment. ghostGA doesn't have sign problem.
+        converter = Wannier90Converter(seedname, rot_mat_type='none', bloch_basis=True, w90zero=tolerance)
+
     converter.convert_dft_input()
     mpi.barrier()
 
@@ -96,7 +100,7 @@ def _run_w90converter(seedname, tolerance):
             assert archive['dft_input']['use_rotations'], 'Creation of rot_mat failed in W90 converter'
     mpi.barrier()
 
-def _full_qe_run(seedname, dft_params, mode):
+def _full_qe_run(seedname, dft_params, mode, ghostGA=False):
     assert mode in ('initial', 'restart', 'update')
 
     # runs a full iteration of DFT
@@ -122,7 +126,7 @@ def _full_qe_run(seedname, dft_params, mode):
     qe_wrapper('win_pp')
     qe_wrapper('pw2wan')
     qe_wrapper('win')
-    _run_w90converter(seedname, dft_params['w90_tolerance'])
+    _run_w90converter(seedname, dft_params['w90_tolerance'], ghostGA=ghostGA)
 
 
 def _store_dft_eigvals(path_to_h5, iteration, projector_type):
@@ -146,91 +150,94 @@ def _store_dft_eigvals(path_to_h5, iteration, projector_type):
 
         archive['dft_eigvals']['it_'+str(iteration)] = eigenvals
 
-#def _full_vasp_run(general_params, dft_params, initial_run, n_iter_dft=1, sum_k=None):
-#    """
-#    Performs a complete DFT cycle in Vasp and the correct converter. If
-#    initial_run, Vasp is starting and performing a normal scf calculation
-#    followed by a converter run. Otherwise, it performs n_iter_dft runs of DFT,
-#    generating the projectors with the converter, and recalculating the charge
-#    density correction with the new projectors.
-#
-#    Parameters
-#    ----------
-#    general_params : dict
-#        general parameters as a dict
-#    dft_params : dict
-#        dft parameters as a dict
-#    initial_run : bool
-#        True when VASP is called for the first time. initial_run = True requires
-#        n_iter_dft = 1.
-#    n_iter_dft : int, optional
-#        Number of DFT iterations to perform. The default is 1.
-#    sum_k : SumkDFT, optional
-#        The SumkDFT object required to recalculate the charge-density correction
-#        if n_iter_dft > 1. The default is None.
-#
-#    Returns
-#    -------
-#    vasp_process_id : int
-#        The process ID of the forked VASP process.
-#    irred_indices : np.array
-#        Integer indices of kpts in the irreducible Brillouin zone. Only needed
-#        for Wannier projectors, which are normally run with symmetries.
-#    """
-#
-#
-#    if initial_run:
-#        assert n_iter_dft == 1
-#    else:
-#        assert n_iter_dft == 1 or sum_k is not None, 'Sumk object needed to run multiple DFT iterations'
-#
-#    for i in range(n_iter_dft):
-#        if initial_run:
-#            vasp_process_id = vasp.run_initial_scf(dft_params['n_cores'], dft_params['dft_exec'],
-#                                                   dft_params['mpi_env'])
-#        else:
-#            vasp_process_id = None
-#            vasp.run_charge_update()
-#
-#        if dft_params['projector_type'] == 'plo':
-#            _run_plo_converter(general_params)
-#            irred_indices = None
-#        elif dft_params['projector_type'] == 'w90':
-#            _run_wannier90(general_params, dft_params)
-#            mpi.barrier()
-#            _run_w90converter(general_params['seedname'], dft_params['w90_tolerance'])
-#            mpi.barrier()
-#            kpts = None
-#            if mpi.is_master_node():
-#                with HDFArchive(general_params['seedname']+'.h5', 'r') as archive:
-#                    kpts = archive['dft_input/kpts']
-#            irred_indices = vasp.read_irred_kpoints(kpts)
-#
-#        # No need for recalculation of density correction if we run DMFT next
-#        if i == n_iter_dft - 1:
-#            break
-#
-#        # Recalculates the density correction
-#        # Reads in new projectors and hopping and updates chemical potential
-#        # rot_mat is not updated since it's more closely related to the local problem than DFT
-#        # New fermi weights are directly read in calc_density_correction
-#        mpi.barrier()
-#        if mpi.is_master_node():
-#            with HDFArchive(general_params['seedname']+'.h5', 'r') as archive:
-#                sum_k.proj_mat = archive['dft_input/proj_mat']
-#                sum_k.hopping = archive['dft_input/hopping']
-#        sum_k.proj_mat = mpi.bcast(sum_k.proj_mat)
-#        sum_k.hopping = mpi.bcast(sum_k.hopping)
-#        sum_k.calc_mu(precision=general_params['prec_mu'])
-#
-#        # Writes out GAMMA file
-#        sum_k.calc_density_correction(dm_type='vasp',  kpts_to_write=irred_indices)
-#
-#    return vasp_process_id, irred_indices
+def _full_vasp_run(general_params, dft_params, initial_run, n_iter_dft=1, sum_k=None, ghostGA=False):
+    """
+    Performs a complete DFT cycle in Vasp and the correct converter. If
+    initial_run, Vasp is starting and performing a normal scf calculation
+    followed by a converter run. Otherwise, it performs n_iter_dft runs of DFT,
+    generating the projectors with the converter, and recalculating the charge
+    density correction with the new projectors.
 
+    Parameters
+    ----------
+    general_params : dict
+        general parameters as a dict
+    dft_params : dict
+        dft parameters as a dict
+    initial_run : bool
+        True when VASP is called for the first time. initial_run = True requires
+        n_iter_dft = 1.
+    n_iter_dft : int, optional
+        Number of DFT iterations to perform. The default is 1.
+    sum_k : SumkDFT, optional
+        The SumkDFT object required to recalculate the charge-density correction
+        if n_iter_dft > 1. The default is None.
+
+    Returns
+    -------
+    vasp_process_id : int
+        The process ID of the forked VASP process.
+    irred_indices : np.array
+        Integer indices of kpts in the irreducible Brillouin zone. Only needed
+        for Wannier projectors, which are normally run with symmetries.
+    """
+
+
+    if initial_run:
+        assert n_iter_dft == 1
+    else:
+        assert n_iter_dft == 1 or sum_k is not None, 'Sumk object needed to run multiple DFT iterations'
+
+    for i in range(n_iter_dft):
+        if initial_run:
+            vasp_process_id = vasp.run_initial_scf(dft_params['n_cores'], dft_params['dft_exec'],
+                                                   dft_params['mpi_env'])
+        else:
+            vasp_process_id = None
+            vasp.run_charge_update()
+
+        if dft_params['projector_type'] == 'plo':
+            _run_plo_converter(general_params)
+            irred_indices = None
+        elif dft_params['projector_type'] == 'w90':
+            _run_wannier90(general_params, dft_params)
+            mpi.barrier()
+            _run_w90converter(general_params['seedname'], dft_params['w90_tolerance'], ghostGA=ghostGA)
+            mpi.barrier()
+            kpts = None
+            if mpi.is_master_node():
+                with HDFArchive(general_params['seedname']+'.h5', 'r') as archive:
+                    kpts = archive['dft_input/kpts']
+            irred_indices = vasp.read_irred_kpoints(kpts)
+
+        # No need for recalculation of density correction if we run DMFT next
+        if i == n_iter_dft - 1:
+            break
+
+        # Recalculates the density correction
+        # Reads in new projectors and hopping and updates chemical potential
+        # rot_mat is not updated since it's more closely related to the local problem than DFT
+        # New fermi weights are directly read in calc_density_correction
+        mpi.barrier()
+        if mpi.is_master_node():
+            with HDFArchive(general_params['seedname']+'.h5', 'r') as archive:
+                sum_k.proj_mat = archive['dft_input/proj_mat']
+                sum_k.hopping = archive['dft_input/hopping']
+        sum_k.proj_mat = mpi.bcast(sum_k.proj_mat)
+        sum_k.hopping = mpi.bcast(sum_k.hopping)
+        sum_k.calc_mu(precision=general_params['prec_mu'])
+
+        # Writes out GAMMA file
+        sum_k.calc_density_correction(dm_type='vasp',  kpts_to_write=irred_indices)
+
+    return vasp_process_id, irred_indices
+
+
+# TODO: dmft keyword is everywhere. Should we change it? Here it also calls from read_config, which has different names
+# in ghostGA. That's problematic, because they have the same function. So they should be unified.
 
 # Main CSC flow method
-def csc_flow_control(general_params, solver_params, dft_params, advanced_params):
+def csc_flow_control(general_params, solver_params, dft_params, advanced_params, ghostGA=False):
     """
     Function to run the csc cycle. It writes and removes the vasp.lock file to
     start and stop Vasp, run the converter, run the dmft cycle and abort the job
@@ -265,25 +272,25 @@ def csc_flow_control(general_params, solver_params, dft_params, advanced_params)
                 iteration_offset = archive['DMFT_results']['iteration_count']
     iteration_offset = mpi.bcast(iteration_offset)
 
-    iter_grisb = iteration_offset+1
+    iter_dmft = iteration_offset+1
 
     # Runs DFT once and converter
     mpi.barrier()
     irred_indices = None
     start_time_dft = timer()
-    mpi.report('  triqs_ghostGA: Running {}...'.format(dft_params['dft_code'].upper()))
+    mpi.report('  solid_dmft: Running {}...'.format(dft_params['dft_code'].upper()))
 
     if dft_params['dft_code'] == 'qe':
         if iteration_offset == 0:
-            _full_qe_run(general_params['seedname'], dft_params, 'initial')
+            _full_qe_run(general_params['seedname'], dft_params, 'initial', ghostGA=ghostGA)
         else:
-            _full_qe_run(general_params['seedname'], dft_params, 'restart')
+            _full_qe_run(general_params['seedname'], dft_params, 'restart', ghostGA=ghostGA)
     elif dft_params['dft_code'] == 'vasp':
         vasp_process_id, irred_indices = _full_vasp_run(general_params, dft_params, True)
 
     mpi.barrier()
     end_time_dft = timer()
-    mpi.report('  triqs_ghostGA: DFT cycle took {:10.3f} seconds'.format(end_time_dft-start_time_dft))
+    mpi.report('  solid_dmft: DFT cycle took {:10.3f} seconds'.format(end_time_dft-start_time_dft))
 
     # Now that everything is ready, starts DFT+DMFT loop
     while True:
@@ -295,40 +302,54 @@ def csc_flow_control(general_params, solver_params, dft_params, advanced_params)
                     # TODO: implement
                     raise NotImplementedError('store_eigenvals not yet compatible with dft_code = qe')
                 _store_dft_eigvals(path_to_h5=general_params['seedname']+'.h5',
-                                   iteration=iter_grisb,
+                                   iteration=iter_dmft,
                                    projector_type=dft_params['projector_type'])
 
             # Reads the DFT energy
             if dft_params['dft_code'] == 'vasp':
                 dft_energy = vasp.read_dft_energy()
             elif dft_params['dft_code'] == 'qe':
-                dft_energy = qe.read_dft_energy(general_params['seedname'], iter_grisb)
+                dft_energy = qe.read_dft_energy(general_params['seedname'], iter_dmft)
         dft_energy = mpi.bcast(dft_energy)
 
-        mpi.report('', '#'*80, 'Calling grisb_cycle')
+        if not ghostGA:
+            mpi.report('', '#'*80, 'Calling dmft_cycle')
+        else:
+            mpi.report('', '#'*80, 'Calling grisb_cycle')
 
         if mpi.is_master_node():
             start_time_dmft = timer()
 
         # Determines number of DMFT steps
-        if iter_grisb == 1:
-            iter_one_shot = general_params['n_iter_grisb_first']
-        #elif iteration_offset > 0 and iter_grisb == iteration_offset + 1:
-        #    iter_one_shot = general_params['n_iter_grisb_per'] - (iter_grisb - 1
-        #                    - general_params['n_iter_grisb_first'])%general_params['n_iter_grisb_per']
+        if not ghostGA:
+            if iter_dmft == 1:
+                iter_one_shot = general_params['n_iter_dmft_first']
+            elif iteration_offset > 0 and iter_dmft == iteration_offset + 1:
+                iter_one_shot = general_params['n_iter_dmft_per'] - (iter_dmft - 1
+                                - general_params['n_iter_dmft_first'])%general_params['n_iter_dmft_per']
+            else:
+                iter_one_shot = general_params['n_iter_dmft_per']
+            # Maximum total number of iterations is n_iter_dmft+iteration_offset
+            iter_one_shot = min(iter_one_shot,
+                                general_params['n_iter_dmft'] + iteration_offset - iter_dmft + 1)
         else:
-            iter_one_shot = general_params['n_iter_grisb_per']
-        # Maximum total number of iterations is n_iter_grisb+iteration_offset
-        #iter_one_shot = min(iter_one_shot,
-        #                    general_params['n_iter_grisb'] + iteration_offset - iter_grisb + 1)
+            # TODO: Why not use the same structure as for DMFT here? (the elif in particular)
+            if iter_dmft == 1:
+                iter_one_shot = general_params['n_iter_grisb_first']
+            else:
+                iter_one_shot = general_params['n_iter_grisb_per']
 
         ############################################################
         # run the dmft_cycle
-        is_converged, sum_k = grisb_cycle(general_params, solver_params, advanced_params,
-                                         dft_params, iter_one_shot, irred_indices, dft_energy)
+        if not ghostGA:
+            is_converged, sum_k = dmft_cycle(general_params, solver_params, advanced_params,
+                                             dft_params, iter_one_shot, irred_indices, dft_energy)
+        else:
+            is_converged, sum_k = grisb_cycle(general_params, solver_params, advanced_params,
+                                              dft_params, iter_one_shot, irred_indices, dft_energy)
         ############################################################
 
-        iter_grisb += iter_one_shot
+        iter_dmft += iter_one_shot
 
         if mpi.is_master_node():
             end_time_dmft = timer()
@@ -336,9 +357,14 @@ def csc_flow_control(general_params, solver_params, dft_params, advanced_params)
             print('DMFT cycle took {:10.3f} seconds'.format(end_time_dmft-start_time_dmft))
             print('='*80 + '\n')
 
-        # If all steps are executed or calculation is converged, finish DFT+DMFT loop
-        if is_converged or iter_grisb > general_params['n_iter_grisb'] + iteration_offset:
-            break
+        if not ghostGA:
+            # If all steps are executed or calculation is converged, finish DFT+DMFT loop
+            if is_converged or iter_dmft > general_params['n_iter_dmft'] + iteration_offset:
+                break
+        else:
+            # If all steps are executed or calculation is converged, finish DFT+gGA loop
+            if is_converged or iter_dmft > general_params['n_iter_grisb'] + iteration_offset:
+                break
 
         # Restarts DFT
         mpi.barrier()
@@ -347,10 +373,10 @@ def csc_flow_control(general_params, solver_params, dft_params, advanced_params)
 
         # Runs DFT and converter
         if dft_params['dft_code'] == 'qe':
-            _full_qe_run(general_params['seedname'], dft_params, 'update')
+            _full_qe_run(general_params['seedname'], dft_params, 'update', ghostGA=ghostGA)
         elif dft_params['dft_code'] == 'vasp':
             # Determines number of DFT steps
-            if iter_grisb == general_params['n_iter_grisb_first'] + 1:
+            if iter_dmft == general_params['n_iter_dmft_first'] + 1:
                 n_iter_dft = dft_params['n_iter_first']
             else:
                 n_iter_dft = dft_params['n_iter']

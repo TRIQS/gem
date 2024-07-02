@@ -3,38 +3,33 @@
 # Author: Tsung-Han Lee
 # Email: henhans74716@gmail.com
 #######################################################
+from pyblock2.driver.core import DMRGDriver, SymmetryTypes
 import unittest
 import numpy as np
 import h5py
 from triqs_ghostGA.grisb import *
 from triqs_ghostGA.utility.utils_TH import U_matrix_kanamori
 from triqs_ghostGA.utility.e_list import EList_SemiCircular
-#from triqs_ghostGA.pyscf_ccsd import *
-from triqs_ghostGA.pyscf_solvers import *
+from triqs_ghostGA.pyblock2_solver import *
 
 class TestGrisb(unittest.TestCase):
     def runTest(self):
         np.set_printoptions(suppress=True,precision=10)
-        ntot = 40
-        nimp = 10
-        nbath= 30
+        ntot = 24
+        nimp = 6
+        nbath= 18
 
         # construct ek with semicircular DOS
-        e_list = EList_SemiCircular(nmesh=100).e_list
+        e_list = EList_SemiCircular(nmesh=5000).e_list
         eks = []
         for e in e_list:
-            tmp = numpy.array([[ 1.0*e, 0.0  , 0.0  , 0.0  , 0.0  ],
-                               [ 0.0  , 1.0*e, 0.0  , 0.0  , 0.0  ],
-                               [ 0.0  , 0.0  , 0.5*e, 0.0  , 0.0  ],
-                               [ 0.0  , 0.0  , 0.0  , 0.5*e, 0.0  ],
-                               [ 0.0  , 0.0  , 0.0  , 0.0  , 0.5*e]],dtype=numpy.complex128)
+            tmp = numpy.array([[ 1.0*e, 0.0  , 0.0  ],
+                               [ 0.0  , 1.0*e, 0.0  ],
+                               [ 0.0  , 0.0  , 1.0*e]],dtype=numpy.complex128)
             tmp = numpy.kron(tmp,numpy.eye(2))
             eks.append(tmp)
         eks = numpy.array(eks)
-        Us = numpy.arange(0.1,3.55,0.1)#[::-1]
-        #R0 = numpy.loadtxt("data/R_U3.5.dat",dtype=numpy.complex128)[:,2:4] #+ numpy.random.rand(nbath,nimp)*0.01
-        #Lambda0 = numpy.loadtxt("data/LAMBDA_U3.5.dat",dtype=numpy.complex128)
-        #R0 = numpy.ones((nbath//2,nimp//2))*0.5
+        Us = numpy.arange(0.1,3.55,0.1)
         numpy.random.seed(1234)
         R0 = numpy.random.rand(nbath//2,nimp//2)
         R0 = numpy.kron(R0,numpy.eye(2))
@@ -42,41 +37,24 @@ class TestGrisb(unittest.TestCase):
         Lambda0[0,0] = 2.0
         Lambda0[1,1] = 2.0
         Lambda0[2,2] = 2.0
-        Lambda0[3,3] = 2.0
-        Lambda0[4,4] = 2.0
+        Lambda0[3,3] = 0.0
+        Lambda0[4,4] = 0.0
         Lambda0[5,5] = 0.0
-        Lambda0[6,6] = 0.0
-        Lambda0[7,7] = 0.0
-        Lambda0[8,8] = 0.0
-        Lambda0[9,9] = 0.0
-        Lambda0[10,10] =-2.0
-        Lambda0[11,11] =-2.0
-        Lambda0[12,12] =-2.0
-        Lambda0[13,13] =-2.0
-        Lambda0[14,14] =-2.0
-        #Lambda0 = numpy.random.rand(nbath//2,nbath//2)
-        #Lambda0 = (Lambda0 + Lambda0.T)/2
+        Lambda0[6,6] =-2.0
+        Lambda0[7,7] =-2.0
+        Lambda0[8,8] =-2.0
         Lambda0 = numpy.kron(Lambda0,numpy.eye(2))
-        #fh5i = h5py.File('sols_backup.h5','r')
-        #R0 = fh5i['U1.50/R'][...]
-        #Lambda0 = fh5i['U1.50/Lambda'][...]
-        #fh5i.close()
 
-        U = 0.4
+        U = 1.0
         J = U/4.
         eloc = np.zeros((nimp,nimp))
-        nnom = 4.0 #nominal occupancy
+        nnom = 2.2 #nominal occupancy
         mu0 = (U+(nimp//2-1)*(U-2*J)+(nimp//2-1)*(U-3*J))*(nnom-0.5)/(2*nimp//2-1)
         Utensor = U_matrix_kanamori(nimp//2, U, J)
         #print(Utensor.shape)
-        edsolver=Pyscf_ccsd(ntot, nimp, nbath)
-        # remove the history files
-        import os
-        try:
-            os.remove('hf.chk')
-            os.remove('ccdiis.h5')
-        except:
-            print('no history files')
+        maxM = 800
+        edsolver=Pyblock2_N_SZ(ntot, nimp, nbath, maxM)
+        print(edsolver.type)
         grisb = Grisb(ntot, nimp, nbath, eks, eloc, Utensor, R=R0, Lambda=Lambda0, edsolver=edsolver)
         grisb.run(mu=mu0, itmax=100, mix=0.5, tol=2e-3, beta=500, silence=True, spin_pen=0.00)
 

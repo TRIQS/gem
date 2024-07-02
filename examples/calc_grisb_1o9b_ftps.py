@@ -1,13 +1,14 @@
 #######################################################
 # Example for the degenerate two-orbital Hubbard model
-# Author: Tsung-Han Lee 
+# Author: Tsung-Han Lee
 # Email: henhans74716@gmail.com
 #######################################################
 import unittest
 import numpy as np
 import h5py
 from triqs_ghostGA.grisb import *
-from triqs_ghostGA.utils_TH import get_semicircle_e_list,U_matrix_kanamori
+from triqs_ghostGA.utility.utils_TH import U_matrix_kanamori
+from triqs_ghostGA.utility.e_list import EList_SemiCircular
 
 class TestGrisb(unittest.TestCase):
     def runTest(self):
@@ -16,8 +17,8 @@ class TestGrisb(unittest.TestCase):
         nimp = 2
         nbath= 18
 
-        # construct ek with semicircular DOS 
-        e_list = get_semicircle_e_list(nmesh=5000) 
+        # construct ek with semicircular DOS
+        e_list = EList_SemiCircular(nmesh=5000).e_list
         eks = []
         for e in e_list:
             tmp = np.array([[1.0*e]],dtype=np.complex128)
