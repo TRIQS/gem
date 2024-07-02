@@ -68,8 +68,8 @@ class SolverStructure(SStructure):
             # sets up necessary GF objects on ImFreq. we are not using it yet.
             self.gf_struct = self.sum_k.gf_struct_solver_list[self.icrsh]
             # TODO: Do we really need that?
-            # self._init_ImFreq_objects()
-            # self._init_ReFreq_hartree()
+            self._init_ImFreq_objects()
+            self._init_ReFreq_hartree()
 
             # sets up solver
             self.triqs_solver = self._create_fci_solver()
@@ -78,16 +78,16 @@ class SolverStructure(SStructure):
 
         elif self.general_params['solver_type'] == 'pyscf_dmrg':
             self.gf_struct = self.sum_k.gf_struct_solver_list[self.icrsh]
-            # self._init_ImFreq_objects()
-            # self._init_ReFreq_hartree()
+            self._init_ImFreq_objects()
+            self._init_ReFreq_hartree()
 
             #set up solver
             self.triqs_solver = self._create_pyscf_dmrg_solver()
 
         elif self.general_params['solver_type'] == 'pyscf_ccsd':
             self.gf_struct = self.sum_k.gf_struct_solver_list[self.icrsh]
-            # self._init_ImFreq_objects()
-            # self._init_ReFreq_hartree()
+            self._init_ImFreq_objects()
+            self._init_ReFreq_hartree()
 
             #set up solver
             self.triqs_solver = self._create_pyscf_ccsd_solver()
