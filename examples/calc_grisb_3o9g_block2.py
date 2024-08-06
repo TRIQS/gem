@@ -10,7 +10,7 @@ import h5py
 from triqs_ghostGA.grisb import *
 from triqs_ghostGA.utility.utils_TH import U_matrix_kanamori
 from triqs_ghostGA.utility.e_list import EList_SemiCircular
-from triqs_ghostGA.pyblock2_solver import *
+from triqs_ghostGA.solvers.pyblock2 import *
 
 class TestGrisb(unittest.TestCase):
     def runTest(self):
@@ -50,13 +50,14 @@ class TestGrisb(unittest.TestCase):
         eloc = np.zeros((nimp,nimp))
         nnom = 2.2 #nominal occupancy
         mu0 = (U+(nimp//2-1)*(U-2*J)+(nimp//2-1)*(U-3*J))*(nnom-0.5)/(2*nimp//2-1)
+        eloc[0, 0], eloc[1, 1] = mu0, mu0
         Utensor = U_matrix_kanamori(nimp//2, U, J)
         #print(Utensor.shape)
         maxM = 800
         edsolver=Pyblock2_N_SZ(ntot, nimp, nbath, maxM)
         print(edsolver.type)
         grisb = Grisb(ntot, nimp, nbath, eks, eloc, Utensor, R=R0, Lambda=Lambda0, edsolver=edsolver)
-        grisb.run(mu=mu0, itmax=100, mix=0.5, tol=2e-3, beta=500, silence=True, spin_pen=0.00)
+        grisb.run(itmax=100, mix=0.5, tol=2e-3, beta=500, silence=True, spin_pen=0.00)
 
         Z = grisb.R.conj().T.dot(grisb.R)
         docc = grisb.docc
