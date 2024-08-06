@@ -24,12 +24,15 @@ cmake_policy(VERSION 3.20)
 
 # ############
 # Define Project
-project(triqs_ghostGA VERSION 3.2.0 LANGUAGES C CXX)
+project(triqs_ghostGA VERSION 3.3.0 LANGUAGES C CXX)
 get_directory_property(IS_SUBPROJECT PARENT_DIRECTORY)
+if(POLICY CMP0144)
+  cmake_policy(SET CMP0144 NEW)
+endif()
 
 # ############
 # Load TRIQS and CPP2PY
-find_package(TRIQS 3.2 REQUIRED)
+find_package(TRIQS 3.3 REQUIRED)
 
 # Get the git hash & print status
 triqs_get_git_hash_of_source_dir(PROJECT_GIT_HASH)
@@ -102,6 +105,23 @@ endif()
 # Additional configuration files
 add_subdirectory(share)
 
+# check optional python packages
+message(STATUS "------- Optional python packages -------")
+function(check_option_python command_str name)
+  execute_process(COMMAND ${Python_EXECUTABLE} -c ${command_str}
+    OUTPUT_VARIABLE res RESULT_VARIABLE returncode OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(NOT returncode EQUAL 0)
+    message(STATUS "-- ${name} is NOT installed.")
+    set(FORKTPS_INSTALLED 1 PARENT_SCOPE)
+  else()
+    message(STATUS "-- ${name} is installed.")
+  endif()
+endfunction()
+
+# Forktps
+check_option_python("import forktps" "ForkTPS")
+check_option_python("import block2" "Block2")
+
 # #############
 # Debian Package
 
@@ -115,7 +135,7 @@ if(BUILD_DEBIAN_PACKAGE AND NOT IS_SUBPROJECT)
   set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
   set(CPACK_PACKAGE_CONTACT "https://github.com/TRIQS/${PROJECT_NAME}")
   execute_process(COMMAND dpkg --print-architecture OUTPUT_VARIABLE CMAKE_DEBIAN_PACKAGE_ARCHITECTURE OUTPUT_STRIP_TRAILING_WHITESPACE)
-  set(CPACK_DEBIAN_PACKAGE_DEPENDS "triqs (>= 3.2), python3, python3-numpy, h5py")
+  set(CPACK_DEBIAN_PACKAGE_DEPENDS "triqs (>= 3.3), python3, python3-numpy, h5py")
   set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
   set(CPACK_DEBIAN_PACKAGE_GENERATE_SHLIBS ON)
   include(CPack)
