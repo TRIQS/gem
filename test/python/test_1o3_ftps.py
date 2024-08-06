@@ -8,12 +8,17 @@ from triqs_ghostGA.utility.utils_TH import U_matrix_kanamori
 from triqs_ghostGA.utility.e_list import EList_SemiCircular
 import numpy as np
 from triqs_ghostGA.version import *
-from triqs_ghostGA.solvers.ftps import FTPS
+# from triqs_ghostGA.solvers.ftps import FTPS
 import os
 
+try:
+    from triqs_ghostGA.solvers.ftps import FTPS
+except ImportError:
+    have_ftps = False
 
 class test_hemb_1o3_ftps(unittest.TestCase):
 
+    @unittest.skipIf(not have_ftps, reason="ForkTPS is not installed")
     def test_grisb_ftps(self):
 
         # 1 orbital with 2 spins, 3 bath per orbital, total 8
