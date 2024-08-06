@@ -28,6 +28,33 @@ class EList ():
 
 ############################################
 
+class EList_TB_2D (EList):
+    r"""Get the energy list from a TRIQS tight-binding object and
+        stores it.
+
+    Input:
+        H_r: TB Hamiltonian object from TRIQS.
+        n_k: Number of k-points in one direction, homogeneous and interpolated from the Fourier interpolation.
+        n_fourier: Number of k-points in the Fourier interpolation.
+    Output:
+        e_list: list of e points.
+    """
+
+    def __init__ (self, H_r, n_k=100, n_fourier=20):
+        kmesh = H_r.get_kmesh(n_k=n_fourier)
+        e_k = H_r.fourier(kmesh)
+
+        k = np.linspace(-np.pi, np.pi, num=n_k)
+        kx, ky = np.meshgrid(k, k)
+
+        e_k_interp = np.vectorize(lambda kx, ky : e_k((kx, ky, 0)).real)(kx, ky)
+        self.k_list = [kx, ky]
+        self.e_list = np.reshape(e_k_interp, n_k**2)
+
+    def __str__ (self): return "EList object. Created from TB " + str(H_r)
+
+############################################
+
 class EList_1D (EList):
     r"""Get the energy list of a 1D chain with dispersion
 
