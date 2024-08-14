@@ -200,11 +200,13 @@ def build_rholoc_onfly(basis,gs_wf,rholoc,bipart_smap):
                 rholoc[bipart_smap[i,1],bipart_smap[j,1]] += gs_wf[i]*gs_wf[j]#M[iidx,jidx]
     return rholoc
 
+# TODO Make basic solver Class?
 class CI(object):
     '''
     Exact diagonalization class aim to solve general impurity Hamiltonian.
     '''
-    def __init__(self, norb, use_Ntot=False, use_Sz=False, CISD=False, thermal=False, dtype=np.float64, Nparticle=None):
+    def __init__(self, norb, use_Ntot=False, use_Sz=False, CISD=False, thermal=False, dtype=np.float64, Nparticle=None,
+                 spin_pen=0, sz_pen=0, sx_pen=0, sy_pen=0):
         '''
         Constructor.
         Input:
@@ -227,6 +229,11 @@ class CI(object):
         self.data_type = dtype # data type of the Hamiltonian
         self.Hone = None # initialize None for one-body part
         self.Htwo = None # initialize None for two-body part
+
+        self.spin_pen = spin_pen
+        self.sz_pen = sz_pen
+        self.sx_pen = sx_pen
+        self.sy_pen = sy_pen
 
         # create basis in the ground space half-filled and optionally Sz=0.
         if use_Ntot == True and use_Sz == False and CISD == False: # Ntot symmetry
@@ -443,7 +450,7 @@ class CI(object):
                     #print(i,j,H1E[i,j])
                     self.Hone += H1E[i,j]*self.denmat_op[(i,j)]
 
-    def build_Hemb_for_grisb_cycle(self, V2E, spin_pen=0., sz_pen=0.0, debug=False):
+    def build_Hemb_for_grisb_cycle(self, V2E, debug=False):
         '''
         build the Hamiltonian and return Hamiltonian
         '''
@@ -453,13 +460,13 @@ class CI(object):
         if self.Htwo is None:
             self.build_two_body(V2E)
         mpi.report('one-body + two-body')
-        self.Ham = self.Hone + self.Htwo + spin_pen*self.S2 + sz_pen*self.Sz.dot(self.Sz)
+        self.Ham = self.Hone + self.Htwo + self.spin_pen*self.S2 + self.sz_pen*self.Sz.dot(self.Sz)
         mpi.report('done')
 #        assert(abs( (self.Ham - self.Ham.getH()).max() ) < 1e-12), 'Hamiltonian is not Hermitian! H.getH()-H='
         if debug:
             return self.Ham
 
-    def build_Hemb(self, H1E, V2E, spin_pen=0., sz_pen=0.0, debug=False):
+    def build_Hemb(self, H1E, V2E, debug=False):
         '''
         build the Hamiltonian and return Hamiltonian
         '''
@@ -469,7 +476,9 @@ class CI(object):
         if self.Htwo is None:
             self.build_two_body(V2E)
         mpi.report('one-body + two-body')
-        self.Ham = self.Hone + self.Htwo + spin_pen*self.S2 + sz_pen*self.Sz.dot(self.Sz)
+        self.Ham = (self.Hone + self.Htwo +
+                    self.spin_pen*self.S2 + self.sz_pen*self.Sz.dot(self.Sz) +
+                    self.sx_pen*self.Sx.dot(self.Sx) + self.sy_pen*self.Sy.dot(self.Sy))
         mpi.report('done')
 #        assert(abs( (self.Ham - self.Ham.getH()).max() ) < 1e-12), 'Hamiltonian is not Hermitian! H.getH()-H='
         if debug:
@@ -516,6 +525,8 @@ class CI(object):
         #build S^2 operator
         self.S2 = Sm.dot(Sp)+Sz.dot(Sz)+Sz
         self.Sz = Sz
+        self.Sx = 0.5*(Sp + Sm)
+        self.Sy = 0.5*(Sp - Sm)/1j
 
 
     #def build_docc_op(self,debug=False):
@@ -667,6 +678,9 @@ class CI(object):
         '''
         mpi.report('diagonalizing num_eig= {:d}'.format(num_eig))
         vals, vecs = eigsh(self.Ham,k=num_eig,which=which,tol=tol)
+        so = np.abs(vals).argsort()[::-1]
+        vals = vals[so]
+        vecs = vecs[:, so]
         self.gs_wf = vecs[:,0]
         self.gs_ene = vals[0]
         self.evals = vals
@@ -680,11 +694,13 @@ class CI(object):
                     self.deg += 1
                     it += 1
         if mpi.is_master_node():
-            print('# Energy        S2        Sz')
+            print('# Energy\t\tS2\t\t\tSz\t\t\tSx\t\t\tSy')
             for i in range(num_eig):
                 S2 = vecs[:,i].conj().T.dot(self.S2.dot(vecs[:,i]))
                 Sz = vecs[:,i].conj().T.dot(self.Sz.dot(vecs[:,i]))
-                print(vals[i], S2, Sz)
+                Sx = vecs[:,i].conj().T.dot(self.Sx.dot(vecs[:,i]))
+                Sy = vecs[:,i].conj().T.dot(self.Sy.dot(vecs[:,i]))
+                print("%.12f  \t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej" % (vals[i], S2.real, S2.imag, Sz.real, Sz.imag, Sx.real, Sx.imag, Sy.real, Sy.imag))
                 print('deg=',self.deg)
                 #print('energies=',vals)
 

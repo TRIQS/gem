@@ -133,22 +133,22 @@ class Grisb(object):
         h1e[self.nimp:,:self.nimp] = self.D.conj()
         return h1e
 
-    def solve_embedding(self, mu, num_eig, ed_verbose, spin_pen, sz_pen=0.0):
+    def solve_embedding(self, mu, num_eig, ed_verbose):
         """ Solve embedding problem using a variety of impurity solver
         """
 
-        fh5 = h5py.File('hemb_test%s.h5' % self.suff,'w')
-        fh5['eloc'] = self.eloc
-        fh5['D'] = self.D
-        fh5['Lambda_c'] = self.Lambda_c
-        fh5['Utensor'] = self.Utensor
-        fh5['mu'] = mu
-        fh5.close()
+        with h5py.File('hemb_test%s.h5' % self.suff,'w') as fh5:
+            fh5['eloc'] = self.eloc
+            fh5['D'] = self.D
+            fh5['Lambda_c'] = self.Lambda_c
+            fh5['Utensor'] = self.Utensor
+            fh5['mu'] = mu
 
         if self.edsolver.type == "CI":
             h1e = self.build_h1e(mu)
-            self.edsolver.build_Hemb(h1e, self.Utensor, spin_pen=spin_pen, sz_pen=sz_pen)
+            self.edsolver.build_Hemb(h1e, self.Utensor)
 
+        # TODO: I moved the spin_pen and sz_pen etc to the solvers
         elif self.edsolver.type == "FTPS":
             self.edsolver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor, spin_pen=spin_pen)
 
@@ -200,7 +200,8 @@ class Grisb(object):
             timestamp = "%d" % datetime.timestamp(datetime.now())
             A[timestamp] = tmp_dict
 
-    def run(self, mu0=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., silence=True, spin_pen=0.0, sz_pen=0.0, idx=0, num_eig=2, ed_verbose=0, diis=False, nfix=None, dmu=0.1, mu_tol=1e-8, nfix_tol=0.01):
+    # TODO: move sz_pen, etc to the solvers.
+    def run(self, mu0=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., silence=True, idx=0, num_eig=2, ed_verbose=0, diis=False, nfix=None, dmu=0.1, mu_tol=1e-8, nfix_tol=0.01):
         """ Run ghost-RISB self-consistency
 
         :param itmax: Maxiumum iteraction for self-consistency.
@@ -251,14 +252,14 @@ class Grisb(object):
 
             # From Lambda and R, calculate Delta_p, D and Lambda_c
             print("# With Lambda and R, compute Delta_p, D and Lambda_c")
-            # self.rhok_list = calc_rhoks(self.R, self.Lambda, self.eks, 1./beta, self.mu)
-            self.rhok_list = np.real(calc_rhoks(self.R, self.Lambda, self.eks, 1./beta, self.mu))
-            # self.Delta_p = calc_Delta_p(self.rhok_list)
-            self.Delta_p = np.real(calc_Delta_p(self.rhok_list))
-            # self.D = calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
-            self.D = np.real(calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list))
-            # self.Lambda_c = calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list)
-            self.Lambda_c = np.real(calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list))
+            self.rhok_list = calc_rhoks(self.R, self.Lambda, self.eks, 1./beta, self.mu)
+            # self.rhok_list = np.real(calc_rhoks(self.R, self.Lambda, self.eks, 1./beta, self.mu))
+            self.Delta_p = calc_Delta_p(self.rhok_list)
+            # self.Delta_p = np.real(calc_Delta_p(self.rhok_list))
+            self.D = calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
+            # self.D = np.real(calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list))
+            self.Lambda_c = calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list)
+            # self.Lambda_c = np.real(calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list))
 
             # TODO: Nicer print and options for verbose
             if not silence:
@@ -284,7 +285,7 @@ class Grisb(object):
             # We now solve with the solver passed as an argument.
             print()
             print("# Solving the embedding Hamiltonian:")
-            self.solve_embedding(self.mu, num_eig, ed_verbose, spin_pen, sz_pen)
+            self.solve_embedding(self.mu, num_eig, ed_verbose)
 
             # Extract relevant quantities from the density matrix, such as Delta_p
             cdaggerf = self.denMat[:self.nimp,self.nimp:]
@@ -295,8 +296,8 @@ class Grisb(object):
                 print("norm(ffdagger.T-Delta_p)=", np.linalg.norm(ffdagger.T-self.Delta_p))
                 print("new Delta_p =", ffdagger.T)
                 print()
-            # self.Delta_p = ffdagger.T
-            self.Delta_p = np.real(ffdagger.T)
+            self.Delta_p = ffdagger.T
+            # self.Delta_p = np.real(ffdagger.T)
 
             # TODO: Separate function
             r"""Calculate R matrix, where the element are given by
@@ -304,16 +305,16 @@ class Grisb(object):
             .. math:
                 R_{b\alpha} = \sum_a \langle \Phi | c^\dagger_\alpha f_a | \Phi \rangle \left[ \Delta ( 1 - \Delta ) \right]^{-1/2}_{ad}
             """
-            # R_new = np.transpose(cdaggerf.dot(funcMat(self.Delta_p, denR)))
-            R_new = np.real(np.transpose(cdaggerf.dot(funcMat(self.Delta_p, denR))))
+            R_new = np.transpose(cdaggerf.dot(funcMat(self.Delta_p, denR)))
+            # R_new = np.real(np.transpose(cdaggerf.dot(funcMat(self.Delta_p, denR))))
 
             # Spin symmetry for R
             if self.spin_sym:
                 R_new = np.kron(R_new[::2,::2],np.eye(2))# symmetrize
 
             # Calculate the new Lambda from R, Lambda_c, Delta_p and D
-            # Lambda_new = calc_Lambda(R_new, self.Lambda_c, self.Delta_p, self.D, self.Hfull_list)
-            Lambda_new = np.real(calc_Lambda(R_new, self.Lambda_c, self.Delta_p, self.D, self.Hfull_list))
+            Lambda_new = calc_Lambda(R_new, self.Lambda_c, self.Delta_p, self.D, self.Hfull_list)
+            # Lambda_new = np.real(calc_Lambda(R_new, self.Lambda_c, self.Delta_p, self.D, self.Hfull_list))
 
             # Spin symmetry for Lambda
             if self.spin_sym:
@@ -368,6 +369,7 @@ class Grisb(object):
             print("# iteration:",it,'diff=',self.diff)
             print()
 
+            # TODO: Add other criteria for convergence, example total energy
             if self.diff < tol or it == (itmax-1):
                 if nfix is None or (nfix is not None and (occ - nfix < nfix_tol)):
                     print("--------------------- ghost-RISB converged with diff=%g ---------------------"%(self.diff))
