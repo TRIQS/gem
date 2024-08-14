@@ -6,6 +6,7 @@ import numpy as np
 from numpy import sqrt, heaviside as hside, pi, arcsin
 import matplotlib.pyplot as plt
 from scipy.optimize import bisect
+from itertools import product as itp
 
 ############################################
 
@@ -23,6 +24,7 @@ class EList ():
     def __init__ (self):
         self.k_list = []
         self.e_list = []
+        self.weight_bins = None
 
     def __str__ (self): return "EList object. Empty."
 
@@ -41,15 +43,22 @@ class EList_TB_2D (EList):
     """
 
     def __init__ (self, H_r, n_k=100, n_fourier=20):
-        kmesh = H_r.get_kmesh(n_k=n_fourier)
-        e_k = H_r.fourier(kmesh)
 
-        k = np.linspace(-np.pi, np.pi, num=n_k)
-        kx, ky = np.meshgrid(k, k)
+        e_k = H_r.fourier(H_r.get_kmesh(n_k=n_fourier))
 
-        e_k_interp = np.vectorize(lambda kx, ky : e_k((kx, ky, 0)).real)(kx, ky)
-        self.k_list = [kx, ky]
-        self.e_list = np.reshape(e_k_interp, n_k**2)
+        k = np.linspace(-np.pi, np.pi, num=n_k+1)[:-1]
+        Kx, Ky = np.meshgrid(k, k)
+
+        e_k_interp = np.zeros((e_k([0, 0, 0]).shape[0], e_k([0, 0, 0]).shape[1], n_k**2), dtype=np.complex_)
+
+        for d1, d2 in itp(range(e_k([0, 0, 0]).shape[0]), range(e_k([0, 0, 0]).shape[1])):
+            tmp_e_k = np.vectorize(lambda kx, ky : e_k([kx, ky, 0])[d1, d2])(Kx, Ky)
+            e_k_interp[d1, d2, :] = tmp_e_k.reshape(n_k**2)
+
+        self.e_list = np.transpose(e_k_interp, axes=[2, 0, 1])
+        # TODO if needed?
+        self.k_list = None
+
 
     def __str__ (self): return "EList object. Created from TB " + str(H_r)
 
