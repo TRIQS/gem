@@ -1,15 +1,15 @@
 
 # run the scf calculation
-#mpirun -n 4 pw.x -i vo2.scf.in | tee vo2.scf.out
+mpirun -n 4 pw.x -i vo2.scf.in | tee vo2.scf.out
 
 
 # OPTIONAL: run the DFT bandstructure calculation
-#mpirun -n 4 pw.x -i vo2.bnd.in | tee vo2.bnd.out
-#mpirun -n 4 bands.x -i vo2.bands.in | tee vo2.bands.out
+mpirun -n 4 pw.x -i vo2.bnd.in | tee vo2.bnd.out
+mpirun -n 4 bands.x -i vo2.bands.in | tee vo2.bands.out
 
 
 # run the nscf calculation
-#mpirun -n 4 pw.x -i vo2.nscf.in | tee vo2.nscf.out
+mpirun -n 4 pw.x -i vo2.nscf.in | tee vo2.nscf.out
 
 # Wannierize
 
