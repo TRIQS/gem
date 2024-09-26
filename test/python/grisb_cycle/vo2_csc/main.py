@@ -87,8 +87,9 @@ def main(argv=sys.argv):
 
 
     # Runs grisb_cycle
-    grisb_cycle(general_params, solver_params, advanced_params,
-               dft_params, general_params['n_iter_grisb'])
+    if not general_params['csc']:
+        grisb_cycle(general_params, solver_params, advanced_params,
+                    dft_params, general_params['n_iter_grisb'])
 
     mpi.barrier()
     if mpi.is_master_node():
