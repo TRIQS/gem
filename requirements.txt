@@ -4,4 +4,5 @@ numpy
 pytest
 scipy
 primme
+h5py
 juliacall --no-binary=juliacall
