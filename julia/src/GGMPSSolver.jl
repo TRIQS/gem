@@ -7,7 +7,7 @@ module GGMPSSolver
     using StatsBase
     using LinearAlgebra
     using Observers
-    using ITensors.HDF5
+    using HDF5
     using DataFrames
 
     ##backend functionality

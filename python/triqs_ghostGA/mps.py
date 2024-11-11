@@ -36,8 +36,8 @@ class ITensorMPSSolver(object):
         self.make_schedule()    #initialize with default
         self.tolerances = []
         self.set_tolerances()   #initialize with default
-        self.scalartype = np.float_ # if not set elsewhere
-        self.scalartype = np.complex_ # if not set elsewhere
+        self.scalartype = np.float64 # if not set elsewhere
+        self.scalartype = np.complex128 # if not set elsewhere
         self.paramagnetic = True
         self.suff = suff
         self.rotateBath = rotateBath
@@ -90,7 +90,7 @@ class ITensorMPSSolver(object):
 
     def build_Hemb(self, D, H1E, LAMBDA, V2E, spin_pen=0.0):
         # Local Hamiltonian
-        #thedtype=np.complex_
+        #thedtype=np.complex128
         thedtype=self.scalartype
         self.E = {"up": np.zeros((self.nimp//2, self.nimp//2),dtype=thedtype),
                   "dn": np.zeros((self.nimp//2, self.nimp//2),dtype=thedtype)}
@@ -211,7 +211,7 @@ class ITensorMPSSolver(object):
         #print(self.singleP)
         ##Assumes this one is the same now
         self.singleP = rotateToTsungHanConvention(self.singleP, self.nimp//2, self.nbath//self.nimp)
-        if self.scalartype==np.float_:
+        if self.scalartype==np.float64:
             self.dm = self.singleP.real
         else:
             self.dm = self.singleP
