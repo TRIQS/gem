@@ -42,6 +42,7 @@ class ITensorMPSSolver(object):
         self.suff = suff
         self.rotateBath = rotateBath
         self.recouple = recouple
+        self.gs_ene = 0
 
     def add_to_schedule(self,nsweeps=1,maxdim=1024, cutoff=1e-14,noise=0.0,outputlevel=1):
         thesweep=    {
@@ -88,7 +89,7 @@ class ITensorMPSSolver(object):
         self.tolerances=[[tol_names,tol_vals]]
         return
 
-    def build_Hemb(self, D, H1E, LAMBDA, V2E, spin_pen=0.0):
+    def build_Hemb(self, D, H1E, LAMBDA, V2E): # , spin_pen=0.0):
         # Local Hamiltonian
         #thedtype=np.complex_
         thedtype=self.scalartype
@@ -114,12 +115,6 @@ class ITensorMPSSolver(object):
                                  [self.W["up"].T.conjugate(), self.B["up"]]]),
                  "dn": np.block([[self.E["dn"], self.W["dn"]],
                                  [self.W["dn"].T.conjugate(), self.B["dn"]]])}
-        np.set_printoptions(precision=5, threshold=np.inf, linewidth=np.inf)
-
-        #print('M["up"] before rotating the bath:')
-        #print(self.M["up"])
-        #print()
-        #LAMBDA = B["up"]
 
         self.Utensor = V2E
 
@@ -130,47 +125,9 @@ class ITensorMPSSolver(object):
 
         self.M["up"]=0.5*(self.M["up"] + self.M["up"].T.conjugate())
         self.M["dn"]=0.5*(self.M["dn"] + self.M["dn"].T.conjugate())
-        #print('v=')
-        #print(self.v)
-
-        #print("M['up'] after rotating to the basis in which the bath is diagonal:")
-        #print(self.M['up'])
-        #print()
-
-        ##modify the parameter for spin_pen
-        self.modify_kwargs("spin_pen",spin_pen)
 
 
     def solve_Hemb(self, num_eig=1, verbose=1):
-        # print("In solve_Hemb")
-        # print(self.Utensor)
-        #print(self.M)
-
-        # Mconn = {"up": np.copy(self.M["up"]),
-        #          "dn": np.copy(self.M["dn"])}
-
-        # cut = {"up": 0, "dn": 0}
-        # for name in ["up", "dn"]:
-        #     for i in np.arange(self.ntot//2-1, self.nimp//2-1, -1):
-        #         W = Mconn[name][:self.nimp//2, i]
-        #         print(W)
-        #         print(np.amax(np.abs(W)))
-        #         if np.amax(np.abs(W)) < 1e-6 and Mconn[name][i, i] < 5e-3:
-        #             print(i)
-        #             Mconn[name] = np.delete(Mconn[name], i, 0)
-        #             Mconn[name] = np.delete(Mconn[name], i, 1)
-        #             Mconn[name] = np.block([[Mconn[name], np.zeros((len(Mconn[name]), 1))],
-        #                                     [np.zeros((1, len(Mconn[name]))), np.zeros((1, 1))]])
-            #         cut[name] += 1
-            # if cut[name] % 2 == 1:
-            #     cut[name] -= 1
-            #     Mconn[name] = np.block([[Mconn[name], np.zeros((len(Mconn[name]), 1))],
-            #                             [np.zeros((1, len(Mconn[name]))), np.zeros((1, 1))]])
-        # print("In solve_Hemb, Mconn:")
-        # print(Mconn['up'])
-
-        sys.stdout.flush()
-
         # Criteria for the bound dimension of the DMRG, just be converged
         # Set up and run ForkTPS using the useful_func.py
         outfile = "data%s.h5" % self.suff
@@ -178,14 +135,10 @@ class ITensorMPSSolver(object):
 
         print(self.M)
         ### Run MPS with julia call ###
-        self.converged, self.gs, self.EHint, self.singleP_up, self.singleP_dn = jl.solve(self.Utensor, self.M, self.schedule,self.tolerances, self.kwargs,outfile=outfile)
+        self.converged, self.gs, self.EHint, self.singleP_up, self.singleP_dn, self.gs_ene = jl.solve(self.Utensor, self.M, self.schedule,self.tolerances, self.kwargs,outfile=outfile)
 
         self.singleP_up = np.asarray(self.singleP_up)
         self.singleP_dn = np.asarray(self.singleP_dn)
-        # self.singleP_rot_up = np.block([[np.asarray(self.singleP_rot_up), np.zeros((len(Mconn["up"]), cut["up"]))],
-        #                                 [np.zeros((cut["up"], len(Mconn["up"]))), 0.5*np.eye(cut["up"])]])
-        # self.singleP_rot_dn = np.block([[np.asarray(self.singleP_rot_dn), np.zeros((len(Mconn["dn"]), cut["dn"]))],
-        #                                 [np.zeros((cut["dn"], len(Mconn["dn"]))), 0.5*np.eye(cut["dn"])]])
 
         print("single particle density matrix up: ")
         print(self.singleP_up)
@@ -196,10 +149,7 @@ class ITensorMPSSolver(object):
         if self.paramagnetic:
             self.singleP_up = 0.5*(self.singleP_up + self.singleP_dn)   #constrains to paramagnet
             self.singleP_dn = self.singleP_up.copy() #constrains to paramagnet
-        #print('self.singleP_rot=')
-        #print(self.singleP_rot)
-        #print('self.v=')
-        #print(self.v)
+
 
     def calc_density_matrix(self):
         if self.rotateBath:
@@ -208,7 +158,7 @@ class ITensorMPSSolver(object):
             zeros = np.zeros(self.singleP_up.shape)
             self.singleP = np.block([[self.singleP_up, zeros],
                                      [zeros, self.singleP_dn]])
-        #print(self.singleP)
+
         ##Assumes this one is the same now
         self.singleP = rotateToTsungHanConvention(self.singleP, self.nimp//2, self.nbath//self.nimp)
         if self.scalartype==np.float_:

@@ -69,7 +69,7 @@ function solve(Utensor,H1E,schedule,tolerances,kwargs;outfile="data",filling=not
        @show spincommutator_int
        spincommutator_nint = GGMPSSolver.compute_commutator(Hnint,S2)
        @show spincommutator_nint
-       
+
        if spincommutator_nint > 1e-2
             @show H1Eup
             @show H1Edn
@@ -95,6 +95,7 @@ function solve(Utensor,H1E,schedule,tolerances,kwargs;outfile="data",filling=not
     Cuu=nothing
     Cdd=nothing
     Eint=nothing
+    E=nothing
     ## setup observers
     internal_obs = GGMPSSolver.Observers.Observer(
         "sweepnumber"=>get_total_sweep,
@@ -127,14 +128,14 @@ function solve(Utensor,H1E,schedule,tolerances,kwargs;outfile="data",filling=not
             converged=GGMPSSolver.check_convergence(E,Cuu,Cdd,Eold,oldCuu,oldCdd,tolerances)
         end
         if converged
-            return true, psi, Eint,Cuu,Cdd
+            return true, psi, Eint, Cuu, Cdd, E
         end
         oldCuu=deepcopy(Cuu)
         oldCdd=deepcopy(Cdd)
         Eold=deepcopy(E)
     end
 
-    return false, psi, Eint, Cuu, Cdd
+    return false, psi, Eint, Cuu, Cdd, E
 end
     #eventually implement logging via Observers, pass in an iteration id, so we can save separate HDF5 files for every iteration
 
