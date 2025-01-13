@@ -10,12 +10,12 @@ end
 
 function  convert_schedule(schedule)::Vector{NamedTuple}
     param_vec=NamedTuple[]
-    
+
     for apair in schedule
-        keys,values=apair        
+        keys,values=apair
         push!(param_vec,namedtuple(keys,values))
     end
-    
+
     return param_vec
 end
 
@@ -88,12 +88,12 @@ end
 function write_mps_to_file(filename,group_path,name,state)
     #assumes that group in group_path already exists
     #and that file is closed! when entering the function
-    f=ITensors.HDF5.h5open(filename,"cw")
+    f=HDF5.h5open(filename,"cw")
     if !(isempty(group_path))
         g=f[group_path]
-        ITensors.HDF5.write(g,name,state)
+        HDF5.write(g,name,state)
     else
-        ITensors.HDF5.write(f,name,state)
+        HDF5.write(f,name,state)
     end
     close(f)
     return
@@ -102,12 +102,12 @@ end
 function read_mps_from_file(filename,group_path,name;T=ITensors.MPS::Type)
     #assumes that group in group_path already exists
     #and that file is closed! when entering the function
-    f=ITensors.HDF5.h5open(filename,"r")
+    f=HDF5.h5open(filename,"r")
     if !(isempty(group_path))
         g=f[group_path]
-        state=ITensors.HDF5.read(g,name,T)
+        state=HDF5.read(g,name,T)
     else
-        state=ITensors.HDF5.read(f,name,T)
+        state=HDF5.read(f,name,T)
     end
     close(f)
     return state

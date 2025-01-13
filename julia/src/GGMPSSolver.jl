@@ -16,6 +16,7 @@ module GGMPSSolver
     include("observer.jl")
     ##interface functionality
     include("driver.jl")
+    include("MPS_julia_codes.jl")
 
     export
         #from driver.jl
