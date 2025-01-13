@@ -77,7 +77,7 @@ class Grisb(object):
     :type Hfull_list: list
 
     """
-    def __init__(self, ntot, nimp, nbath, eks, eloc, Utensor, spin_sym=True, soc=False, R=None, Lambda=None, edsolver=None, suff=''):
+    def __init__(self, ntot, nimp, nbath, eks, eloc, Utensor, spin_sym=True, soc=False, R=None, Lambda=None, edsolver=None, write=True, suff=''):
         print("##### INITIALIZATON OF THE GRISB OBJECT #####")
         self.ntot = ntot
         self.nimp = nimp
@@ -88,6 +88,7 @@ class Grisb(object):
         self.soc = soc
         self.spin_sym = spin_sym
         self.gs_wf = None
+        self.write = write
         self.suff = suff    # Suffixe for file writting when many cpu at same time
         # initialize R and Lambda
         if R is None:
@@ -131,18 +132,25 @@ class Grisb(object):
         h1e[:self.nimp,self.nimp:] = self.D.T
         h1e[self.nimp:,self.nimp:] = -self.Lambda_c
         h1e[self.nimp:,:self.nimp] = self.D.conj()
+
+        print("h1e")
+        print(h1e)
+
         return h1e
 
     def solve_embedding(self, mu, num_eig, ed_verbose):
         """ Solve embedding problem using a variety of impurity solver
         """
 
-        with h5py.File('hemb_test%s.h5' % self.suff,'w') as fh5:
-            fh5['eloc'] = self.eloc
-            fh5['D'] = self.D
-            fh5['Lambda_c'] = self.Lambda_c
-            fh5['Utensor'] = self.Utensor
-            fh5['mu'] = mu
+        if self.write is True:
+            with h5py.File('hemb_test%s.h5' % self.suff,'w') as fh5:
+                fh5['eloc'] = self.eloc
+                fh5['D'] = self.D
+                fh5['Lambda_c'] = self.Lambda_c
+                fh5['Utensor'] = self.Utensor
+                fh5['mu'] = mu
+
+        print("Solving Embedding problem using the %s solver." % self.edsolver.type)
 
         if self.edsolver.type == "CI":
             h1e = self.build_h1e(mu)
@@ -150,19 +158,22 @@ class Grisb(object):
 
         # TODO: I moved the spin_pen and sz_pen etc to the solvers
         elif self.edsolver.type == "FTPS":
-            self.edsolver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor, spin_pen=spin_pen)
+            self.edsolver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor) #, spin_pen=spin_pen)
 
         elif self.edsolver.type == "ITensorMPSSolver":
-            self.edsolver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor, spin_pen=spin_pen)
+            self.edsolver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor) #, spin_pen=spin_pen)
 
         elif self.edsolver.type == "PySCFCCSD":
-            self.edsolver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor, spin_pen=spin_pen)
+            self.edsolver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor) #, spin_pen=spin_pen)
 
         elif self.edsolver.type == "Block2NSZ":
-            self.edsolver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor, spin_pen=spin_pen)
+            self.edsolver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor) #, spin_pen=spin_pen)
+
+        elif self.edsolver.type == "SVDSolver":
+            self.edsolver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor) #, spin_pen=spin_pen)
 
         else:
-            raise ValueError("only Full ED, CI, and HCI are supported")
+            raise ValueError("only CI, FTPS, ITensorMPSSolver, PySCFCCSD, Block2NSZ and SVDSolver types of solvers are supported")
             # TODO: Replace whole if-clause by edsolver.prolog(self) implemented by
             # Solver(AbstractSolver)
 
@@ -294,7 +305,8 @@ class Grisb(object):
             if not silence:
                 # Compare previous Delta_p with new
                 print("norm(ffdagger.T-Delta_p)=", np.linalg.norm(ffdagger.T-self.Delta_p))
-                print("new Delta_p =", ffdagger.T)
+                print("new Delta_p =")
+                print(ffdagger.T)
                 print()
             self.Delta_p = ffdagger.T
             # self.Delta_p = np.real(ffdagger.T)
@@ -335,14 +347,15 @@ class Grisb(object):
                 self.R = (1.-mix)*np.copy(self.R) + mix*R_new
                 self.Lambda = (1.-mix)*np.copy(self.Lambda) + mix*Lambda_new
 
-            # Save checkpoint
-            # TODO: Improve this
-            with HDFArchive('checkpoint%s.h5' % self.suff,'a') as fh5:
-                fh5['R_%d' % it] = self.R
-                fh5['Lambda_%d'% it] = self.Lambda
-                fh5['eks'] = self.eks
-                fh5['Utensor'] = self.Utensor
-                fh5['mu'] = self.mu
+            if self.write is True:
+                # Save checkpoint
+                # TODO: Improve this
+                with HDFArchive('checkpoint%s.h5' % self.suff,'a') as fh5:
+                    fh5['R_%d' % it] = self.R
+                    fh5['Lambda_%d'% it] = self.Lambda
+                    fh5['eks'] = self.eks
+                    fh5['Utensor'] = self.Utensor
+                    fh5['mu'] = self.mu
 
             if not silence:
                 print("R_new=")
@@ -356,7 +369,7 @@ class Grisb(object):
                 print("ffdagger.T")
                 print(ffdagger.T)
                 print("density matrix=")
-                print(self.denMat[::2,::2])
+                print(self.denMat)
                 print()
 
             if nfix is not None:

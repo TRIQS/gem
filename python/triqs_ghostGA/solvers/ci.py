@@ -206,7 +206,7 @@ class CI(object):
     Exact diagonalization class aim to solve general impurity Hamiltonian.
     '''
     def __init__(self, norb, use_Ntot=False, use_Sz=False, CISD=False, thermal=False, dtype=np.float64, Nparticle=None,
-                 spin_pen=0, sz_pen=0, sx_pen=0, sy_pen=0):
+                 spin_pen=0, sz_pen=0, sx_pen=0, sy_pen=0, sz2_pen=0, sx2_pen=0, sy2_pen=0):
         '''
         Constructor.
         Input:
@@ -234,6 +234,9 @@ class CI(object):
         self.sz_pen = sz_pen
         self.sx_pen = sx_pen
         self.sy_pen = sy_pen
+        self.sz2_pen = sz2_pen
+        self.sx2_pen = sx2_pen
+        self.sy2_pen = sy2_pen
 
         # create basis in the ground space half-filled and optionally Sz=0.
         if use_Ntot == True and use_Sz == False and CISD == False: # Ntot symmetry
@@ -397,10 +400,10 @@ class CI(object):
             for j in range(Umatrix.shape[1]):
                 for k in range(Umatrix.shape[2]):
                     for l in range(Umatrix.shape[3]):
-                        # check if l==j or i==k or U=0, if true it has 0 contribution
-                        if l==j or i==k or abs(Umatrix[i,j,k,l])<1e-8:
-                            continue # 0 contribution
-                        else:
+                        # # check if l==j or i==k or U=0, if true it has 0 contribution
+                        # if l==j or i==k or abs(Umatrix[i,j,k,l])<1e-8:
+                        #     continue # 0 contribution
+                        # else:
                             #print(i,j,k,l,Umatrix[i,j,k,l])
                             row_ind, col_ind, data = build_two_body_ijkl_csc_2(i, j, k, l, self.basis, bit_max, self.norb)
                             self.Htwo +=  0.5*Umatrix[i,j,k,l]*csc_matrix( (data, (row_ind, col_ind)), shape=(self.hsize,self.hsize),dtype=self.data_type)
@@ -408,13 +411,16 @@ class CI(object):
                             #self.Htwo +=  0.5*Umatrix[i,j,k,l]*csc_matrix( (data, indices, indptr), shape=(self.hsize,self.hsize),dtype=self.data_type)
                         #print i,j,k,l,Umatrix[i,j,k,l]
 
-    def build_h1e(self, eloc, D, Lambdac, mu):
-        self.h1e = np.zeros((self.norb,self.norb), dtype=np.complex128)
-        nimp = eloc.shape[0]
-        self.h1e[:nimp,:nimp] = eloc - mu*np.eye(nimp)
-        self.h1e[:nimp,nimp:] = D.T
-        self.h1e[nimp:,nimp:] = -Lambdac
-        self.h1e[nimp:,:nimp] = D.conj()
+    # def build_h1e(self, eloc, D, Lambdac, mu):
+    #     self.h1e = np.zeros((self.norb,self.norb), dtype=np.complex128)
+    #     nimp = eloc.shape[0]
+    #     self.h1e[:nimp,:nimp] = eloc - mu*np.eye(nimp)
+    #     self.h1e[:nimp,nimp:] = D.T
+    #     self.h1e[nimp:,nimp:] = -Lambdac
+    #     self.h1e[nimp:,:nimp] = D.conj()
+
+    #     print("h1e")
+    #     print(self.h1e)
 
     def build_one_body_for_grisb_cycle(self, debug=False):
         '''
@@ -477,8 +483,9 @@ class CI(object):
             self.build_two_body(V2E)
         mpi.report('one-body + two-body')
         self.Ham = (self.Hone + self.Htwo +
-                    self.spin_pen*self.S2 + self.sz_pen*self.Sz.dot(self.Sz) +
-                    self.sx_pen*self.Sx.dot(self.Sx) + self.sy_pen*self.Sy.dot(self.Sy))
+                    self.spin_pen*self.S2 +
+                    self.sz_pen*self.Sz + self.sx_pen*self.Sx + self.sy_pen*self.Sy +
+                    self.sz2_pen*self.Sz.dot(self.Sz) + self.sx2_pen*self.Sx.dot(self.Sx) + self.sy2_pen*self.Sy.dot(self.Sy))
         mpi.report('done')
 #        assert(abs( (self.Ham - self.Ham.getH()).max() ) < 1e-12), 'Hamiltonian is not Hermitian! H.getH()-H='
         if debug:
@@ -527,7 +534,6 @@ class CI(object):
         self.Sz = Sz
         self.Sx = 0.5*(Sp + Sm)
         self.Sy = 0.5*(Sp - Sm)/1j
-
 
     #def build_docc_op(self,debug=False):
     #    '''
@@ -694,13 +700,17 @@ class CI(object):
                     self.deg += 1
                     it += 1
         if mpi.is_master_node():
-            print('# Energy\t\tS2\t\t\tSz\t\t\tSx\t\t\tSy')
+            print('# Energy\t\tS2\t\t\tSz\t\t\tSx\t\t\tSy\t\t\tSz2\t\t\tSx2\t\t\tSy2')
             for i in range(num_eig):
                 S2 = vecs[:,i].conj().T.dot(self.S2.dot(vecs[:,i]))
                 Sz = vecs[:,i].conj().T.dot(self.Sz.dot(vecs[:,i]))
+                Sz2 = vecs[:,i].conj().T.dot(self.Sz.dot(self.Sz).dot(vecs[:,i]))
                 Sx = vecs[:,i].conj().T.dot(self.Sx.dot(vecs[:,i]))
+                Sx2 = vecs[:,i].conj().T.dot(self.Sx.dot(self.Sx).dot(vecs[:,i]))
                 Sy = vecs[:,i].conj().T.dot(self.Sy.dot(vecs[:,i]))
-                print("%.12f  \t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej" % (vals[i], S2.real, S2.imag, Sz.real, Sz.imag, Sx.real, Sx.imag, Sy.real, Sy.imag))
+                Sy2 = vecs[:,i].conj().T.dot(self.Sy.dot(self.Sy).dot(vecs[:,i]))
+                print("%.12e  \t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej" %
+                      (vals[i], S2.real, S2.imag, Sz.real, Sz.imag, Sx.real, Sx.imag, Sy.real, Sy.imag, Sz2.real, Sz2.imag, Sx2.real, Sx2.imag, Sy2.real, Sy2.imag))
                 print('deg=',self.deg)
                 #print('energies=',vals)
 
