@@ -123,7 +123,7 @@ def rotateBath(M, Norb, Nbath, paramagnetic=True, recouple=True):
         M_rot={"up": np.copy(M_rot["up"]), "dn": np.copy(M_rot["up"])}
         v_all={"up": np.copy(v_all["up"]), "dn": np.copy(v_all["up"])}
 
-    np.set_printoptions(precision=8, linewidth=np.inf, threshold=np.inf)
+    # np.set_printoptions(precision=8, linewidth=np.inf, threshold=np.inf)
     print("M_rot up")
     print(M_rot["up"])
     return M_rot, v_all

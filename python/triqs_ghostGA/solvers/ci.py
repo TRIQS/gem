@@ -411,32 +411,16 @@ class CI(object):
                             #self.Htwo +=  0.5*Umatrix[i,j,k,l]*csc_matrix( (data, indices, indptr), shape=(self.hsize,self.hsize),dtype=self.data_type)
                         #print i,j,k,l,Umatrix[i,j,k,l]
 
-    # def build_h1e(self, eloc, D, Lambdac, mu):
-    #     self.h1e = np.zeros((self.norb,self.norb), dtype=np.complex128)
-    #     nimp = eloc.shape[0]
-    #     self.h1e[:nimp,:nimp] = eloc - mu*np.eye(nimp)
-    #     self.h1e[:nimp,nimp:] = D.T
-    #     self.h1e[nimp:,nimp:] = -Lambdac
-    #     self.h1e[nimp:,:nimp] = D.conj()
+    def build_h1e(self, eloc, D, Lambdac, mu):
+        self.h1e = np.zeros((self.norb,self.norb), dtype=np.complex128)
+        nimp = eloc.shape[0]
+        self.h1e[:nimp,:nimp] = eloc - mu*np.eye(nimp)
+        self.h1e[:nimp,nimp:] = D.T
+        self.h1e[nimp:,nimp:] = -Lambdac
+        self.h1e[nimp:,:nimp] = D.conj()
 
-    #     print("h1e")
-    #     print(self.h1e)
-
-    def build_one_body_for_grisb_cycle(self, debug=False):
-        '''
-        build one body part of Hamiltonian for grisb_cycle routine for materials using denmat operators.
-        Input:
-          debug: bool. print out debug message
-        '''
-        self.Hone = csc_matrix((self.hsize,self.hsize),dtype=self.data_type)
-
-        for i in range(0,self.norb):
-            for j in range(0,self.norb):
-                if np.abs(self.h1e[i,j])<1e-8:
-                    continue # 0 contribution
-                else:
-                    #print(i,j,H1E[i,j])
-                    self.Hone += self.h1e[i,j]*self.denmat_op[(i,j)]
+        print("h1e")
+        print(self.h1e)
 
     def build_one_body(self, H1E, debug=False):
         '''
@@ -456,28 +440,13 @@ class CI(object):
                     #print(i,j,H1E[i,j])
                     self.Hone += H1E[i,j]*self.denmat_op[(i,j)]
 
-    def build_Hemb_for_grisb_cycle(self, V2E, debug=False):
+    def build_Hemb(self, D, eloc, Lambdac, V2E, debug=False):
         '''
         build the Hamiltonian and return Hamiltonian
         '''
         mpi.report('build one-body')
-        self.build_one_body_for_grisb_cycle()
-        mpi.report('build two-body')
-        if self.Htwo is None:
-            self.build_two_body(V2E)
-        mpi.report('one-body + two-body')
-        self.Ham = self.Hone + self.Htwo + self.spin_pen*self.S2 + self.sz_pen*self.Sz.dot(self.Sz)
-        mpi.report('done')
-#        assert(abs( (self.Ham - self.Ham.getH()).max() ) < 1e-12), 'Hamiltonian is not Hermitian! H.getH()-H='
-        if debug:
-            return self.Ham
-
-    def build_Hemb(self, H1E, V2E, debug=False):
-        '''
-        build the Hamiltonian and return Hamiltonian
-        '''
-        mpi.report('build one-body')
-        self.build_one_body(H1E)
+        self.build_h1e(eloc, D, Lambdac, 0)
+        self.build_one_body(self.h1e)
         mpi.report('build two-body')
         if self.Htwo is None:
             self.build_two_body(V2E)
@@ -869,205 +838,3 @@ class CI(object):
             return np.vdot(bra,operator.dot(ket))
         else:
             return np.vdot(bra,ket)
-
-
-
-#  def build_one_body_RISB(self, H1E, D, Lambdac, dtype=np.float64, debug=False):
-#    '''
-#    Depricated! too slow compare to build_one_body above!
-#    build one-body interaction which changes with iteration.
-#    Input:
-#      H1E: numpy array, with index (i,j). local part of one-body hamiltonian
-#      D: numpy array, with index (i,j). hybridization part of one-body hamiltonian
-#      Lambdac: numpy array, with index (i,j). bath part of one-body hamiltonian
-#      dtype: data type of the matrix
-#      debug: bool. print out debug message
-#    '''
-#    #self.Hone = csr_matrix((self.hsize,self.hsize),dtype=dtype)
-#    indptr = []
-#    indices = []
-#    bsrids = []
-#    data = []
-#    cumu = 0
-#    #build <bsl|Hone|bsr>
-#    for bsrid,bsr in enumerate(self.basis):
-#      indptr.append(cumu)
-#      #build local
-#      #print 'build local'
-#      for i in range(0,self.norb/2):
-#        for j in range(0,self.norb/2):
-#          #print i, j
-#          # temporary bit to perform hopping operation
-#          tmp_bit1 = 2**(self.norb-1-j)
-#          tmp_bit2 = 2**(self.norb-1-i)
-#          # see if j orbital is occupied and i is empty if not continue
-#          if self.strb.format(bsr)[j] != '1' or self.strb.format(bsr)[i] != '0' and i!=j or abs(H1E[i,j])<1e-12:
-#            #print 'ignore'
-#            #print i, j, self.strb.format(bsr), self.strb.format(bsr)[j]
-#            continue
-#          #print 'keep'
-#          #print i, j, self.strb.format(bsr), self.strb.format(bsr)[j]
-#
-#          # annhilate particles on j
-#          bsltmp = bsr ^ tmp_bit1
-#          # create particles on i
-#          bsl = bsltmp | tmp_bit2
-#          #print self.strb.format(tmp_bit1), self.strb.format(bsr), self.strb.format(bsl)
-#          #print 'bsrid=',bsrid,'bsr=',bsr,'bsl=',bsl, 'cumu=',cumu
-#          if bsl not in self.basis: #continue if bsl is not in the basis list
-#            continue
-#          else: #else look up bsl index
-#            bslid = np.where(self.basis==bsl)[0][0]
-#          #print 'bsrid=',bsrid,'bsr=',bsr,'bslid=',bslid,'bsl=',bsl, 'cumu=',cumu
-#          #determine sign
-#          #sign = 0
-#          #for s in self.strb.format(bsr)[min(i,j)+1:max(i,j)]:
-#          #  sign += int(s)
-#          #sign = (-1.)**sign
-#          sign = 0
-#          for s in self.strb.format(bsr)[:j]:
-#            sign += int(s)
-#          for s in self.strb.format(bsltmp)[:i]:
-#            sign += int(s)
-#          sign = (-1.)**sign
-#          if debug:
-#            print self.strb.format(bsr)[min(i,j)+1:max(i,j)], sign
-#            print i,j,'bsrid=',bsrid,'bsr=',bsr,'',self.strb.format(bsr),'tmp_bit1=',tmp_bit1,self.strb.format(tmp_bit1),'tmp_bit2=',tmp_bit2,self.strb.format(tmp_bit2),'bslid=',bslid,'bsl=',bsl,self.strb.format(bsl), 'cumu=',cumu
-#          #construct scs matrix index, pointer, and data
-#          if (bslid not in indices) or bsrids[indices.index(bslid)]!= bsrid:#if new element
-#            indices.append(bslid)
-#            data.append(sign*H1E[i,j])
-#            bsrids.append(bsrid)
-#            cumu += 1
-#          else:#else add to exisiting data
-#            idx = indices.index(bslid)
-#            data[idx] += sign*H1E[i,j]
-#      #build bath
-#      #print 'build bath'
-#      for i in range(self.norb/2,self.norb):
-#        for j in range(self.norb/2,self.norb):
-#          #print i, j
-#          # temporary bit for hopping operation
-#          tmp_bit1 = 2**(self.norb-1-j)
-#          tmp_bit2 = 2**(self.norb-1-i)
-#          # see if j orbital is empty and i is occupied if not continue
-#          if self.strb.format(bsr)[j] != '0' or self.strb.format(bsr)[i] != '1' and i!=j or abs(Lambdac[i-self.norb/2,j-self.norb/2])<1e-12:
-#             continue
-#          # create particles on j
-#          bstmp = bsr | tmp_bit1
-#          # annhilate particles on i
-#          bsl = bstmp ^ tmp_bit2
-#          if bsl not in self.basis:
-#            continue
-#          else:
-#            bslid = np.where(self.basis==bsl)[0][0]
-#          #determine sign
-#          sign = 0
-#          for s in self.strb.format(bsr)[:j]:
-#            sign += int(s)
-#          for s in self.strb.format(bstmp)[:i]:
-#            sign += int(s)
-#          sign = (-1.)**sign
-#          #for s in self.strb.format(bsr)[min(i,j)+1:max(i,j)]:
-#          #  sign += int(s)
-#          #sign = (-1.)**(abs(j-i)-sign)
-#          if debug:
-#            print self.strb.format(bsr)[min(i,j)+1:max(i,j)], sign
-#            print i,j,'bsrid=',bsrid,'bsr=',bsr,'',self.strb.format(bsr),'tmp_bit1=',tmp_bit1,self.strb.format(tmp_bit1),'tmp_bit2=',tmp_bit2,self.strb.format(tmp_bit2),'bslid=',bslid,'bsl=',bsl,self.strb.format(bsl), 'cumu=',cumu
-#          if (bslid not in indices) or bsrids[indices.index(bslid)]!= bsrid:
-#            indices.append(bslid)
-#            data.append(sign*Lambdac[i-self.norb/2,j-self.norb/2])
-#            bsrids.append(bsrid)
-#            cumu += 1
-#          else:
-#            idx = indices.index(bslid)
-#            data[idx] += sign*Lambdac[i-self.norb/2,j-self.norb/2]
-#
-#      #build hybridization
-#      #print 'build hyb'
-#      for i in range(0,self.norb/2):
-#        for j in range(self.norb/2,self.norb):
-#          #print i, j
-#          tmp_bit1 = 2**(self.norb-1-j)
-#          tmp_bit2 = 2**(self.norb-1-i)
-#          # see if j orbital is occupied and i is empty if not continue
-#          if self.strb.format(bsr)[j] != '1' or self.strb.format(bsr)[i] != '0' or abs(D[i,j-self.norb/2])<1e-12:
-#             continue
-#          # annhilate particles on j
-#          bsltmp = bsr ^ tmp_bit1
-#          # create particles on i
-#          bsl = bsltmp | tmp_bit2
-#          if bsl not in self.basis:#continue if bsl is not in the basis
-#            continue
-#          else:#else look up bsl's index
-#            bslid = np.where(self.basis==bsl)[0][0]
-#          #determine sign
-#          #sign = 0
-#          #for s in self.strb.format(bsr)[min(i,j)+1:max(i,j)]:
-#          #  sign += int(s)
-#          #sign = (-1.)**(sign)
-#          sign = 0
-#          for s in self.strb.format(bsr)[:j]:
-#            sign += int(s)
-#          for s in self.strb.format(bsltmp)[:i]:
-#            sign += int(s)
-#          sign = (-1.)**sign
-#          if debug:
-#            print self.strb.format(bsr)[min(i,j)+1:max(i,j)], sign
-#            print i,j,'bsrid=',bsrid,'bsr=',bsr,'',self.strb.format(bsr),'tmp_bit1=',tmp_bit1,self.strb.format(tmp_bit1),'tmp_bit2=',tmp_bit2,self.strb.format(tmp_bit2),'bslid=',bslid,'bsl=',bsl,self.strb.format(bsl), 'cumu=',cumu
-#          #construct csc matrix index, pointer, and data
-#          if (bslid not in indices) or bsrids[indices.index(bslid)]!= bsrid:#if new element
-#            indices.append(bslid)
-#            data.append(sign*D[i,j-self.norb/2])
-#            bsrids.append(bsrid)
-#            cumu += 1
-#          else:# else add to existing data
-#            idx = indices.index(bslid)
-#            data[idx] += sign*D[i,j-self.norb/2]
-#      #print 'build hybT'
-#      for i in range(self.norb/2,self.norb):
-#        for j in range(0,self.norb/2):
-#          #print i, j
-#          tmp_bit1 = 2**(self.norb-1-j)
-#          tmp_bit2 = 2**(self.norb-1-i)
-#          # see if j orbital is occupied and i is empty if not continue
-#          if self.strb.format(bsr)[j] != '1' or self.strb.format(bsr)[i] != '0' or abs(D.conj().T[i-self.norb/2,j])<1e-12:
-#             continue
-#          # annhilate particles on j
-#          bsltmp = bsr ^ tmp_bit1
-#          # create particles on i
-#          bsl = bsltmp | tmp_bit2
-#          if bsl not in self.basis:#continue if bsl is not in the basis list
-#            continue
-#          else:#else look up bsl index
-#            bslid = np.where(self.basis==bsl)[0][0]
-#          #determine sign
-#          #sign = 0
-#          #for s in self.strb.format(bsr)[min(i,j)+1:max(i,j)]:
-#          #  sign += int(s)
-#          #sign = (-1.)**sign
-#          sign = 0
-#          for s in self.strb.format(bsr)[:j]:
-#            sign += int(s)
-#          for s in self.strb.format(bsltmp)[:i]:
-#            sign += int(s)
-#          sign = (-1.)**sign
-#          if debug:
-#            print self.strb.format(bsr)[min(i,j)+1:max(i,j)], sign
-#            print i,j,'bsrid=',bsrid,'bsr=',bsr,'',self.strb.format(bsr),'tmp_bit1=',tmp_bit1,self.strb.format(tmp_bit1),'tmp_bit2=',tmp_bit2,self.strb.format(tmp_bit2),'bslid=',bslid,'bsl=',bsl,self.strb.format(bsl), 'cumu=',cumu
-#          if (bslid not in indices) or bsrids[indices.index(bslid)]!= bsrid:#new element
-#            indices.append(bslid)
-#            data.append(sign*D.conj().T[i-self.norb/2,j])
-#            bsrids.append(bsrid)
-#            cumu += 1
-#          else:#adde to existing data
-#            idx = indices.index(bslid)
-#            data[idx] += sign*D.conj().T[i-self.norb/2,j]
-#
-#    indptr.append(cumu)
-#    #print indptr
-#    #print indices
-#    #print data
-#    self.Hone = csc_matrix( (data, indices, indptr), shape=(self.hsize,self.hsize),dtype=dtype)
-#    #print self.Hone.todense()
-

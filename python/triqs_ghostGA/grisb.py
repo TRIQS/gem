@@ -125,19 +125,6 @@ class Grisb(object):
         print("\n\n")
 
 
-    def build_h1e(self,mu):
-        # TODO: Move to the CI solver?
-        h1e = np.zeros((self.ntot,self.ntot), dtype=np.complex128)
-        h1e[:self.nimp,:self.nimp] = self.eloc - mu*np.eye(self.nimp)
-        h1e[:self.nimp,self.nimp:] = self.D.T
-        h1e[self.nimp:,self.nimp:] = -self.Lambda_c
-        h1e[self.nimp:,:self.nimp] = self.D.conj()
-
-        print("h1e")
-        print(h1e)
-
-        return h1e
-
     def solve_embedding(self, mu, num_eig, ed_verbose):
         """ Solve embedding problem using a variety of impurity solver
         """
@@ -151,33 +138,15 @@ class Grisb(object):
                 fh5['mu'] = mu
 
         print("Solving Embedding problem using the %s solver." % self.edsolver.type)
-
-        if self.edsolver.type == "CI":
-            h1e = self.build_h1e(mu)
-            self.edsolver.build_Hemb(h1e, self.Utensor)
-
-        # TODO: I moved the spin_pen and sz_pen etc to the solvers
-        elif self.edsolver.type == "FTPS":
-            self.edsolver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor) #, spin_pen=spin_pen)
-
-        elif self.edsolver.type == "ITensorMPSSolver":
-            self.edsolver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor) #, spin_pen=spin_pen)
-
-        elif self.edsolver.type == "PySCFCCSD":
-            self.edsolver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor) #, spin_pen=spin_pen)
-
-        elif self.edsolver.type == "Block2NSZ":
-            self.edsolver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor) #, spin_pen=spin_pen)
-
-        elif self.edsolver.type == "SVDSolver":
-            self.edsolver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor) #, spin_pen=spin_pen)
-
-        else:
+        if not self.edsolver.type in ["CI", "FTPS", "ITensorMPSSolver", "PySCFCCSD",
+                                      "Block2NSZ", "SVDSolver"]:
             raise ValueError("only CI, FTPS, ITensorMPSSolver, PySCFCCSD, Block2NSZ and SVDSolver types of solvers are supported")
             # TODO: Replace whole if-clause by edsolver.prolog(self) implemented by
             # Solver(AbstractSolver)
 
+        self.edsolver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor)
         self.edsolver.solve_Hemb(num_eig=num_eig, verbose=ed_verbose )
+
         self.denMat = self.edsolver.calc_density_matrix()
         self.E2loc = self.edsolver.compute_E2loc()
 
