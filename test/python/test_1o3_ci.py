@@ -46,11 +46,11 @@ class test_hemb_ci_1o3(unittest.TestCase):
 
         # test CI solver
         edsolver = CI(ntot, use_Ntot=True,
-                      use_Sz=True, dtype=np.complex128)
+                      use_Sz=True, dtype=np.complex128, spin_pen=0.05)
         grisb = Grisb(ntot, nimp, nbath, eks, eloc, Utensor, R=R0,
                       Lambda=Lambda0, edsolver=edsolver)
         grisb.run(itmax=30, mix=1, tol=1e-5, beta=500,
-                  silence=True, spin_pen=0.05)
+                  silence=True)
 
         name = "1o3_ci"
 

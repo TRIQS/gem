@@ -52,9 +52,9 @@ class test_hemb_1o3_ci(unittest.TestCase):
         Utensor[0, 0, 1, 1] = U
         # Utensor = U_matrix_kanamori(nimp//2, U, 0)
 
-        edsolver=CI(ntot, use_Ntot=True, use_Sz=True, dtype=np.complex128)
+        edsolver=CI(ntot, use_Ntot=True, use_Sz=True, dtype=np.complex128, spin_pen=0.0)
         grisb = Grisb(ntot, nimp, nbath, eks, eloc, Utensor, R=R0, Lambda=Lambda0, edsolver=edsolver)
-        grisb.run(mu0=-0.2, nfix=nfix, itmax=100, mix=1, tol=1e-5, beta=500, silence=True, spin_pen=0.0, mu_tol=1e-8)
+        grisb.run(mu0=-0.2, nfix=nfix, itmax=100, mix=1, tol=1e-5, beta=500, silence=True, mu_tol=1e-8)
 
         name = "1o3_canonical_ci"
         with HDFArchive(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "r") as A:

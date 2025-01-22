@@ -47,11 +47,11 @@ class test_hemb_ci_1o3(unittest.TestCase):
 
         # test CI solver
         edsolver = CI(ntot, use_Ntot=True, use_Sz=False,
-                      dtype=np.complex128)
+                      dtype=np.complex128, spin_pen=0.05)
         grisb = Grisb(ntot, nimp, nbath, eks, eloc, Utensor, R=R0,
                       Lambda=Lambda0, edsolver=edsolver)
         grisb.run(itmax=30, mix=1, tol=1e-5, beta=500,
-                  silence=True, spin_pen=0.05, diis=True)
+                  silence=True, diis=True)
 
         name = "1o3_ci_diis"
         with HDFArchive(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "r") as A:

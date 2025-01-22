@@ -58,10 +58,10 @@ class test_hemb_2o6_block2(unittest.TestCase):
         Utensor = U_matrix_kanamori(nimp//2, U, J)
 
         maxM = 500
-        edsolver=Pyblock2_N_SZ(ntot, nimp, nbath, maxM)
+        edsolver=Pyblock2_N_SZ(ntot, nimp, nbath, maxM, spin_pen=0.10)
 
         grisb = Grisb(ntot, nimp, nbath, eks, eloc, Utensor, R=R0, Lambda=Lambda0, edsolver=edsolver)
-        grisb.run(mu0=0.0, nfix=nfix, itmax=100, mix=1, tol=1e-5, beta=500, silence=True, spin_pen=0.10)
+        grisb.run(mu0=0.0, nfix=nfix, itmax=100, mix=1, tol=1e-5, beta=500, silence=True)
 
         name = "2o6_canonical_ci"
         # with HDFArchive(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "r") as A:
