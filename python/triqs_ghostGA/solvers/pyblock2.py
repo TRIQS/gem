@@ -5,7 +5,7 @@ import numpy
 class Pyblock2_N(object):
     """ Wrapper for pyblock2 solvers with N symmetry
     """
-    def __init__(self, ntot, nimp, nbath, maxM):
+    def __init__(self, ntot, nimp, nbath, maxM, spin_pen=0):
         """Constructor method
         """
         self.ntot = ntot
@@ -14,9 +14,10 @@ class Pyblock2_N(object):
         self.maxM = maxM
         print('maxM=',maxM)
         self.type= 'Block2N'
+        self.spin_pen = 0
         # initialize pyscf solvers
 
-    def build_Hemb(self, D, H1E, LAMBDA, V2E, spin_pen=0.0):
+    def build_Hemb(self, D, H1E, LAMBDA, V2E):
         tmat = numpy.zeros((self.ntot,self.ntot),dtype=numpy.complex128)
         tmat[:self.nimp,:self.nimp] = H1E
         tmat[:self.nimp,self.nimp:] = D.T
@@ -131,7 +132,7 @@ class Pyblock2_N(object):
         return etwo
 
 class Pyblock2_N_SZ(Pyblock2_N):
-    def __init__(self, ntot, nimp, nbath, maxM):
+    def __init__(self, ntot, nimp, nbath, maxM, spin_pen=0):
         """Constructor method
         """
         self.ntot = ntot
