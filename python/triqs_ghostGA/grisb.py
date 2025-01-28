@@ -177,7 +177,7 @@ class Grisb(object):
             timestamp = "%d" % datetime.timestamp(datetime.now())
             A[timestamp] = tmp_dict
 
-    def run(self, mu=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., silence=True, spin_pen=0.0, sz_pen=0.0, idx=0, num_eig=2, ed_verbose=0, diis=False):
+    def run(self, mu=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., silence=True, spin_pen=0.0, sz_pen=0.0, idx=0, num_eig=2, ed_verbose=0, diis=False, fit_RnL=False, fit_DnLc=False):
         """ Run ghost-RISB self-consistency
 
         :param itmax: Maxiumum iteraction for self-consistency.
@@ -209,8 +209,16 @@ class Grisb(object):
             # compute qp density matrix
             self.rhok_list=calc_rhoks(self.R, self.Lambda, self.eks, 1./beta)
             self.Delta_p=calc_Delta_p(self.rhok_list)
-            self.D=calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
-            self.Lambda_c=calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list)
+            if( (fit_DnLc) and (it>1) ):
+                print("FIT D AND LAMBDA_C")
+                self.D=calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
+                self.Lambda_c=calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list)
+
+                self.D, self.Lambda_c = fit_D_and_Lambda_c(self.D, self.Lambda_c, self.R, self.Lambda, self.Delta_p, cdaggerf )
+            else:
+                self.D=calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
+                self.Lambda_c=calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list)
+
             if not silence:
                 if not self.soc:
                     print("Delta_p=")
@@ -239,17 +247,34 @@ class Grisb(object):
             self.Delta_p = ffdagger.T
             print("Delta_p new:")
             print(self.Delta_p)
-            R_new = np.transpose(cdaggerf.dot(funcMat(self.Delta_p, denR)))
-            if not self.soc:
-                R_new = np.kron(R_new[::2,::2],np.eye(2))# symmetrize
-            R_new = svd_truncate_R(R_new)
-            #Lambda_new = find_Lambda(self.Lambda, R_new, ffdagger, self.eks, self.Hspin_list, beta)
-            Lambda_new = calc_Lambda(R_new, self.Lambda_c, self.Delta_p, self.D, self.Hfull_list)
-            if not self.soc:
-                Lambda_new = np.kron(Lambda_new[::2,::2],np.eye(2)) # symmetryize
+            print("cdaggerf:")
+            print(cdaggerf)
+            if(fit_RnL):
+                R_new = np.transpose(cdaggerf.dot(funcMat(self.Delta_p, denR)))
+                if not self.soc:
+                    R_new = np.kron(R_new[::2,::2],np.eye(2))# symmetrize
+                R_new = svd_truncate_R(R_new)
+                #Lambda_new = find_Lambda(self.Lambda, R_new, ffdagger, self.eks, self.Hspin_list, beta)
+                Lambda_new = calc_Lambda(R_new, self.Lambda_c, self.Delta_p, self.D, self.Hfull_list)
+                if not self.soc:
+                    Lambda_new = np.kron(Lambda_new[::2,::2],np.eye(2)) # symmetryize
+                R_new, Lambda_new = fit_R_and_Lambda(R_new, Lambda_new, self.D, self.Lambda_c, self.Delta_p, cdaggerf )
+            else:
+                R_new = np.transpose(cdaggerf.dot(funcMat(self.Delta_p, denR)))
+                if not self.soc:
+                    R_new = np.kron(R_new[::2,::2],np.eye(2))# symmetrize
+                R_new = svd_truncate_R(R_new)
+                #Lambda_new = find_Lambda(self.Lambda, R_new, ffdagger, self.eks, self.Hspin_list, beta)
+                Lambda_new = calc_Lambda(R_new, self.Lambda_c, self.Delta_p, self.D, self.Hfull_list)
+                if not self.soc:
+                    Lambda_new = np.kron(Lambda_new[::2,::2],np.eye(2)) # symmetryize
             diff_R = np.abs(self.R-R_new).max()
             diff_Lambda = np.abs(self.Lambda-Lambda_new).max()
             self.diff = max(diff_R,diff_Lambda)
+            print("R_new:")
+            print(R_new)
+            print("Lambda_new:")
+            print(Lambda_new)
             if diis and ( it >= numNonDIIS ):
                 error = Lambda_new - self.Lambda
                 error = np.reshape( error, error.shape[0]*error.shape[1] )
