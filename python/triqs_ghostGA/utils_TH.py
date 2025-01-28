@@ -745,9 +745,10 @@ def calc_C_hole(H):
     #
     return C
 
-def denR(x):
+def denR(x,eps=0.0):
     # return (x*((1.0+0.j)-x))**(-0.5)
-    return (x*((1.0+0.j)-x)+1e-12)**(-0.5)
+    #return (x*((1.0+0.j)-x)+1e-12)**(-0.5)
+    return ( (x+eps)*((1.0+0.j)-x+eps))**(-0.5)
 
 def denR_real(x):
     #return 1./sqrt(x*((1.0)-x))
