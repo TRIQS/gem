@@ -45,14 +45,15 @@ class EList_TB_2D (EList):
     def __init__ (self, H_r, n_k=100, n_fourier=20):
 
         e_k = H_r.fourier(H_r.get_kmesh(n_k=n_fourier))
+        G = H_r.bz.units
 
-        k = np.linspace(-np.pi, np.pi, num=n_k+1)[:-1]
-        Kx, Ky = np.meshgrid(k, k)
+        g = np.linspace(-0.5, 0.5, num=n_k+1)[:-1]
+        Gx, Gy = np.meshgrid(g, g)
 
         e_k_interp = np.zeros((e_k([0, 0, 0]).shape[0], e_k([0, 0, 0]).shape[1], n_k**2), dtype=np.complex_)
 
         for d1, d2 in itp(range(e_k([0, 0, 0]).shape[0]), range(e_k([0, 0, 0]).shape[1])):
-            tmp_e_k = np.vectorize(lambda kx, ky : e_k([kx, ky, 0])[d1, d2])(Kx, Ky)
+            tmp_e_k = np.vectorize(lambda gx, gy : e_k(G.T @ np.array([gx, gy, 0]))[d1, d2])(Gx, Gy)
             e_k_interp[d1, d2, :] = tmp_e_k.reshape(n_k**2)
 
         self.e_list = np.transpose(e_k_interp, axes=[2, 0, 1])
