@@ -89,14 +89,14 @@ class ITensorMPSSolver(object):
         self.tolerances=[[tol_names,tol_vals]]
         return
 
-    def build_Hemb(self, D, H1E, LAMBDA, V2E): # , spin_pen=0.0):
+    def build_Hemb(self, D, eloc, LAMBDA, V2E): # , spin_pen=0.0):
         # Local Hamiltonian
         #thedtype=np.complex_
         thedtype=self.scalartype
         self.E = {"up": np.zeros((self.nimp//2, self.nimp//2),dtype=thedtype),
                   "dn": np.zeros((self.nimp//2, self.nimp//2),dtype=thedtype)}
-        self.E["up"] = H1E[::2,::2]
-        self.E["dn"] = H1E[1::2,1::2]
+        self.E["up"] = eloc[::2,::2]
+        self.E["dn"] = eloc[1::2,1::2]
 
         # Hybridization matrix
         self.W = {"up": np.zeros((self.nimp//2, self.nbath//2),dtype=thedtype),
