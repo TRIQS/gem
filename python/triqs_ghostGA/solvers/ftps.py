@@ -26,12 +26,12 @@ class FTPS(object):
         self.nbath = nbath
         self.maxM = maxM
 
-    def build_Hemb(self, D, H1E, LAMBDA, V2E, spin_pen=0.0):
+    def build_Hemb(self, D, eloc, LAMBDA, V2E, spin_pen=0.0):
         # Local Hamiltonian
         self.E = {"up": np.zeros((self.nimp//2, self.nimp//2)),
                   "dn": np.zeros((self.nimp//2, self.nimp//2))}
-        self.E["up"] = H1E[::2,::2]
-        self.E["dn"] = H1E[1::2,1::2]
+        self.E["up"] = eloc[::2,::2]
+        self.E["dn"] = eloc[1::2,1::2]
 
         # Hybridization matrix
         self.W = {"up": np.zeros((self.nimp//2, self.nbath//2), dtype=np.complex128),    ##was self.nbath//self.nimp ##but this is not general
@@ -60,6 +60,7 @@ class FTPS(object):
 
         # Rotate the Bath and Hybridization for smaller entropy
         self.M, self.v = rotateBath(self.M, self.nimp//2, self.nbath//self.nimp)
+        self.h1e = self.M
         #print('v=')
         #print(self.v)
 
