@@ -206,7 +206,7 @@ class CI(object):
     Exact diagonalization class aim to solve general impurity Hamiltonian.
     '''
     def __init__(self, norb, use_Ntot=False, use_Sz=False, CISD=False, thermal=False, dtype=np.float64, Nparticle=None,
-                 spin_pen=0, sz_pen=0, sx_pen=0, sy_pen=0, sz2_pen=0, sx2_pen=0, sy2_pen=0):
+                 spin_pen=0, sz_pen=0, sx_pen=0, sy_pen=0):
         '''
         Constructor.
         Input:
@@ -234,9 +234,6 @@ class CI(object):
         self.sz_pen = sz_pen
         self.sx_pen = sx_pen
         self.sy_pen = sy_pen
-        self.sz2_pen = sz2_pen
-        self.sx2_pen = sx2_pen
-        self.sy2_pen = sy2_pen
 
         # create basis in the ground space half-filled and optionally Sz=0.
         if use_Ntot == True and use_Sz == False and CISD == False: # Ntot symmetry
@@ -451,10 +448,9 @@ class CI(object):
         if self.Htwo is None:
             self.build_two_body(V2E)
         mpi.report('one-body + two-body')
-        self.Ham = (self.Hone + self.Htwo +
-                    self.spin_pen*self.S2 +
-                    self.sz_pen*self.Sz + self.sx_pen*self.Sx + self.sy_pen*self.Sy +
-                    self.sz2_pen*self.Sz.dot(self.Sz) + self.sx2_pen*self.Sx.dot(self.Sx) + self.sy2_pen*self.Sy.dot(self.Sy))
+        self.M = {"up": self.h1e[::2, ::2], "dn": self.h1e[1::2, 1::2]}
+        self.Ham = self.Hone + self.Htwo + self.spin_pen*self.S2
+        self.Ham += self.sz_pen*self.Sz.dot(self.Sz) + self.sx_pen*self.Sx.dot(self.Sx) + self.sy_pen*self.Sy.dot(self.Sy)
         mpi.report('done')
 #        assert(abs( (self.Ham - self.Ham.getH()).max() ) < 1e-12), 'Hamiltonian is not Hermitian! H.getH()-H='
         if debug:
