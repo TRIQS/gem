@@ -17,6 +17,7 @@ from scipy.optimize import bisect
 # from scipy.linalg import eigh
 from scipy.special import factorial as fact
 # from scipy.misc import derivative
+# from triqs.operators.utility import U_matrix_kanamori as Uijkl
 
 def funcMat(H, function, pr=False):
     tiny = 1e-8 # use to regularize eigen problem for singular matrix
@@ -1385,6 +1386,7 @@ def U_matrix_kanamori(n_orb, U_int, J_hund):
     Ufull_matrix[::2, ::2, 1::2, 1::2] = U_matrix  # up, dn
     Ufull_matrix[1::2, 1::2, ::2, ::2] = U_matrix  # dn, up
     return Ufull_matrix#, u_avg, j_avg
+
 
 # Convert U,J -> radial integrals F_k
 def U_J_to_radial_integrals(l, U_int, J_hund):
