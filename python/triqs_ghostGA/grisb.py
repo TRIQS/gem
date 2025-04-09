@@ -10,10 +10,11 @@ import numpy as np
 import numba
 from triqs_ghostGA.utils_TH import denR, denRm1, ddenRm1, realHcombination, inverse_realHcombination, \
      Hermitian_list, get_blocks, funcMat, calc_nf, dF
+from triqs_ghostGA.utils_SG import space_list, measure_space
 from triqs_ghostGA.DIIS import *
 from triqs_ghostGA.utils_grisb import *
 from h5 import *
-import sys
+import sys  
 
 
 class Grisb(object):
@@ -97,6 +98,7 @@ class Grisb(object):
         print(self.R)
         print('initial Lambda matrix =')
         print(self.Lambda)
+        self.space = space_list(nbath) # list containing Nempt, Nfull and U_qp
 
     def build_h1e(self,mu):
         # TODO: Move to the CI solver?
@@ -209,15 +211,10 @@ class Grisb(object):
             # compute qp density matrix
             self.rhok_list=calc_rhoks(self.R, self.Lambda, self.eks, 1./beta)
             self.Delta_p=calc_Delta_p(self.rhok_list)
-            if( (fit_DnLc) and (it>1) ):
-                print("FIT D AND LAMBDA_C")
-                self.D=calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
-                self.Lambda_c=calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list)
 
-                self.D, self.Lambda_c = fit_D_and_Lambda_c(self.D, self.Lambda_c, self.R, self.Lambda, self.Delta_p, cdaggerf )
-            else:
-                self.D=calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
-                self.Lambda_c=calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list)
+            # check on pysical space
+            self.D=calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
+            self.Lambda_c=calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list)
 
             if not silence:
                 if not self.soc:
@@ -249,25 +246,17 @@ class Grisb(object):
             print(self.Delta_p)
             print("cdaggerf:")
             print(cdaggerf)
-            if(fit_RnL):
-                R_new = np.transpose(cdaggerf.dot(funcMat(self.Delta_p, denR)))
-                if not self.soc:
-                    R_new = np.kron(R_new[::2,::2],np.eye(2))# symmetrize
-                R_new = svd_truncate_R(R_new)
-                #Lambda_new = find_Lambda(self.Lambda, R_new, ffdagger, self.eks, self.Hspin_list, beta)
-                Lambda_new = calc_Lambda(R_new, self.Lambda_c, self.Delta_p, self.D, self.Hfull_list)
-                if not self.soc:
-                    Lambda_new = np.kron(Lambda_new[::2,::2],np.eye(2)) # symmetryize
-                R_new, Lambda_new = fit_R_and_Lambda(R_new, Lambda_new, self.D, self.Lambda_c, self.Delta_p, cdaggerf )
-            else:
-                R_new = np.transpose(cdaggerf.dot(funcMat(self.Delta_p, denR)))
-                if not self.soc:
-                    R_new = np.kron(R_new[::2,::2],np.eye(2))# symmetrize
-                R_new = svd_truncate_R(R_new)
-                #Lambda_new = find_Lambda(self.Lambda, R_new, ffdagger, self.eks, self.Hspin_list, beta)
-                Lambda_new = calc_Lambda(R_new, self.Lambda_c, self.Delta_p, self.D, self.Hfull_list)
-                if not self.soc:
-                    Lambda_new = np.kron(Lambda_new[::2,::2],np.eye(2)) # symmetryize
+        
+            # new check on physical space using dbath_aim
+            R_new = np.transpose(cdaggerf.dot(funcMat(self.Delta_p, denR)))
+            if not self.soc:
+                R_new = np.kron(R_new[::2,::2],np.eye(2))# symmetrize
+            R_new = svd_truncate_R(R_new)
+            #Lambda_new = find_Lambda(self.Lambda, R_new, ffdagger, self.eks, self.Hspin_list, beta)
+            Lambda_new = calc_Lambda(R_new, self.Lambda_c, self.Delta_p, self.D, self.Hfull_list)
+            if not self.soc:
+                Lambda_new = np.kron(Lambda_new[::2,::2],np.eye(2)) # symmetryize
+
             diff_R = np.abs(self.R-R_new).max()
             diff_Lambda = np.abs(self.Lambda-Lambda_new).max()
             self.diff = max(diff_R,diff_Lambda)
