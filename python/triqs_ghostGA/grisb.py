@@ -320,6 +320,153 @@ class Grisb(object):
             print()
             sys.stdout.flush()
 
+    def run_reg(self, mu=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., silence=True, spin_pen=0.0, sz_pen=0.0, idx=0, num_eig=2, ed_verbose=0, diis=False, fit_RnL=False, fit_DnLc=False):
+        """ Run ghost-RISB self-consistency with regularisation for full and empty states
+
+        :param itmax: Maxiumum iteraction for self-consistency.
+        :type itmax: int
+
+        :param tol: Tolerence for convergence
+        :type tol: float
+
+        :param beta: Inverse temperature (equivalent to smearing temperature).
+        :type beta: float
+
+        :param silence: Silence the printing.
+        :type silence: bool
+
+        :param spin_pen: Penalty for S2 conservation.
+        :type spin_pen: float
+
+        :param silence: Orbital index for computing double occupancy.
+        :type idx: int
+
+        """
+        print("mu = ", mu)
+        self.diff = 1e20
+        if diis is True:
+            #RDIIS = DIIS(7)
+            LDIIS = DIIS(7)
+            numNonDIIS = 4
+        for it in range(itmax):
+            # compute qp density matrix
+            self.rhok_list=calc_rhoks(self.R, self.Lambda, self.eks, 1./beta)
+            self.Delta_p=calc_Delta_p(self.rhok_list)
+
+            # check on pysical space
+            self.space = measure_space(self.space, self.Delta_p)
+            print("Nempt - Nfull:",self.space[0],self.space[1])
+            print("U_qp",self.space[2])
+            self.D=calc_D_reg(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list, self.space)
+            #self.Lambda_c=calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list)
+            self.Lambda_c=calc_Lambda_c_reg(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list, self.space)
+
+            if not silence:
+                if not self.soc:
+                    print("Delta_p=")
+                    print(self.Delta_p[::2,::2])
+                    print("D=")
+                    print(self.D[::2,::2])
+                    print("Lambda_c=")
+                    print(self.Lambda_c[::2,::2])
+                else:
+                    print("Delta_p=")
+                    print(self.Delta_p[:,:])
+                    print("D=")
+                    print(self.D[:,:])
+                    print("Lambda_c=")
+                    print(self.Lambda_c[:,:])
+            # ED solvers
+            sys.stdout.flush()
+
+            self.solve_embedding(mu, num_eig, ed_verbose, spin_pen, sz_pen)
+            #Update R and Update Lambda
+            cdaggerf = self.denMat[:self.nimp,self.nimp:]
+            ffdagger = self.denMat[self.nimp:,self.nimp:]
+            ffdagger = (np.eye(self.nbath,dtype=np.complex128) - ffdagger).T
+            #if not silence:
+            print("norm(ffdagger.T-Delta_p)=", np.linalg.norm(ffdagger.T-self.Delta_p))
+            self.Delta_p = ffdagger.T
+            print("Delta_p new:")
+            print(self.Delta_p)
+            print("cdaggerf:")
+            print(cdaggerf)
+        
+            # new check on physical space using dbath_aim
+            self.space = measure_space(self.space, self.Delta_p)
+            R_new = calc_R_reg(cdaggerf,self.Delta_p,self.space)
+            if not self.soc:
+                R_new = np.kron(R_new[::2,::2],np.eye(2))# symmetrize
+            #Lambda_new = find_Lambda(self.Lambda, R_new, ffdagger, self.eks, self.Hspin_list, beta)
+            #Lambda_new = calc_Lambda(R_new, self.Lambda_c, self.Delta_p, self.D, self.Hfull_list)
+            Lambda_new = calc_Lambda_reg(R_new, self.Lambda_c, self.Delta_p, self.D, self.Hfull_list,self.space)
+            if not self.soc:
+                Lambda_new = np.kron(Lambda_new[::2,::2],np.eye(2)) # symmetryize
+
+            diff_R = np.abs(self.R-R_new).max()
+            diff_Lambda = np.abs(self.Lambda-Lambda_new).max()
+            self.diff = max(diff_R,diff_Lambda)
+            print("R_new:")
+            print(R_new)
+            print("Lambda_new:")
+            print(Lambda_new)
+            if diis and ( it >= numNonDIIS ):
+                error = Lambda_new - self.Lambda
+                error = np.reshape( error, error.shape[0]*error.shape[1] )
+                LDIIS.append( error, Lambda_new )
+                #error = R_new - self.R
+                #error = np.reshape( error, error.shape[0]*error.shape[1] )
+                #RDIIS.append( error, R_new )
+                self.R = R_new#RDIIS.Solve()
+                self.Lambda = LDIIS.Solve()
+            else:
+                self.R = (1.-mix)*np.copy(self.R) + mix*R_new
+                self.Lambda = (1.-mix)*np.copy(self.Lambda) + mix*Lambda_new
+#           Try fix a gague that R is non-zero only on the upper left Experiment!
+#            tmp = np.zeros(self.R.shape,dtype=self.R.dtype)
+#            tmp[:self.nimp,:self.nimp] = sqrtm(self.R.conj().T.dot(self.R)[:self.nimp,:self.nimp])
+#            self.R = tmp
+            # check point
+            with HDFArchive('checkpoint%s.h5' % self.suff,'a') as fh5:
+                fh5['R_%d' % it] = self.R
+                fh5['Lambda_%d'% it] = self.Lambda
+                fh5['eks'] = self.eks
+                fh5['Utensor'] = self.Utensor
+                fh5['mu'] = mu
+
+            if not silence:
+                print("R_new=")
+                print(R_new)
+                print("R=")
+                print(self.R)
+                print("Lambda_new=")
+                print(Lambda_new)
+                print("Lambda=")
+                print(self.Lambda)
+                print("ffdagger.T")
+                print(ffdagger.T)
+                print("density matrix=")
+                print(self.denMat[::2,::2])
+
+            # Save information
+            self.save_data(mu)
+
+            print("iteration:",it,'diff=',self.diff)
+            if self.diff < tol or it == (itmax-1):
+                print("--------------------- ghost-RISB converged with diff=%g ---------------------"%(self.diff))
+                print("density matrix=")
+                print(self.denMat)
+                self.nfill = np.trace(self.denMat[:self.nimp,:self.nimp])
+                self.docc = []
+                for idx in range(0,self.nimp,2):
+                    self.docc.append(self.edsolver.calc_double_occ(idx))
+                print("double occupancy=", self.docc)
+                break
+            print("##########")
+            print()
+            sys.stdout.flush()
+
+
     def func_mu(self, mu, *args):
         #self.mu_tmp = mu
         nfix, itmax, mix, tol, beta, silence, spin_pen, sz_pen, idx, num_eig, ed_verbose, diis = args

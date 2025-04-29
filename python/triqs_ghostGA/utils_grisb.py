@@ -17,10 +17,55 @@ def calc_D(R, Lambda, Delta_p, eks, rhoks):
     Right=funcMat(Delta_p, denR)
     return np.dot(Right,np.transpose(Left))
 
+def calc_D_reg(R, Lambda, Delta_p, eks, rhoks, space):
+    """ Compute D matrix
+    """
+    print("USING CALC D REG ***")
+    print("USING CALC D REG ***")
+    print("USING CALC D REG ***")
+    print("USING CALC D REG ***")
+    Nempt, Nfull, U_qp = space
+    nb = U_qp.shape[0]
+
+    Left=[np.dot( np.dot(eks[x], R.conj().T ), rhoks[x].T ) for x in range(len(rhoks))]
+    Left=sum(Left)/float(len(rhoks))
+    Left_T = U_qp.conj().T @ Left.T
+    Left_T_aux = Left_T[Nempt:nb-Nfull,:]
+    Delta_tot = U_qp.conj().T @ Delta_p @ U_qp
+    Delta_aux = Delta_tot[Nempt:nb-Nfull,Nempt:nb-Nfull]
+    evals, U_aux = np.linalg.eigh(Delta_aux)
+    evals = 1.0/np.sqrt(evals*(1.0-evals))
+    Dsq_aux = U_aux @ np.diag(evals) @ U_aux.conj().T
+    D_aux = Dsq_aux @ Left_T_aux
+    D_res = np.zeros_like(Left_T)
+    D_res[Nempt:nb-Nfull,:] = D_aux
+    return U_qp @ D_res
+
+def calc_R_reg(cdaggerf, Delta_p, space):
+    """ Compute D matrix
+    """
+    print("USING CALC R REG ***")
+    print("USING CALC R REG ***")
+    print("USING CALC R REG ***")
+    print("USING CALC R REG ***")
+    Nempt, Nfull, U_qp = space
+    nb = U_qp.shape[0]
+    Delta_tot = U_qp.conj().T @ Delta_p @ U_qp
+    Delta_aux = Delta_tot[Nempt:nb-Nfull,Nempt:nb-Nfull]
+    evals, U_aux = np.linalg.eigh(Delta_aux)
+    evals = 1.0/np.sqrt(evals*(1.0-evals))
+    Dsq_aux = U_aux @ np.diag(evals) @ U_aux.conj().T
+    cdgf_tot = cdaggerf @ U_qp
+    cdgf_aux = cdgf_tot[:,Nempt:nb-Nfull]
+    RT_aux = cdgf_aux @ Dsq_aux
+    RT_res = np.zeros_like(cdaggerf)
+    RT_res[:,Nempt:nb-Nfull] = RT_aux
+    RT_res = RT_res @ U_qp.conj().T
+    return RT_res.T
+
 def calc_Lambda_c(R, Lambda, Delta_p, D, H_list):
     """ Compute Lambda_c matrix
     """
-    no = Lambda.shape[0]
     print("In calc_Lambda_c")
     l=inverse_realHcombination(Lambda,H_list)
     lc=np.copy(l)*0.0
@@ -34,11 +79,36 @@ def calc_Lambda_c(R, Lambda, Delta_p, D, H_list):
     Lambda_c=realHcombination(lc,H_list)
     return Lambda_c
 
+def calc_Lambda_c_reg(R, Lambda, Delta_p, D, H_list,space):
+    """ Compute Lambda_c matrix
+    """
+    print("In calc_Lambda_c_reg")
+    Nempt, Nfull, U_qp = space
+    nb = U_qp.shape[0]
+    l=inverse_realHcombination(Lambda,H_list)
+    lc=np.copy(l)*0.0
+    MM=np.dot(D,np.transpose(R))
+    for k in range(len(H_list)):
+        AA=Delta_p
+        HH=H_list[k].T
+        derivative=dF(AA,HH, denRm1, ddenRm1)
+        tt=np.trace(np.dot(MM,derivative))
+        lc[k]=-l[k]-(tt+np.conjugate(tt)).real
+    Lambda_c = realHcombination(lc,H_list)
+    Lambda_c = U_qp.conj().T @ Lambda_c @ U_qp
+    if(Nempt>0 ):
+        Lambda_c[:Nempt,:]=0; Lambda_c[:,:Nempt]=0
+        Lambda_c[:Nempt,:Nempt] =  np.eye(Nempt)
+    if(Nfull>0):
+        Lambda_c[nb-Nfull:,:]=0; Lambda_c[:,nb-Nfull:]=0
+        Lambda_c[:Nempt,:Nempt] = -np.eye(Nempt)
+
+    return U_qp @ Lambda_c @ U_qp.conj().T
+
 def calc_Lambda(R, Lambda_c, Delta_p, D, H_list):
     """ Compute Lambda_c matrix
     """
     print("In calc_Lambda")
-    no = Lambda_c.shape[0]
     lc=inverse_realHcombination(Lambda_c,H_list)
     l=np.copy(lc)*0.0
     MM=np.dot(D,np.transpose(R))
@@ -50,6 +120,33 @@ def calc_Lambda(R, Lambda_c, Delta_p, D, H_list):
         l[k]=-lc[k]-(tt+np.conjugate(tt)).real
     Lambda=realHcombination(l,H_list)
     return Lambda
+
+def calc_Lambda_reg(R, Lambda_c, Delta_p, D, H_list, space):
+    """ Compute Lambda_c matrix
+    """
+    print("In calc_Lambda")
+    Nempt, Nfull, U_qp = space
+    nb = U_qp.shape[0]
+    lc=inverse_realHcombination(Lambda_c,H_list)
+    l=np.copy(lc)*0.0
+    MM=np.dot(D,np.transpose(R))
+    for k in range(len(H_list)):
+        AA=Delta_p
+        HH=H_list[k].T
+        derivative=dF(AA,HH, denRm1, ddenRm1)
+        tt=np.trace(np.dot(MM,derivative))
+        l[k]=-lc[k]-(tt+np.conjugate(tt)).real
+    Lambda=realHcombination(l,H_list)
+
+    Lambda = U_qp.conj().T @ Lambda @ U_qp
+    if(Nempt>0 ):
+        Lambda[:Nempt,:]=0; Lambda[:,:Nempt]=0
+        Lambda[:Nempt,:Nempt] =  np.eye(Nempt)
+    if(Nfull>0):
+        Lambda[nb-Nfull:,:]=0; Lambda[:,nb-Nfull:]=0
+        Lambda[:Nempt,:Nempt] = -np.eye(Nempt)
+    
+    return U_qp @ Lambda @ U_qp.conj().T
 
 
 
