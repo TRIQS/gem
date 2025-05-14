@@ -169,3 +169,139 @@ def svd_truncate_R(R, eps=0.5):
             sp[i,i] = si
     Rp = u @ sp @ vh
     return Rp
+
+# Here functions that adopt regularisation scheme in case of singular 1BDM
+###########################################
+#      utilities for grisb
+#      Author: Samuele Giuli
+#      email: samuele.giuli@gmail.com
+###########################################
+
+
+def space_list(nbath:int):
+    Nempt=0; Nfull=0; U_qp=np.eye(nbath,dtype=np.complex128)
+    my_list=[Nempt, Nfull, U_qp]
+    return my_list
+
+def measure_space(my_list,delta_qp):
+    Nempt, Nfull, U_qp = my_list
+    nb = delta_qp.shape[0]
+    delta_tot = np.conj(U_qp.T) @ delta_qp @ U_qp
+    delta_aux = delta_tot[Nempt:nb-Nfull,Nempt:nb-Nfull]
+    e_aux, U_aux = np.linalg.eigh(delta_aux)
+    i_empt=-1; i_full=len(e_aux)
+    for i,ei in enumerate(e_aux):
+        if(ei<1e-10):
+            i_empt=i
+        elif(ei>1.0-1e-10):
+            i_full=i
+            break
+    if(i_empt>-1 or i_full<len(e_aux)):
+        U_tot = np.eye( U_qp.shape[0], dtype=np.complex128 )
+        U_tot[Nempt:nb-Nfull,Nempt:nb-Nfull] = U_aux
+        U_qp = U_qp @ U_tot
+        Nempt += (i_empt+1)
+        Nfull += (len(e_aux)-i_full)
+    return [Nempt, Nfull, U_qp]
+
+def calc_D_reg(R, Lambda, Delta_p, eks, rhoks, space):
+    """ Compute D matrix
+    """
+    print("USING CALC D REG ***")
+    print("USING CALC D REG ***")
+    print("USING CALC D REG ***")
+    print("USING CALC D REG ***")
+    Nempt, Nfull, U_qp = space
+    nb = U_qp.shape[0]
+
+    Left=[np.dot( np.dot(eks[x], R.conj().T ), rhoks[x].T ) for x in range(len(rhoks))]
+    Left=sum(Left)/float(len(rhoks))
+    Left_T = U_qp.conj().T @ Left.T
+    Left_T_aux = Left_T[Nempt:nb-Nfull,:]
+    Delta_tot = U_qp.conj().T @ Delta_p @ U_qp
+    Delta_aux = Delta_tot[Nempt:nb-Nfull,Nempt:nb-Nfull]
+    evals, U_aux = np.linalg.eigh(Delta_aux)
+    evals = 1.0/np.sqrt(evals*(1.0-evals))
+    Dsq_aux = U_aux @ np.diag(evals) @ U_aux.conj().T
+    D_aux = Dsq_aux @ Left_T_aux
+    D_res = np.zeros_like(Left_T)
+    D_res[Nempt:nb-Nfull,:] = D_aux
+    return U_qp @ D_res
+
+def calc_R_reg(cdaggerf, Delta_p, space):
+    """ Compute D matrix
+    """
+    print("USING CALC R REG ***")
+    print("USING CALC R REG ***")
+    print("USING CALC R REG ***")
+    print("USING CALC R REG ***")
+    Nempt, Nfull, U_qp = space
+    nb = U_qp.shape[0]
+    Delta_tot = U_qp.conj().T @ Delta_p @ U_qp
+    Delta_aux = Delta_tot[Nempt:nb-Nfull,Nempt:nb-Nfull]
+    evals, U_aux = np.linalg.eigh(Delta_aux)
+    evals = 1.0/np.sqrt(evals*(1.0-evals))
+    Dsq_aux = U_aux @ np.diag(evals) @ U_aux.conj().T
+    cdgf_tot = cdaggerf @ U_qp
+    cdgf_aux = cdgf_tot[:,Nempt:nb-Nfull]
+    RT_aux = cdgf_aux @ Dsq_aux
+    RT_res = np.zeros_like(cdaggerf)
+    RT_res[:,Nempt:nb-Nfull] = RT_aux
+    RT_res = RT_res @ U_qp.conj().T
+    return RT_res.T
+
+def calc_Lambda_c_reg(R, Lambda, Delta_p, D, H_list,space):
+    """ Compute Lambda_c matrix
+    """
+    print("In calc_Lambda_c_reg")
+    Nempt, Nfull, U_qp = space
+    nb = U_qp.shape[0]
+    l=inverse_realHcombination(Lambda,H_list)
+    lc=np.copy(l)*0.0
+    MM=np.dot(D,np.transpose(R))
+    for k in range(len(H_list)):
+        AA=Delta_p
+        HH=H_list[k].T
+        derivative=dF(AA,HH, denRm1, ddenRm1)
+        tt=np.trace(np.dot(MM,derivative))
+        lc[k]=-l[k]-(tt+np.conjugate(tt)).real
+    Lambda_c = realHcombination(lc,H_list)
+    Lambda_c = U_qp.conj().T @ Lambda_c @ U_qp
+    if(Nempt>0 ):
+        Lambda_c[:Nempt,:]=0; Lambda_c[:,:Nempt]=0
+        Lambda_c[:Nempt,:Nempt] =  np.eye(Nempt)
+    if(Nfull>0):
+        Lambda_c[nb-Nfull:,:]=0; Lambda_c[:,nb-Nfull:]=0
+        Lambda_c[:Nempt,:Nempt] = -np.eye(Nempt)
+
+    return U_qp @ Lambda_c @ U_qp.conj().T
+
+
+def calc_Lambda_reg(R, Lambda_c, Delta_p, D, H_list, space):
+    """ Compute Lambda_c matrix
+    """
+    print("In calc_Lambda")
+    Nempt, Nfull, U_qp = space
+    nb = U_qp.shape[0]
+    lc=inverse_realHcombination(Lambda_c,H_list)
+    l=np.copy(lc)*0.0
+    MM=np.dot(D,np.transpose(R))
+    for k in range(len(H_list)):
+        AA=Delta_p
+        HH=H_list[k].T
+        derivative=dF(AA,HH, denRm1, ddenRm1)
+        tt=np.trace(np.dot(MM,derivative))
+        l[k]=-lc[k]-(tt+np.conjugate(tt)).real
+    Lambda=realHcombination(l,H_list)
+
+    Lambda = U_qp.conj().T @ Lambda @ U_qp
+    if(Nempt>0 ):
+        Lambda[:Nempt,:]=0; Lambda[:,:Nempt]=0
+        Lambda[:Nempt,:Nempt] =  np.eye(Nempt)
+    if(Nfull>0):
+        Lambda[nb-Nfull:,:]=0; Lambda[:,nb-Nfull:]=0
+        Lambda[:Nempt,:Nempt] = -np.eye(Nempt)
+    
+    return U_qp @ Lambda @ U_qp.conj().T
+
+

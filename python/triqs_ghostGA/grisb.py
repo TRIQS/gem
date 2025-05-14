@@ -8,7 +8,8 @@ import sys
 
 from triqs_ghostGA.utility.utils_TH import denR, denRm1, ddenRm1, realHcombination, inverse_realHcombination, \
     Hermitian_list, get_blocks, funcMat, calc_nf, dF
-from triqs_ghostGA.utility.utils_grisb import calc_rhoks, calc_Delta_p, calc_D, calc_Lambda_c, calc_Lambda
+from triqs_ghostGA.utility.utils_grisb import calc_rhoks, calc_Delta_p, calc_D, calc_Lambda_c, calc_Lambda, \
+    space_list ,measure_space, calc_D_reg, calc_Lambda_c_reg, calc_Lambda_reg, calc_R_reg
 from triqs_ghostGA.DIIS import *
 
 def occupation_vs_mu(mu, *args):
@@ -108,7 +109,7 @@ class Grisb(object):
             if Lambda.shape != (nbath,nbath):
                 raise ValueError("Lambda has inconsistent shape. Should be (nbath,nbath)")
             self.Lambda = Lambda
-
+        self.space = space_list(nbath)
         if edsolver is None:
             raise ValueError("Not edsolver was passed to the GRISB.")
         else:
@@ -181,7 +182,7 @@ class Grisb(object):
             A[timestamp] = tmp_dict
 
     # TODO: move sz_pen, etc to the solvers.
-    def run(self, mu0=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., silence=True, idx=0, num_eig=2, ed_verbose=0, diis=False, nfix=None, dmu=0.1, mu_tol=1e-8, nfix_tol=0.01):
+    def run(self, mu0=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., silence=True, idx=0, num_eig=2, ed_verbose=0, diis=False, nfix=None, dmu=0.1, mu_tol=1e-8, nfix_tol=0.01,regularisation=False):
         """ Run ghost-RISB self-consistency
 
         :param itmax: Maxiumum iteraction for self-consistency.
@@ -216,7 +217,6 @@ class Grisb(object):
             #RDIIS = DIIS(7)
             LDIIS = DIIS(7)
             numNonDIIS = 4
-
         for it in range(itmax):
             print("### Iteration %d" % it)
 
@@ -236,9 +236,14 @@ class Grisb(object):
             # self.rhok_list = np.real(calc_rhoks(self.R, self.Lambda, self.eks, 1./beta, self.mu))
             self.Delta_p = calc_Delta_p(self.rhok_list)
             # self.Delta_p = np.real(calc_Delta_p(self.rhok_list))
-            self.D = calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
             # self.D = np.real(calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list))
-            self.Lambda_c = calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list)
+            if(regularisation):
+                self.space = measure_space(self.space,self.Delta_p)
+                self.D = calc_D_reg(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list,self.space)    
+                self.Lambda_c = calc_Lambda_c_reg(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list,self.space)
+            else:
+                self.D = calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)    
+                self.Lambda_c = calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list)
             # self.Lambda_c = np.real(calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list))
 
             # TODO: Nicer print and options for verbose
@@ -286,20 +291,21 @@ class Grisb(object):
             .. math:
                 R_{b\alpha} = \sum_a \langle \Phi | c^\dagger_\alpha f_a | \Phi \rangle \left[ \Delta ( 1 - \Delta ) \right]^{-1/2}_{ad}
             """
-            R_new = np.transpose(cdaggerf.dot(funcMat(self.Delta_p, denR)))
-            # R_new = np.real(np.transpose(cdaggerf.dot(funcMat(self.Delta_p, denR))))
-
-            # Spin symmetry for R
-            if self.spin_sym:
-                R_new = np.kron(R_new[::2,::2],np.eye(2))# symmetrize
-
-            # Calculate the new Lambda from R, Lambda_c, Delta_p and D
-            Lambda_new = calc_Lambda(R_new, self.Lambda_c, self.Delta_p, self.D, self.Hfull_list)
-            # Lambda_new = np.real(calc_Lambda(R_new, self.Lambda_c, self.Delta_p, self.D, self.Hfull_list))
-
-            # Spin symmetry for Lambda
-            if self.spin_sym:
-                Lambda_new = np.kron(Lambda_new[::2,::2],np.eye(2)) # symmetryize
+            if(regularisation):
+                self.space = measure_space(self.space,self.Delta_p)
+                R_new = calc_R_reg(cdaggerf,self.Delta_p,self.space)
+                if self.spin_sym:
+                    R_new = np.kron(R_new[::2,::2],np.eye(2))# symmetrize
+                Lambda_new = calc_Lambda_reg(R_new, self.Lambda_c, self.Delta_p, self.D, self.Hfull_list,self.space)
+                if self.spin_sym:
+                    Lambda_new = np.kron(Lambda_new[::2,::2],np.eye(2)) # symmetryize
+            else:
+                R_new = np.transpose(cdaggerf.dot(funcMat(self.Delta_p, denR)))
+                if self.spin_sym:
+                    R_new = np.kron(R_new[::2,::2],np.eye(2))# symmetrize
+                Lambda_new = calc_Lambda(R_new, self.Lambda_c, self.Delta_p, self.D, self.Hfull_list)
+                if self.spin_sym:
+                    Lambda_new = np.kron(Lambda_new[::2,::2],np.eye(2)) # symmetryize
 
             # Calculate difference of R and Lambda from prior iteration and check convergence
             # and apply mixing if required
