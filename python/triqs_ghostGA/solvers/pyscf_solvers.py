@@ -6,7 +6,7 @@ import os
 class Pyscf_ccsd(object):
     """ Wrapper for pyscf ccsd solvers
     """
-    def __init__(self, ntot, nimp, nbath):
+    def __init__(self, ntot, nimp, nbath, restrict=True):
         """Constructor method
         """
         self.ntot = ntot
@@ -14,6 +14,7 @@ class Pyscf_ccsd(object):
         self.nbath = nbath
         self.hsize = 2**ntot
         self.type= 'PySCFCCSD'
+        self.restrict = restrict #CCSD? True: for spin symmetry
         # initialize pyscf solvers
 
     def build_Hemb(self, D, H1E, LAMBDA, V2E, spin_pen=0.0):
@@ -26,9 +27,8 @@ class Pyscf_ccsd(object):
         self.h2 = numpy.zeros((self.ntot//2,self.ntot//2,self.ntot//2,self.ntot//2))
         self.h2[:self.nimp//2,:self.nimp//2,:self.nimp//2,:self.nimp//2] = V2E[::2,::2,1::2,1::2] # spin symmetric
 
-    def solve_Hemb(self, num_eig=10, verbose=0, restrict=True):
-        self.restrict = restrict # restrict CCSD? True: for spin symmetry
-        if restrict:
+    def solve_Hemb(self, num_eig=10, verbose=0):
+        if self.restrict:
             mol = gto.M()
             mol.nelectron = self.ntot//2
             mol.incore_anyway = True
@@ -80,17 +80,21 @@ class Pyscf_ccsd(object):
             mf.get_ovlp = lambda *args: numpy.eye(self.ntot//2)
             mf._eri = ao2mo.restore(8, self.h2, self.ntot//2) # 8-fold symmetry
             mf.init_guess = 'minao'
-            mf = mf.run()
+            dm_alpha, dm_beta = mf.get_init_guess()
+            dm_beta[:2,:2] = 0
+            dm = (dm_alpha,dm_beta)
+            mf.kernel(dm)
+            #mf = mf.run()
             self.Cup, self.Cdn = mf.mo_coeff
             self.mycc = cc.UCCSD(mf)
             self.mycc.conv_tol = 1e-8
             self.mycc.conv_tol_normt = 1e-5
             self.mycc.max_cycle = 500
             self.mycc.diis_space = 20
-            self.mycc.diis_start_cycle = 4
+            self.mycc.diis_start_cycle = 5
             #self.mycc.diis = False
-            self.mycc.iterative_damping = 0.001
-            self.mycc.diis = diis.ADIIS
+            self.mycc.iterative_damping = 0.05
+            self.mycc.diis = diis.EDIIS
             #self.eccsd, t1, t2 = self.mycc.kernel()
             self.eccsd, t1, t2 = self.mycc.ccsd()
             #self.mycc.nroots = 3
