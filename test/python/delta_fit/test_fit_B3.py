@@ -77,12 +77,14 @@ D22_sol=Delta_sol[Bsize:,Bsize:]
 print("Final flling:",np.sum(np.diag(Delta_sol)))
 print("")
 print("Without derivatives in ",noder_time,"s")
-print("Gauge invariant distances:")
+print("Distance in R :", np.sum(np.abs(R_target-R_sol)))
+print("Distance in Lambda:", np.sum(np.abs(Lambda_target-Lam_sol)))
 Ut,S_trg,Vt = np.linalg.svd(R_target)
 Us,S_sol,Vs = np.linalg.svd(R_sol)
+Lg_trg=Ut.T.conj()@Lambda_target@Ut
+Lg_sol=Us.T.conj()@Lam_sol@Us
 print("Distance in gauge invariant R:",np.sum(np.abs(S_trg-S_sol)))
-print("Distance in gauge invariant Lambda:", \
-      np.sum(np.abs( Ut.T.conj()@Lambda_target@Ut -Us.T.conj()@Lam_sol@Us )))
+print("Distance in gauge invariant Lambda:", np.sum(np.abs(Lg_sol-Lg_trg)))
 print("")
 
 
@@ -107,12 +109,14 @@ D22_sol = Delta_sol[Bsize:,Bsize:]
 print("Final filling:",np.sum(np.diag(Delta_sol)))
 print("")
 print("With derivatives in ",yeder_time,"s")
-print("Gauge invariant distances:")
+print("Distance in R :", np.sum(np.abs(R_target-R_sol)))
+print("Distance in Lambda:", np.sum(np.abs(Lambda_target-Lam_sol)))
 Ut,S_trg,Vt = np.linalg.svd(R_target)
 Us,S_sol,Vs = np.linalg.svd(R_sol)
+Lg_trg=Ut.T.conj()@Lambda_target@Ut
+Lg_sol=Us.T.conj()@Lam_sol@Us
 print("Distance in gauge invariant R:",np.sum(np.abs(S_trg-S_sol)))
-print("Distance in gauge invariant Lambda:", \
-      np.sum(np.abs( Ut.T.conj()@Lambda_target@Ut -Us.T.conj()@Lam_sol@Us )))
+print("Distance in gauge invariant Lambda:", np.sum(np.abs(Lg_sol-Lg_trg)))
 print("")
 
 
@@ -135,10 +139,12 @@ D22_sol = Delta_sol[Bsize:,Bsize:]
 print("Final filling:",np.sum(np.diag(Delta_sol)))
 print("")
 print("With derivatives in ",yeder_time,"s")
-print("Gauge invariant distances:")
+print("Distance in R:", np.sum(np.abs(R_target-R_sol)))
+print("Distance in Lambda:", np.sum(np.abs(Lambda_target-Lam_sol)))
 Ut,S_trg,Vt = np.linalg.svd(R_target)
 Us,S_sol,Vs = np.linalg.svd(R_sol)
+Lg_trg=Ut.T.conj()@Lambda_target@Ut
+Lg_sol=Us.T.conj()@Lam_sol@Us
 print("Distance in gauge invariant R:",np.sum(np.abs(S_trg-S_sol)))
-print("Distance in gauge invariant Lambda:", \
-      np.sum(np.abs( Ut.T.conj()@Lambda_target@Ut -Us.T.conj()@Lam_sol@Us )))
+print("Distance in gauge invariant Lambda:", np.sum(np.abs(Lg_sol-Lg_trg)))
 print("")
