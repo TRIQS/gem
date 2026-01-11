@@ -26,14 +26,14 @@ H = build_H(Lambda_target, Lambda_c, D, R_target)
 Delta_target = F_of_H(H, beta)
 
 
-
 D11_target=Delta_target[:Bsize,:Bsize]
+D22_target=Delta_target[Bsize:,Bsize:]
 D12_target=Delta_target[:Bsize,Bsize:]
 RTD12_target = R_target.T@D12_target
 
 #in principle zero:
-residual0 = residual(x_target, beta, Lambda_c, D, D11_target, RTD12_target)
-jacobian0 = jacobian(x_target, beta, Lambda_c, D, D11_target, RTD12_target)
+residual0 = residual(x_target, beta, Lambda_c, D, D22_target, RTD12_target)
+jacobian0 = jacobian(x_target, beta, Lambda_c, D, D22_target, RTD12_target)
 tot_res0 = np.sum(np.abs(residual0))
 if(tot_res0>1e-10):
     raise ValueError(f"The residual of the starting point should be zero while it is:{tot_res0}")
@@ -43,18 +43,33 @@ Lambda_0 = 2.0*(-0.5+np.random.rand(Bsize,Bsize)) + 2j*(-0.5+np.random.rand(Bsiz
 Lambda_0=0.5*(Lambda_0 + Lambda_0.T.conj() )
 R_0 = 2.0*(np.random.rand(Bsize,size)-0.5 +1j*np.random.rand(Bsize,size)-0.5*1j)
 
-Lambda_0 = Lambda_target +0.02*Lambda_0
-R_0      = R_target +0.02*R_0
+Lambda_0 = Lambda_target +0.00001*Lambda_0
+R_0      = R_target +0.00001*R_0
 
 print("Starting from:")
 print(Lambda_0)
 print(R_0)
-
+start_x = pack_params(Lambda_0, R_0)
+start_residual = residual(start_x, beta, Lambda_c, D, D22_target, RTD12_target)
+print("Starting residual:",np.sum(np.abs(start_residual)))
 
 in_time=time.time()
-res, Lam_sol, R_sol = solve_F_only(beta, Lambda_c, D, Lambda_0, R_0, D11_target, D12_target)
+res, Lam_sol, R_sol = solve_F_only(beta, Lambda_c, D, Lambda_0, R_0, D22_target, RTD12_target)
 fin_time=time.time()
 noder_time=fin_time-in_time
+
+H_sol = build_H(Lam_sol, Lambda_c, D, R_sol)
+Delta_sol = F_of_H(H_sol, beta)
+D11_sol=Delta_sol[:Bsize,:Bsize]
+D12_sol=Delta_sol[:Bsize,Bsize:]
+D22_sol=Delta_sol[Bsize:,Bsize:]
+
+print(np.diag(Delta_sol))
+print(np.sum(np.diag(Delta_sol)))
+print(np.sum(np.abs(D11_target-D11_sol)))
+print(np.sum(np.abs(D12_target-D12_sol)))
+print(np.sum(np.abs(D22_target-D22_sol)))
+
 
 print("")
 print("Without derivatives in ",noder_time,"s")
@@ -64,7 +79,7 @@ print("")
 
 
 in_time=time.time()
-res, Lam_sol, R_sol = solve_F_dF(beta, Lambda_c, D, Lambda_0, R_0, D11_target, RTD12_target)
+res, Lam_sol, R_sol = solve_F_dF(beta, Lambda_c, D, Lambda_0, R_0, D22_target, RTD12_target)
 fin_time=time.time()
 yeder_time=fin_time-in_time
 

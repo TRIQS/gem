@@ -39,7 +39,7 @@ def F_of_H(H, beta):
 # -------------------------------------------------
 # Frechet derivative dF(H)[dH]
 # -------------------------------------------------
-def dF_spectral(H, dH, beta, tol=1e-12):
+def dF_spectral(H, dH, beta, tol=1e-14):
     eps, U = np.linalg.eigh(H)
 
     f = fermi(eps, beta)
@@ -139,15 +139,16 @@ def unpack_params(x, n, p):
 # ============================================================
 # Residual
 # ============================================================
-def residual(x, beta, Lambda_c, D, F11_target, RTF12_target):
+def residual(x, beta, Lambda_c, D, F22_target, RTF12_target):
     n, p = D.shape
     Lambda, R = unpack_params(x, n, p)
 
     H = build_H(Lambda, Lambda_c, D, R)
     F = F_of_H(H, beta)
 
-    F11 = F[:n, :n]
+    F22 = F[n:, n:]
     F12 = F[:n, n:]
+    
     RTF12 = R.T@F12
 
     iu = np.triu_indices(n)
@@ -155,26 +156,26 @@ def residual(x, beta, Lambda_c, D, F11_target, RTF12_target):
 
     # Standard Physical Residual
     res = np.concatenate([
-        (F11.real[iu] - F11_target.real[iu]),
-        (F11.imag[iu_strict] - F11_target.imag[iu_strict]),
+        (F22.real[iu] - F22_target.real[iu]),
+        (F22.imag[iu_strict] - F22_target.imag[iu_strict]),
         (RTF12.real - RTF12_target.real).ravel(),
         (RTF12.imag - RTF12_target.imag).ravel()
     ])
-
+    #print("in residual:",np.sum(np.abs(res)))
     return res
 
 
 # ============================================================
 # Jacobian via Frechet derivative
 # ============================================================
-def jacobian(x, beta, Lambda_c, D, F11_target, RTF12_target):
+def jacobian(x, beta, Lambda_c, D, F22_target, RTF12_target):
     n, p = D.shape
     Lambda, R = unpack_params(x, n, p)
 
     H = build_H(Lambda, Lambda_c, D, R)
     F = F_of_H(H, beta)
 
-    F11 = F[:n, :n]
+    F22 = F[n:, n:]
     F12 = F[:n, n:]
 
     Jcols = []
@@ -191,7 +192,7 @@ def jacobian(x, beta, Lambda_c, D, F11_target, RTF12_target):
         dH = dH_dLambda(dLambda, n) + dH_dR(dR, D)
         dF = dF_spectral(H, dH, beta)
 
-        dF11 = dF[:n, :n]
+        dF22 = dF[n:, n:]
         dF12 = dF[:n, n:]
         #  d(R.T@F12) with respect to R is
         #  R.T @ dF12 + d(R.T) @ F12
@@ -200,9 +201,9 @@ def jacobian(x, beta, Lambda_c, D, F11_target, RTF12_target):
 
         # Must match the concatenation logic in residual()
         Jcols.append(np.concatenate([
-            # F11 (Hermitian reduction)
-            dF11.real[iu],
-            dF11.imag[iu_strict],
+            # F22 (Hermitian reduction)
+            dF22.real[iu],
+            dF22.imag[iu_strict],
             # RTF12 (full)
             dRTF12.real.ravel(),
             dRTF12.imag.ravel()
@@ -215,7 +216,7 @@ def jacobian(x, beta, Lambda_c, D, F11_target, RTF12_target):
 # Root solve
 # ============================================================
 # This one works without derivatives and with least square instead of root
-def solve_F_only(beta, Lambda_c, D, Lambda0, R0, F11_target, RTF12_target):
+def solve_F_only(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target):
     x0 = pack_params(Lambda0, R0)
 
     # We use least_squares because it supports 'trf' and '2-point' (numerical) jacobians
@@ -223,11 +224,11 @@ def solve_F_only(beta, Lambda_c, D, Lambda0, R0, F11_target, RTF12_target):
         residual,
         x0,
         jac='2-point', # This tells Scipy to compute the gradient numerically
-        args=(beta, Lambda_c, D, F11_target, RTF12_target),
+        args=(beta, Lambda_c, D, F22_target, RTF12_target),
         method="trf",
         max_nfev=200,  # Limits total function calls to 200
-        xtol=1e-12,
-        ftol=1e-12,
+        xtol=1e-14,
+        ftol=1e-14,
         verbose=2      # Useful to see if the cost function is actually decreasing
     )
     
@@ -236,16 +237,16 @@ def solve_F_only(beta, Lambda_c, D, Lambda0, R0, F11_target, RTF12_target):
 
 
 # This one works
-def solve_F_dF(beta, Lambda_c, D, Lambda0, R0, F11_target, RTF12_target):
+def solve_F_dF(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target):
     x0 = pack_params(Lambda0, R0)
-    res = residual(x0, beta, Lambda_c, D, F11_target, RTF12_target)
+    res = residual(x0, beta, Lambda_c, D, F22_target, RTF12_target)
     sol = root(
         residual,
         x0,
         jac=jacobian,
-        args=(beta, Lambda_c, D, F11_target, RTF12_target),
+        args=(beta, Lambda_c, D, F22_target, RTF12_target),
         method="lm", # Change from 'hybr' to 'lm'
-        options={'ftol': 1e-10, 'xtol': 1e-10}
+        options={'ftol': 1e-14, 'xtol': 1e-14}
     )
 
     Lambda_sol, R_sol = unpack_params(sol.x, Lambda0.shape[0], R0.shape[1])
