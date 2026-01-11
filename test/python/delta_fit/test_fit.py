@@ -1,4 +1,4 @@
-from delta_fit import solve_F_only, solve_F_dF, build_H, F_of_H
+from delta_fit import *
 import numpy as np
 
 import time
@@ -15,6 +15,8 @@ beta=100
 Lambda_target = np.loadtxt("input_data/lambda.real")
 Lambda_target=0.5*(Lambda_target + Lambda_target.T.conj() )
 R_target = np.loadtxt("input_data/R.real").reshape((3,1))
+x_target = pack_params(Lambda_target, R_target)
+
 
 Lambda_c = np.loadtxt("input_data/lambdac.real")
 Lambda_c = 0.5*(Lambda_c + Lambda_c.T.conj() )
@@ -27,6 +29,15 @@ Delta_target = F_of_H(H, beta)
 
 D11_target=Delta_target[:Bsize,:Bsize]
 D12_target=Delta_target[:Bsize,Bsize:]
+RTD12_target = R_target.T@D12_target
+
+#in principle zero:
+residual0 = residual(x_target, beta, Lambda_c, D, D11_target, RTD12_target)
+jacobian0 = jacobian(x_target, beta, Lambda_c, D, D11_target, RTD12_target)
+tot_res0 = np.sum(np.abs(residual0))
+if(tot_res0>1e-10):
+    raise ValueError(f"The residual of the starting point should be zero while it is:{tot_res0}")
+
 
 Lambda_0 = 2.0*(-0.5+np.random.rand(Bsize,Bsize)) + 2j*(-0.5+np.random.rand(Bsize,Bsize))
 Lambda_0=0.5*(Lambda_0 + Lambda_0.T.conj() )
@@ -53,7 +64,7 @@ print("")
 
 
 in_time=time.time()
-res, Lam_sol, R_sol = solve_F_dF(beta, Lambda_c, D, Lambda_0, R_0, D11_target, D12_target)
+res, Lam_sol, R_sol = solve_F_dF(beta, Lambda_c, D, Lambda_0, R_0, D11_target, RTD12_target)
 fin_time=time.time()
 yeder_time=fin_time-in_time
 
