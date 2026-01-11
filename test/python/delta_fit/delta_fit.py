@@ -7,8 +7,8 @@ from scipy.optimize import least_squares
 # -------------------------
 def build_H(Lambda, Lambda_c, D, R):
     H11 = Lambda
-    H12 = D @ R.T
-    H21 = R.conj() @ D.T.conj()
+    H12 = R @ D.T #Needed to be transposed #conj maybe?
+    H21 = H12.T.conj()
     H22 = -Lambda_c
     return np.block([[H11, H12],
                      [H21, H22]])
@@ -77,7 +77,7 @@ def dH_dR(dR, D):
     n, p = D.shape
     Z_nn = np.zeros((n, n), dtype=complex)
     
-    term12 = D @ dR.T
+    term12 = dR @ D.T
     term21 = term12.conj().T 
     
     return np.block([
@@ -164,6 +164,31 @@ def residual(x, beta, Lambda_c, D, F22_target, RTF12_target):
     #print("in residual:",np.sum(np.abs(res)))
     return res
 
+def residual_11(x, beta, Lambda_c, D, F11_target, RTF12_target):
+    n, p = D.shape
+    Lambda, R = unpack_params(x, n, p)
+
+    H = build_H(Lambda, Lambda_c, D, R)
+    F = F_of_H(H, beta)
+
+    F11 = F[:n, :n]
+    F12 = F[:n, n:]
+    
+    RTF12 = R.T@F12
+
+    iu = np.triu_indices(n)
+    iu_strict = np.triu_indices(n, k=1)
+
+    # Standard Physical Residual
+    res = np.concatenate([
+        (F11.real[iu] - F11_target.real[iu]),
+        (F11.imag[iu_strict] - F11_target.imag[iu_strict]),
+        (RTF12.real - RTF12_target.real).ravel(),
+        (RTF12.imag - RTF12_target.imag).ravel()
+    ])
+    #print("in residual:",np.sum(np.abs(res)))
+    return res
+
 
 # ============================================================
 # Jacobian via Frechet derivative
@@ -211,6 +236,49 @@ def jacobian(x, beta, Lambda_c, D, F22_target, RTF12_target):
 
     return np.column_stack(Jcols)
 
+def jacobian_11(x, beta, Lambda_c, D, F11_target, RTF12_target):
+    n, p = D.shape
+    Lambda, R = unpack_params(x, n, p)
+
+    H = build_H(Lambda, Lambda_c, D, R)
+    F = F_of_H(H, beta)
+
+    F11 = F[:n, :n]
+    F12 = F[:n, n:]
+
+    Jcols = []
+    
+    # Indices for Hermitian reduction
+    iu = np.triu_indices(n)
+    iu_strict = np.triu_indices(n, k=1)
+
+    for k in range(len(x)):
+        dx = np.zeros_like(x)
+        dx[k] = 1.0
+
+        dLambda, dR = unpack_params(dx, n, p)
+        dH = dH_dLambda(dLambda, n) + dH_dR(dR, D)
+        dF = dF_spectral(H, dH, beta)
+
+        dF11 = dF[:n, :n]
+        dF12 = dF[:n, n:]
+        #  d(R.T@F12) with respect to R is
+        #  R.T @ dF12 + d(R.T) @ F12
+        dRTF12 = R.T@dF12 +dR.T@F12
+        
+
+        # Must match the concatenation logic in residual()
+        Jcols.append(np.concatenate([
+            # F11 (Hermitian reduction)
+            dF11.real[iu],
+            dF11.imag[iu_strict],
+            # RTF12 (full)
+            dRTF12.real.ravel(),
+            dRTF12.imag.ravel()
+        ]))
+
+    return np.column_stack(Jcols)
+
 
 # ============================================================
 # Root solve
@@ -240,14 +308,38 @@ def solve_F_only(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target):
 def solve_F_dF(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target):
     x0 = pack_params(Lambda0, R0)
     res = residual(x0, beta, Lambda_c, D, F22_target, RTF12_target)
+    if(False):
+        sol = least_squares(
+            residual,
+            x0,
+            jac=jacobian,
+            args=(beta, Lambda_c, D, F22_target, RTF12_target),
+            method="trf", # Change from 'hybr' to 'lm'
+            ftol=1e-14,
+            xtol=1e-14,
+            verbose=2
+        )
+    elif(True):
+        sol = root(
+            residual,
+            x0,
+            jac=jacobian,
+            args=(beta, Lambda_c, D, F22_target, RTF12_target),
+            method="lm", # Change from 'hybr' to 'lm'
+            options={'ftol': 1e-14, 'xtol': 1e-14}
+        )
+    Lambda_sol, R_sol = unpack_params(sol.x, Lambda0.shape[0], R0.shape[1])
+    return sol, Lambda_sol, R_sol
+# This one works
+def solve_F_dF_11(beta, Lambda_c, D, Lambda0, R0, F11_target, RTF12_target):
+    x0 = pack_params(Lambda0, R0)
     sol = root(
-        residual,
+        residual_11,
         x0,
-        jac=jacobian,
-        args=(beta, Lambda_c, D, F22_target, RTF12_target),
+        jac=jacobian_11,
+        args=(beta, Lambda_c, D, F11_target, RTF12_target),
         method="lm", # Change from 'hybr' to 'lm'
         options={'ftol': 1e-14, 'xtol': 1e-14}
     )
-
     Lambda_sol, R_sol = unpack_params(sol.x, Lambda0.shape[0], R0.shape[1])
     return sol, Lambda_sol, R_sol
