@@ -9,7 +9,7 @@ size=1
 B=3
 Bsize=int(B*size)
 beta=100
-noise=0.1
+noise=0.2
 fold_data=f"input_data/B3"
 
 #READING SOLUTIONS OF A B=3 Norb=1 gRISB calculation
@@ -79,12 +79,13 @@ print("")
 print("Without derivatives in ",noder_time,"s")
 print("Distance in R :", np.sum(np.abs(R_target-R_sol)))
 print("Distance in Lambda:", np.sum(np.abs(Lambda_target-Lam_sol)))
-Ut,S_trg,Vt = np.linalg.svd(R_target)
-Us,S_sol,Vs = np.linalg.svd(R_sol)
-Lg_trg=Ut.T.conj()@Lambda_target@Ut
-Lg_sol=Us.T.conj()@Lam_sol@Us
-print("Distance in gauge invariant R:",np.sum(np.abs(S_trg-S_sol)))
+Lg_trg, Ut = np.linalg.eigh(Lambda_target)
+Lg_sol, Us = np.linalg.eigh(Lam_sol)
+Rg_trg=np.abs(Ut.T.conj()@R_target)
+Rg_sol=np.abs(Us.T.conj()@R_sol)
+print("Distance in gauge invariant R:",np.sum(np.abs(Rg_trg-Rg_sol)))
 print("Distance in gauge invariant Lambda:", np.sum(np.abs(Lg_sol-Lg_trg)))
+noder_error = np.sum(np.abs(Rg_trg-Rg_sol))+np.sum(np.abs(Lg_sol-Lg_trg))
 print("")
 
 
@@ -111,40 +112,14 @@ print("")
 print("With derivatives in ",yeder_time,"s")
 print("Distance in R :", np.sum(np.abs(R_target-R_sol)))
 print("Distance in Lambda:", np.sum(np.abs(Lambda_target-Lam_sol)))
-Ut,S_trg,Vt = np.linalg.svd(R_target)
-Us,S_sol,Vs = np.linalg.svd(R_sol)
-Lg_trg=Ut.T.conj()@Lambda_target@Ut
-Lg_sol=Us.T.conj()@Lam_sol@Us
-print("Distance in gauge invariant R:",np.sum(np.abs(S_trg-S_sol)))
+Lg_trg, Ut = np.linalg.eigh(Lambda_target)
+Lg_sol, Us = np.linalg.eigh(Lam_sol)
+Rg_trg=np.abs(Ut.T.conj()@R_target)
+Rg_sol=np.abs(Us.T.conj()@R_sol)
+print("Distance in gauge invariant R:",np.sum(np.abs(Rg_trg-Rg_sol)))
 print("Distance in gauge invariant Lambda:", np.sum(np.abs(Lg_sol-Lg_trg)))
+yeder_error = np.sum(np.abs(Rg_trg-Rg_sol))+np.sum(np.abs(Lg_sol-Lg_trg))
 print("")
-
-
-print(" --- TESTING ROOT WITH DERIVATIVES FITTING <fdagf> ---")
-in_time=time.time()
-res, Lam_sol, R_sol = solve_F_dF_11(beta, Lambda_c, D, Lambda_0, R_0, D11_target, RTD12_target)
-fin_time=time.time()
-yeder_time=fin_time-in_time
-x_fdf=pack_params(Lam_sol,R_sol)
-Fdf_residual=residual_11(x_fdf,beta,Lambda_c,D,D11_target,RTD12_target)
-print("F dF residual:",np.sum(np.abs(Fdf_residual)))
-
-H_sol = build_H(Lam_sol, Lambda_c, D, R_sol)
-Delta_sol = F_of_H(H_sol, beta)
-D11_sol = Delta_sol[:Bsize,:Bsize]
-D12_sol = Delta_sol[:Bsize,Bsize:]
-D22_sol = Delta_sol[Bsize:,Bsize:]
-
-#print(np.diag(Delta_sol))
-print("Final filling:",np.sum(np.diag(Delta_sol)))
-print("")
-print("With derivatives in ",yeder_time,"s")
-print("Distance in R:", np.sum(np.abs(R_target-R_sol)))
-print("Distance in Lambda:", np.sum(np.abs(Lambda_target-Lam_sol)))
-Ut,S_trg,Vt = np.linalg.svd(R_target)
-Us,S_sol,Vs = np.linalg.svd(R_sol)
-Lg_trg=Ut.T.conj()@Lambda_target@Ut
-Lg_sol=Us.T.conj()@Lam_sol@Us
-print("Distance in gauge invariant R:",np.sum(np.abs(S_trg-S_sol)))
-print("Distance in gauge invariant Lambda:", np.sum(np.abs(Lg_sol-Lg_trg)))
-print("")
+print(" --- OVERALL ---")
+print("Time without derivatives:",noder_time,"s - and error:",noder_error)
+print("Time with derivatives:",yeder_time,"s - and error:",yeder_error)

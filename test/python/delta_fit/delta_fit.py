@@ -1,13 +1,12 @@
 import numpy as np
-from scipy.optimize import root
-from scipy.optimize import least_squares
+from scipy.optimize import root, least_squares, brentq
 
 # -------------------------
 # Build H
 # -------------------------
 def build_H(Lambda, Lambda_c, D, R):
     H11 = Lambda
-    H12 = R @ D.T #Needed to be transposed #conj maybe?
+    H12 = R @ D.T
     H21 = H12.T.conj()
     H22 = -Lambda_c
     return np.block([[H11, H12],
@@ -29,10 +28,26 @@ def fermi_prime(eps, beta):
     return -beta * f * (1 - f)
 
 # -------------------------------------------------
+# Get chemical potential
+# -------------------------------------------------
+def get_mu(eps, beta):
+    # avoids overflow using where since else is zero
+    def occupation(mu,eps,beta):
+        return np.sum( fermi( eps-mu,beta))-len(eps)/2
+    mu_min=np.min(eps)-10/beta
+    mu_max=np.max(eps)+10/beta
+
+    return brentq( occupation, mu_min, mu_max, args=(eps,beta) )
+
+
+
+# -------------------------------------------------
 # F(H) via diagonalization
 # -------------------------------------------------
 def F_of_H(H, beta):
     eps, U = np.linalg.eigh(H)
+    mu   = get_mu(eps, beta)
+    eps -= mu
     f = fermi(eps, beta)
     return (U * f) @ U.conj().T
 
@@ -41,6 +56,8 @@ def F_of_H(H, beta):
 # -------------------------------------------------
 def dF_spectral(H, dH, beta, tol=1e-14):
     eps, U = np.linalg.eigh(H)
+    mu   = get_mu(eps, beta)
+    eps -= mu
 
     f = fermi(eps, beta)
     fp = fermi_prime(eps, beta)
@@ -71,8 +88,8 @@ def dH_dLambda(dLambda, n):
 def dH_dR(dR, D):
     """
     dR is the perturbation to R.
-    If R_target is perturbed by dR, then H12 changes by D @ dR.T.
-    Because H is Hermitian, H21 must change by (D @ dR.T).conj().T
+    If R_target is perturbed by dR, then H12 changes by dR @ D.T
+    Because H is Hermitian, H21 must change by (dR @ D.T).conj().T
     """
     n, p = D.shape
     Z_nn = np.zeros((n, n), dtype=complex)
