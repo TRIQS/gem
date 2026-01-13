@@ -1,4 +1,4 @@
-from delta_fit import *
+from triqs_ghostGA.utility.delta_fit import *
 import numpy as np
 
 import time
@@ -9,7 +9,7 @@ size=1
 B=3
 Bsize=int(B*size)
 beta=100
-noise=0.2
+noise=0.1
 fold_data=f"input_data/B3"
 
 #READING SOLUTIONS OF A B=3 Norb=1 gRISB calculation

@@ -1,5 +1,5 @@
 import numpy as np
-from delta_fit import *
+from triqs_ghostGA.utility.delta_fit import *
 
 m, n = 23,7
 R = np.random.rand( m, n) + 1j*np.random.rand( m, n)

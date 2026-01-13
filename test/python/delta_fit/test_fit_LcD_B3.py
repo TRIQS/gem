@@ -1,4 +1,4 @@
-from delta_fit import *
+from triqs_ghostGA.utility.delta_fit import *
 import numpy as np
 
 import time
