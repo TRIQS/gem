@@ -10,6 +10,7 @@ from triqs_ghostGA.utility.utils_TH import denR, denRm1, ddenRm1, realHcombinati
     Hermitian_list, get_blocks, funcMat, calc_nf, dF
 from triqs_ghostGA.utility.utils_grisb import calc_rhoks, calc_Delta_p, calc_D, calc_Lambda_c, calc_Lambda, \
     space_list ,measure_space, calc_D_reg, calc_Lambda_c_reg, calc_Lambda_reg, calc_R_reg
+from triqs_ghostGA.utility.delta_fit import * #new_hybridization, new_self_energy
 from triqs_ghostGA.DIIS import *
 
 def occupation_vs_mu(mu, *args):
@@ -78,7 +79,7 @@ class Grisb(object):
     :type Hfull_list: list
 
     """
-    def __init__(self, ntot, nimp, nbath, eks, eloc, Utensor, spin_sym=True, soc=False, R=None, Lambda=None, edsolver=None, write=True, suff=''):
+    def __init__(self, ntot, nimp, nbath, eks, eloc, Utensor, spin_sym=True, soc=False, R=None, Lambda=None, Lambda_c=None, D=None,edsolver=None, write=True, suff=''):
         print("##### INITIALIZATON OF THE GRISB OBJECT #####")
         self.ntot = ntot
         self.nimp = nimp
@@ -110,6 +111,17 @@ class Grisb(object):
                 raise ValueError("Lambda has inconsistent shape. Should be (nbath,nbath)")
             self.Lambda = Lambda
         self.space = space_list(nbath)
+        #
+        if( D is None):
+            self.D = np.random.random(R.shape)
+        else:
+            self.D=D
+        #
+        if(Lambda_c is None):
+            Lambda_c=np.zeros_like(self.Lambda)
+        else:
+            self.Lambda_c=Lambda_c
+
         if edsolver is None:
             raise ValueError("Not edsolver was passed to the GRISB.")
         else:
@@ -369,9 +381,21 @@ class Grisb(object):
                         self.docc.append(self.edsolver.calc_double_occ(idx))
                     print("double occupancy=", self.docc)
                     break
+        print("CHECK RESIDUAL")
+        x_LR=pack_params(self.Lambda,self.R)
+        x_LcD=pack_params(self.Lambda_c,self.D)
+        F11_trg = self.Delta_p
+        F22_trg = np.eye(self.nbath)-F11_trg
+        F12D_trg = sum( [np.dot( np.dot(self.eks[x], self.R.conj().T ), self.rhok_list[x].T ) for x in range(len(self.rhok_list))] ).T/float(len(self.rhok_list))
+        RTF12_trg=cdaggerf
+        print("residual LR :",residual_LR(x_LR,beta, self.Lambda_c,self.D,F22_trg,RTF12_trg ))
+        print("residual LcD:",residual_LcD(x_LcD,beta, self.Lambda,self.R,F11_trg,F12D_trg ))
+        
+
+        
     # TODO: move sz_pen, etc to the solvers.
     def run_gdmet(self, mu0=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., silence=True, idx=0, num_eig=2, ed_verbose=0, diis=False, nfix=None, dmu=0.1, mu_tol=1e-8, nfix_tol=0.01,regularisation=False):
-        """ Run ghost-RISB self-consistency
+        """ Run ghost-RISB self-consistency with new unification formulation
 
         :param itmax: Maxiumum iteraction for self-consistency.
         :type itmax: int
@@ -393,6 +417,11 @@ class Grisb(object):
 
         """
 
+        print("inside run")
+        print('R',self.R)
+        print("L",self.Lambda)
+        print("D",self.D)
+        print("Lc",self.Lambda_c)
         print("########## STARTING THE GHOST-GA LOOP ##########")
 
         self.mu = mu0
@@ -418,22 +447,15 @@ class Grisb(object):
                     # Optimize to find chemical potential mu
                     self.mu = find_mu(self.mu, self.R, self.Lambda, self.eks, nfix_qp, beta, dmu=dmu, mu_tol=mu_tol)
 
-            # From Lambda and R, calculate Delta_p, D and Lambda_c
-            print("# With Lambda and R, compute Delta_p, D and Lambda_c")
+            # From Lambda and R solve QP to get Delta_p and sum_k (eps_k R Delta_k)
+            print("# With Lambda and R solve QP")
             self.rhok_list = calc_rhoks(self.R, self.Lambda, self.eks, 1./beta, self.mu)
-            # self.rhok_list = np.real(calc_rhoks(self.R, self.Lambda, self.eks, 1./beta, self.mu))
-            self.Delta_p = calc_Delta_p(self.rhok_list)
-            # self.Delta_p = np.real(calc_Delta_p(self.rhok_list))
-            # self.D = np.real(calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list))
-            if(regularisation):
-                self.space = measure_space(self.space,self.Delta_p)
-                self.D = calc_D_reg(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list,self.space)    
-                self.Lambda_c = calc_Lambda_c_reg(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list,self.space)
-            else:
-                self.D = calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)    
-                self.Lambda_c = calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list)
-            # self.Lambda_c = np.real(calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list))
+            self.Delta_p = calc_Delta_p(self.rhok_list) #F11_target
+            F11_target  = self.Delta_p
+            F12D_target = sum( [np.dot( np.dot(self.eks[x], self.R.conj().T ), self.rhok_list[x].T ) for x in range(len(self.rhok_list))] ).T/float(len(self.rhok_list))
 
+            self.Lambda_c, self.D = new_hybridization( self.Lambda_c,self.D, self.Lambda,self.R, F11_target,F12D_target ,beta=beta,method="dF" )
+                
             # TODO: Nicer print and options for verbose
             if not silence:
                 if self.spin_sym:
@@ -461,40 +483,22 @@ class Grisb(object):
             self.solve_embedding(self.mu, num_eig, ed_verbose)
 
             # Extract relevant quantities from the density matrix, such as Delta_p
-            cdaggerf = self.denMat[:self.nimp,self.nimp:]
-            ffdagger = self.denMat[self.nimp:,self.nimp:]
-            ffdagger = (np.eye(self.nbath,dtype=np.complex128) - ffdagger).T
+            cdaggerb = self.denMat[:self.nimp,self.nimp:]
+            bdaggerb = self.denMat[self.nimp:,self.nimp:]
+            bbdagger = (np.eye(self.nbath,dtype=np.complex128) - bdaggerb.T)
             if not silence:
                 # Compare previous Delta_p with new
-                print("norm(ffdagger.T-Delta_p)=", np.linalg.norm(ffdagger.T-self.Delta_p))
+                print("norm(bbdagger.T-Delta_p)=", np.linalg.norm(bbdagger.T-self.Delta_p))
                 print("new Delta_p =")
-                print(ffdagger.T)
+                print(bbdagger.T)
                 print()
-            self.Delta_p = ffdagger.T
-            # self.Delta_p = np.real(ffdagger.T)
+            self.Delta_p = bbdagger.T
 
-            # TODO: Separate function
-            r"""Calculate R matrix, where the element are given by
+            F22_target=bdaggerb
+            RTF12_target=cdaggerb
 
-            .. math:
-                R_{b\alpha} = \sum_a \langle \Phi | c^\dagger_\alpha f_a | \Phi \rangle \left[ \Delta ( 1 - \Delta ) \right]^{-1/2}_{ad}
-            """
-            if(regularisation):
-                self.space = measure_space(self.space,self.Delta_p)
-                R_new = calc_R_reg(cdaggerf,self.Delta_p,self.space)
-                if self.spin_sym:
-                    R_new = np.kron(R_new[::2,::2],np.eye(2))# symmetrize
-                Lambda_new = calc_Lambda_reg(R_new, self.Lambda_c, self.Delta_p, self.D, self.Hfull_list,self.space)
-                if self.spin_sym:
-                    Lambda_new = np.kron(Lambda_new[::2,::2],np.eye(2)) # symmetryize
-            else:
-                R_new = np.transpose(cdaggerf.dot(funcMat(self.Delta_p, denR)))
-                if self.spin_sym:
-                    R_new = np.kron(R_new[::2,::2],np.eye(2))# symmetrize
-                Lambda_new = calc_Lambda(R_new, self.Lambda_c, self.Delta_p, self.D, self.Hfull_list)
-                if self.spin_sym:
-                    Lambda_new = np.kron(Lambda_new[::2,::2],np.eye(2)) # symmetryize
-
+            Lambda_new, R_new = new_self_energy(self.Lambda,self.R, self.Lambda_c,self.D,  F22_target,RTF12_target,beta=beta, method="dF")
+                        
             # Calculate difference of R and Lambda from prior iteration and check convergence
             # and apply mixing if required
             diff_R = np.abs(self.R-R_new).max()
@@ -506,9 +510,12 @@ class Grisb(object):
                 LDIIS.append( error, Lambda_new )
                 self.R = R_new#RDIIS.Solve()
                 self.Lambda = LDIIS.Solve()
-            else:
+            elif( it>=1 ):
                 self.R = (1.-mix)*np.copy(self.R) + mix*R_new
                 self.Lambda = (1.-mix)*np.copy(self.Lambda) + mix*Lambda_new
+            else:
+                self.R = 1.0*R_new
+                self.Lambda = 1.0*Lambda_new
 
             if self.write is True:
                 # Save checkpoint

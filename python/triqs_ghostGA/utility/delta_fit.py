@@ -336,9 +336,9 @@ def solve_F_only_LR(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target):
         jac='2-point', # This tells Scipy to compute the gradient numerically
         args=(beta, Lambda_c, D, F22_target, RTF12_target),
         method="trf",
-        max_nfev=200,  # Limits total function calls to 200
-        xtol=1e-14,
-        ftol=1e-14,
+        max_nfev=100,  # Limits total function calls to 200
+        xtol=1e-9,
+        ftol=1e-9,
         verbose=2      # Useful to see if the cost function is actually decreasing
     )
     
@@ -362,8 +362,9 @@ def solve_F_dF_LR(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target):
             jac=jacobian_LR,
             args=(beta, Lambda_c, D, F22_target, RTF12_target),
             method="trf", # Change from 'hybr' to 'lm'
-            ftol=1e-14,
-            xtol=1e-14,
+            max_nfev=100,
+            ftol=1e-9,
+            xtol=1e-9,
             verbose=2
         )
     elif(False):
@@ -373,16 +374,17 @@ def solve_F_dF_LR(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target):
             jac=jacobian_LR,
             args=(beta, Lambda_c, D, F22_target, RTF12_target),
             method="lm", # Change from 'hybr' to 'lm'
-            options={'ftol': 1e-14, 'xtol': 1e-14}
+            options={'ftol': 1e-9, 'xtol': 1e-9}
         )
     Lambda_sol, R_sol = unpack_params(sol.x, Lambda0.shape[0], R0.shape[1])
     return sol, Lambda_sol, R_sol
 
-def new_self_energy( Lambda0,R0, Lambda_c,D, F22_target,RTF12_target, beta=500, method="dF"):
+def new_self_energy( Lambda0,R0, Lambda_c,D, F22_target,RTF12_target, beta=200, method="dF"):
+    print("New self-energy fitting Lambda and R")
     if(method=="dF"):
         res, new_Lambda, new_R = solve_F_dF_LR(beta, Lambda_c,D,Lambda0,R0,F22_target,RTF12_target)
     elif(method=="F"):
-        res, new_Lambda, new_R = solve_F_dF_LR(beta, Lambda_c,D,Lambda0,R0,F22_target,RTF12_target)
+        res, new_Lambda, new_R = solve_F_only_LR(beta, Lambda_c,D,Lambda0,R0,F22_target,RTF12_target)
     else:
         raise ValueError(f"Tried new_self_energy with method={method} - only \"F\" and \"dF\" methods are available")
     return new_Lambda, new_R
@@ -400,9 +402,9 @@ def solve_F_only_LcD(beta, Lambda, R, Lambda_c0, D0, F11_target, F12D_target):
         jac='2-point', # This tells Scipy to compute the gradient numerically
         args=(beta, Lambda, R, F11_target, F12D_target),
         method="trf",
-        max_nfev=200,  # Limits total function calls to 200
-        xtol=1e-14,
-        ftol=1e-14,
+        max_nfev=100,  # Limits total function calls to 200
+        xtol=1e-9,
+        ftol=1e-9,
         verbose=2      # Useful to see if the cost function is actually decreasing
     )
     Lambda_c_sol, D_sol = unpack_params(sol.x, D0.shape[0], D0.shape[1])
@@ -425,8 +427,9 @@ def solve_F_dF_LcD(beta, Lambda, R, Lambda_c0, D0, F11_target, F12D_target):
             jac=jacobian_LcD,
             args=(beta, Lambda, R, F11_target, F12D_target),
             method="trf", # Change from 'hybr' to 'lm'
-            ftol=1e-14,
-            xtol=1e-14,
+            max_nfev=100,
+            ftol=1e-9,
+            xtol=1e-9,
             verbose=2
         )
     elif(False):
@@ -436,14 +439,14 @@ def solve_F_dF_LcD(beta, Lambda, R, Lambda_c0, D0, F11_target, F12D_target):
             jac=jacobian_LcD,
             args=(beta, Lambda, R, F11_target, F12D_target),
             method="lm", # Change from 'hybr' to 'lm'
-            options={'ftol': 1e-14, 'xtol': 1e-14}
+            options={'ftol': 1e-9, 'xtol': 1e-9}
         )
     Lambda_c_sol, D_sol = unpack_params(sol.x, D0.shape[0], D0.shape[1])
     return sol, Lambda_c_sol, D_sol
 
 
-def new_hybridization( Lambda_c0,D0, Lambda,R, F11_target, F12D_target, beta=500, method="dF"):
-    new_Lambda_c=None; new_D=None
+def new_hybridization( Lambda_c0,D0, Lambda,R, F11_target, F12D_target, beta=200, method="dF"):
+    print("New hybridization fitting Lambda_c and D")
     if(method=="dF"):
         res, new_Lambda_c, new_D = solve_F_dF_LcD(beta, Lambda,R,Lambda_c0,D0,F11_target,F12D_target)
     elif(method=="F"):
