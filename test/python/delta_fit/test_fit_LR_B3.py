@@ -37,8 +37,8 @@ print("D11_target:",D11_target.real)
 print("D22_target:",D22_target.real)
 
 #in principle zero:
-residual0 = residual(x_target, beta, Lambda_c, D, D22_target, RTD12_target)
-jacobian0 = jacobian(x_target, beta, Lambda_c, D, D22_target, RTD12_target)
+residual0 = residual_LR(x_target, beta, Lambda_c, D, D22_target, RTD12_target)
+jacobian0 = jacobian_LR(x_target, beta, Lambda_c, D, D22_target, RTD12_target)
 tot_res0 = np.sum(np.abs(residual0))
 if(tot_res0>1e-10):
     raise ValueError(f"The residual of the starting point should be zero while it is:{tot_res0}")
@@ -55,17 +55,17 @@ print("Starting from:")
 print(Lambda_0)
 print(R_0)
 start_x = pack_params(Lambda_0, R_0)
-start_residual = residual(start_x, beta, Lambda_c, D, D22_target, RTD12_target)
+start_residual = residual_LR(start_x, beta, Lambda_c, D, D22_target, RTD12_target)
 print("Starting residual:",np.sum(np.abs(start_residual)))
 
 
 print(" --- TESTING ROOT WITHOUT DERIVATIVES ---")
 in_time=time.time()
-res, Lam_sol, R_sol = solve_F_only(beta, Lambda_c, D, Lambda_0, R_0, D22_target, RTD12_target)
+Lam_sol, R_sol = new_self_energy( Lambda_0,R_0, Lambda_c,D, D22_target,RTD12_target, beta=beta, method="F")
 fin_time=time.time()
 noder_time=fin_time-in_time
 x_fonly=pack_params(Lam_sol,R_sol)
-Fonly_residual=residual(x_fonly,beta,Lambda_c,D,D22_target,RTD12_target)
+Fonly_residual=residual_LR(x_fonly,beta,Lambda_c,D,D22_target,RTD12_target)
 print("F only residual:",np.sum(np.abs(Fonly_residual)))
 
 H_sol = build_H(Lam_sol, Lambda_c, D, R_sol)
@@ -93,11 +93,11 @@ print("")
 
 print(" --- TESTING ROOT WITH DERIVATIVES FITTING <bdagb> ---")
 in_time=time.time()
-res, Lam_sol, R_sol = solve_F_dF(beta, Lambda_c, D, Lambda_0, R_0, D22_target, RTD12_target)
+Lam_sol, R_sol = new_self_energy( Lambda_0,R_0, Lambda_c,D, D22_target,RTD12_target, beta=beta, method="dF")
 fin_time=time.time()
 yeder_time=fin_time-in_time
 x_fdf=pack_params(Lam_sol,R_sol)
-Fdf_residual=residual(x_fdf,beta,Lambda_c,D,D22_target,RTD12_target)
+Fdf_residual=residual_LR(x_fdf,beta,Lambda_c,D,D22_target,RTD12_target)
 print("F dF residual:",np.sum(np.abs(Fdf_residual)))
 
 H_sol = build_H(Lam_sol, Lambda_c, D, R_sol)

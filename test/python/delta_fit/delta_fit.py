@@ -105,7 +105,7 @@ def dH_dR(dR, D):
 def dH_dLambdac(dLambdac, n):
     Z = np.zeros((n, n), dtype=complex)
     return np.block([[Z, Z],
-                     [Z, dLambdac]])
+                     [Z, -dLambdac]])
 
 def dH_dD(dD, R):
     """
@@ -132,7 +132,7 @@ def dH_dD(dD, R):
 # It works for both Lambda+R and Lambda_c+D
 # ============================================================
 def pack_params(Lambda, R):
-    n = Lambda.shape[0]
+    n = R.shape[0]
     p = R.shape[1]
 
     iu = np.triu_indices(n)
@@ -168,8 +168,7 @@ def unpack_params(x, n, p):
     Lambda.real[iu] = Lam_re
     Lambda.real[(iu[1], iu[0])] = Lam_re
     Lambda.imag[iu_strict] = Lam_im
-    Lambda.imag[np.tril_indices(n, k=-1)] = -Lam_im
-
+    Lambda.imag[iu_strict[1],iu_strict[0]] = -Lam_im
     R = R_re + 1j * R_im
     return Lambda, R
 
@@ -186,7 +185,6 @@ def residual_LR(x, beta, Lambda_c, D, F22_target, RTF12_target):
 
     F22 = F[n:, n:]
     F12 = F[:n, n:]
-    
     RTF12 = R.T@F12
 
     iu = np.triu_indices(n)
@@ -199,7 +197,6 @@ def residual_LR(x, beta, Lambda_c, D, F22_target, RTF12_target):
         (RTF12.real - RTF12_target.real).ravel(),
         (RTF12.imag - RTF12_target.imag).ravel()
     ])
-    #print("in residual:",np.sum(np.abs(res)))
     return res
 
 def residual_LcD(x, beta, Lambda, R, F11_target, F12D_target):
@@ -211,7 +208,6 @@ def residual_LcD(x, beta, Lambda, R, F11_target, F12D_target):
 
     F11 = F[:n, :n]
     F12 = F[:n, n:]
-    
     F12D = F12@D
 
     iu = np.triu_indices(n)
@@ -224,7 +220,6 @@ def residual_LcD(x, beta, Lambda, R, F11_target, F12D_target):
         (F12D.real - F12D_target.real).ravel(),
         (F12D.imag - F12D_target.imag).ravel()
     ])
-    #print("in residual:",np.sum(np.abs(res)))
     return res
 
 
@@ -295,21 +290,18 @@ def jacobian_LcD(x, beta, Lambda, R, F11_target, F12D_target):
         dx[k] = 1.0
 
         dLambda_c, dD = unpack_params(dx, n, p)
-        dH = dH_dLambda_c(dLambda_c, n) + dH_dD(dD, D)
+        dH = dH_dLambdac(dLambda_c, n) + dH_dD(dD, R)
         dF = dF_spectral(H, dH, beta)
 
-        dF22 = dF[n:, n:]
+        dF11 = dF[:n, :n]
         dF12 = dF[:n, n:]
-        #  d(R.T@F12) with respect to R is
-        #  R.T @ dF12 + d(R.T) @ F12
-        dRTF12 = dF12@D +F12@dD
+        dF12D = dF12@D +F12@dD
         
-
         # Must match the concatenation logic in residual()
         Jcols.append(np.concatenate([
             # F22 (Hermitian reduction)
-            dF22.real[iu],
-            dF22.imag[iu_strict],
+            dF11.real[iu],
+            dF11.imag[iu_strict],
             # F12D (full)
             dF12D.real.ravel(),
             dF12D.imag.ravel()
@@ -345,7 +337,6 @@ def solve_F_only_LR(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target):
 # This one works
 def solve_F_dF_LR(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target):
     x0 = pack_params(Lambda0, R0)
-    res = residual_LR(x0, beta, Lambda_c, D, F22_target, RTF12_target)
     if(False):
         sol = least_squares(
             residual_LR,
@@ -369,11 +360,11 @@ def solve_F_dF_LR(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target):
     Lambda_sol, R_sol = unpack_params(sol.x, Lambda0.shape[0], R0.shape[1])
     return sol, Lambda_sol, R_sol
 
-def new_self_energy( Lambda0,R0, Lambda_c,D, beta, F22_target,RTF12_target, method="dF"):
+def new_self_energy( Lambda0,R0, Lambda_c,D, F22_target,RTF12_target, beta=500, method="dF"):
     if(method=="dF"):
-        res, new_Lambda, new_R = solve_F_dF(beta, Lambda_c,D,Lambda0,R0,F22_target,RTF12_target)
+        res, new_Lambda, new_R = solve_F_dF_LR(beta, Lambda_c,D,Lambda0,R0,F22_target,RTF12_target)
     elif(method=="F"):
-        res, new_Lambda, new_R = solve_F_dF(beta, Lambda_c,D,Lambda0,R0,F22_target,RTF12_target)
+        res, new_Lambda, new_R = solve_F_dF_LR(beta, Lambda_c,D,Lambda0,R0,F22_target,RTF12_target)
     else:
         raise ValueError(f"Tried new_self_energy with method={method} - only \"F\" and \"dF\" methods are available")
     return new_Lambda, new_R
@@ -384,7 +375,6 @@ def new_self_energy( Lambda0,R0, Lambda_c,D, beta, F22_target,RTF12_target, meth
 # This one works without derivatives and with least square instead of root
 def solve_F_only_LcD(beta, Lambda, R, Lambda_c0, D0, F11_target, F12D_target):
     x0 = pack_params(Lambda_c0, D0)
-
     # We use least_squares because it supports 'trf' and '2-point' (numerical) jacobians
     sol = least_squares(
         residual_LcD,
@@ -397,15 +387,13 @@ def solve_F_only_LcD(beta, Lambda, R, Lambda_c0, D0, F11_target, F12D_target):
         ftol=1e-14,
         verbose=2      # Useful to see if the cost function is actually decreasing
     )
-    
-    Lambda_c_sol, D_sol = unpack_params(sol.x, Lambda_c0.shape[0], D0.shape[1])
+    Lambda_c_sol, D_sol = unpack_params(sol.x, D0.shape[0], D0.shape[1])
     return sol, Lambda_c_sol, D_sol
 
 
 # This one works
 def solve_F_dF_LcD(beta, Lambda, R, Lambda_c0, D0, F11_target, F12D_target):
     x0 = pack_params(Lambda_c0, D0)
-    res = residual_LcD(x0, beta, Lambda, R, F11_target, F12D_target)
     if(False):
         sol = least_squares(
             residual_LcD,
@@ -426,16 +414,18 @@ def solve_F_dF_LcD(beta, Lambda, R, Lambda_c0, D0, F11_target, F12D_target):
             method="lm", # Change from 'hybr' to 'lm'
             options={'ftol': 1e-14, 'xtol': 1e-14}
         )
-    Lambda_c_sol, D_sol = unpack_params(sol.x, Lambda_c0.shape[0], D0.shape[1])
+    Lambda_c_sol, D_sol = unpack_params(sol.x, D0.shape[0], D0.shape[1])
     return sol, Lambda_c_sol, D_sol
 
 
-def new_hybridization( Lambda_c0,D0, Lambda,R, beta, F11_target, F12D_target, method="dF"):
+def new_hybridization( Lambda_c0,D0, Lambda,R, F11_target, F12D_target, beta=500, method="dF"):
+    new_Lambda_c=None; new_D=None
     if(method=="dF"):
-        res, new_Lambda_c, new_D = solve_F_dF(beta, Lambda,R,Lambda_c0,D0,F11_target,F12D_target)
+        res, new_Lambda_c, new_D = solve_F_dF_LcD(beta, Lambda,R,Lambda_c0,D0,F11_target,F12D_target)
     elif(method=="F"):
-        res, new_Lambda_c, new_D = solve_F_dF(beta, Lambda,R,Lambda_c0,D0,F11_target,F12D_target)
+        res, new_Lambda_c, new_D = solve_F_only_LcD(beta, Lambda,R,Lambda_c0,D0,F11_target,F12D_target)
     else:
         raise ValueError(f"Tried new_hybridization with method={method} - only \"F\" and \"dF\" methods are available")
+    
     return new_Lambda_c, new_D
     
