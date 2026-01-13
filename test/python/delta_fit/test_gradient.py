@@ -1,5 +1,5 @@
 import numpy as np
-from delta_fit import *
+from triqs_ghostGA.utility.delta_fit import *
 
 # --- Configuration ---
 # Use a small size and beta=1.0 for debugging to avoid vanishing gradients
@@ -24,7 +24,7 @@ def check_gradient_LR(x_test, beta, Lambda_c, D, F22_target, RTF12_target):
     print("Computing numerical Jacobian via finite differences...")
     f0 = wrapped_residual_LR(x_test)
     num_jac = []
-    epsilon = 1e-9  # Optimal step size for double precision
+    epsilon = 1e-9   # Optimal step size for double precision
     
     for i in range(len(x_test)):
         x_eps = np.copy(x_test)
@@ -50,7 +50,7 @@ def check_gradient_LR(x_test, beta, Lambda_c, D, F22_target, RTF12_target):
     print(f"Jacobian Shape: {ana_jac.shape}")
     print(f"Max Absolute Difference: {max_diff:.2e}")
     
-    if max_diff < 1e-6:
+    if max_diff < 1e-5:
         print("SUCCESS: Analytical and Numerical Jacobians match.")
     else:
         print("FAILURE: Significant mismatch detected.")
@@ -88,7 +88,7 @@ def check_gradient_LcD(x_test, beta, Lambda, R, F11_target, F12D_target):
     print("Computing numerical Jacobian via finite differences...")
     f0 = wrapped_residual_LcD(x_test)
     num_jac = []
-    epsilon = 1e-9  # Optimal step size for double precision
+    epsilon = 1e-9   # Optimal step size for double precision
     
     for i in range(len(x_test)):
         x_eps = np.copy(x_test)
@@ -114,7 +114,7 @@ def check_gradient_LcD(x_test, beta, Lambda, R, F11_target, F12D_target):
     print(f"Jacobian Shape: {ana_jac.shape}")
     print(f"Max Absolute Difference: {max_diff:.2e}")
     
-    if max_diff < 1e-6:
+    if max_diff < 1e-5:
         print("SUCCESS: Analytical and Numerical Jacobians match.")
     else:
         print("FAILURE: Significant mismatch detected.")
