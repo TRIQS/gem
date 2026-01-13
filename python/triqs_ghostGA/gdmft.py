@@ -285,11 +285,10 @@ class Gdmft(object):
             # compute qp density matrix
             self.rhok_list=calc_rhoks(self.R, self.Lambda, self.eks, 1./beta)
             self.Delta_p=calc_Delta_p(self.rhok_list)
-            #self.D=calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
-            #self.Lambda_c=calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list)
-            right = calc_right(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
-            self.D, self.Lambda_c = find_D_Lambdac_dmft(self.Lambda, self.R, self.eloc, self.D, self.Lambda_c, self.Delta_p,
-                                                         right,self.Hspin_list, beta, method_min=method_min)
+            self.D=calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
+            self.Lambda_c=calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list)
+            #right = calc_right(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
+            #self.D, self.Lambda_c = find_D_Lambdac_dmft(self.Lambda, self.R, self.eloc, self.D, self.Lambda_c, self.Delta_p, right,self.Hspin_list, beta, method_min=method_min)
             if not silence:
                 if not self.soc:
                     print("Delta_p=")
