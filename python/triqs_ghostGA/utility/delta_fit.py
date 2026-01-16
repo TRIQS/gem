@@ -17,11 +17,20 @@ def build_H(Lambda, Lambda_c, D, R):
 # -------------------------------------------------
 def fermi(eps, beta):
     # avoids overflow using where since else is zero
-    return np.where(
-        beta * eps > 0,
-        np.exp(-beta * eps) / (1 + np.exp(-beta * eps)),
-        1 / (1 + np.exp(beta * eps))
-    )
+    #return np.where(
+    #    beta * eps > 0,
+    #    np.exp(-beta * eps) / (1 + np.exp(-beta * eps)),
+    #    1 / (1 + np.exp(beta * eps))
+    #)
+    f = []
+    for e in eps:
+        if e*beta<500:
+                f.append(1./(1+np.exp(e*beta)))
+        elif e*beta< -500:
+            f.append(1)
+        elif e*beta> 500:
+            f.append(0)
+    return np.array(f)
 
 def fermi_prime(eps, beta):
     f = fermi(eps, beta)
@@ -161,7 +170,7 @@ def residual(x, beta, Lambda_c, D, F22_target, RTF12_target):
     Lambda, R = unpack_params(x, n, p)
 
     H = build_H(Lambda, Lambda_c, D, R)
-    F = F_of_H(H, beta)
+    F = F_of_H(H, beta).T
 
     F22 = F[n:, n:]
     F12 = F[:n, n:]
@@ -219,7 +228,7 @@ def jacobian(x, beta, Lambda_c, D, F22_target, RTF12_target):
     Lambda, R = unpack_params(x, n, p)
 
     H = build_H(Lambda, Lambda_c, D, R)
-    F = F_of_H(H, beta)
+    F = F_of_H(H, beta).T
 
     F22 = F[n:, n:]
     F12 = F[:n, n:]
@@ -363,10 +372,11 @@ def solve_F_dF_minimize(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target
     sol = minimize(
         residual_minimize,
         x0,
-        jac=jacobian_minimize,
+        #jac=jacobian_minimize,
         args=(beta, Lambda_c, D, F22_target, RTF12_target),
-        method="BFGS", 
-        options={'disp':False, 'eps': 1e-12, 'maxiter': len(x0)*100000} ,
+        method="BFGS",
+        tol=1e-5,
+        options={'disp':False, 'eps': 1e-10, 'maxiter': len(x0)*10000}
         )
     print('sols.fun=',sol.fun)
     print('sols.message=',sol.message)
