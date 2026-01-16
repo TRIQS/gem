@@ -149,12 +149,14 @@ if __name__ == "__main__":
     L_test = np.random.randn(n, n) + 1j*np.random.randn(n, n)
     L_test = 0.5 * (L_test + L_test.conj().T)
     R_test = np.random.randn(n, p) + 1j*np.random.randn(n, p)
+
+    mu_test = np.random.rand()
     
-    x_start_LR  = pack_params(L_test, R_test)
-    x_start_LcD = pack_params(Lc_test, D_test)
+    x_start_LR  = pack_params(L_test, R_test, mu_test)
+    x_start_LcD = pack_params(Lc_test, D_test, mu_test)
 
     
-    H = build_H(L_test, Lc_test, D_test, R_test)
+    H = build_H(L_test, Lc_test, D_test, R_test, mu_test)
     Delta_trg = F_of_H(H, beta)
     
 

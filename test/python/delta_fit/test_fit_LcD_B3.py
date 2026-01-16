@@ -20,13 +20,14 @@ R = np.loadtxt(f"{fold_data}/R.real").reshape((3,1))
 Lambda_c_trg = np.loadtxt(f"{fold_data}/lambdac.real")
 Lambda_c_trg = 0.5*(Lambda_c_trg + Lambda_c_trg.T.conj() )
 D_trg = np.loadtxt(f"{fold_data}/V.real").reshape((3,1))
+mu_trg=0.0
 
 
-x_trg = pack_params(Lambda_c_trg, D_trg)
+x_trg = pack_params(Lambda_c_trg, D_trg,mu_trg)
 
 
 
-H = build_H(Lambda, Lambda_c_trg, D_trg, R)
+H = build_H(Lambda, Lambda_c_trg, D_trg, R,mu_trg)
 Delta_trg = F_of_H(H, beta)
 
 
@@ -50,25 +51,26 @@ D_0 = 2.0*(np.random.rand(Bsize,size)-0.5 +1j*np.random.rand(Bsize,size)-0.5*1j)
 
 Lambda_c_0 = Lambda_c_trg +noise*Lambda_c_0
 D_0      = D_trg +noise*D_0
+mu_0 = mu_trg + noise*(np.random.rand()-0.5)
 
 print("Starting from:")
 print(Lambda_c_0)
 print(D_0)
-start_x = pack_params(Lambda_c_0, D_0)
+start_x = pack_params(Lambda_c_0, D_0,mu_0)
 start_residual = residual_LcD(start_x, beta, Lambda, R, F11_trg, F12D_trg)
 print("Starting residual:",np.sum(np.abs(start_residual)))
 
 print(" --- TESTING ROOT WITHOUT DERIVATIVES ---")
 
 in_time=time.time()
-Lamc_sol, D_sol = new_hybridization( Lambda_c_0,D_0, Lambda,R, F11_trg,F12D_trg, beta=beta, method="F")
+Lamc_sol, D_sol, mu_sol = new_hybridization( mu_0,Lambda_c_0,D_0, Lambda,R, F11_trg,F12D_trg, beta=beta, method="F")
 fin_time=time.time()
 noder_time=fin_time-in_time
-x_fonly=pack_params(Lamc_sol,D_sol)
+x_fonly=pack_params(Lamc_sol,D_sol,mu_sol)
 Fonly_residual=residual_LcD(x_fonly,beta,Lambda,R,F11_trg,F12D_trg)
 print("F only residual:",np.sum(np.abs(Fonly_residual)))
 
-H_sol = build_H(Lambda, Lamc_sol, D_sol, R)
+H_sol = build_H(Lambda, Lamc_sol, D_sol, R, mu_sol)
 Delta_sol = F_of_H(H_sol, beta)
 D11_sol=Delta_sol[:Bsize,:Bsize]
 D12_sol=Delta_sol[:Bsize,Bsize:]
@@ -95,14 +97,14 @@ print("")
 
 print(" --- TESTING ROOT WITH DERIVATIVES FITTING <bdagb> ---")
 in_time=time.time()
-Lamc_sol, D_sol = new_hybridization( Lambda_c_0,D_0, Lambda,R, F11_trg,F12D_trg, beta=beta, method="dF")
+Lamc_sol, D_sol, mu_sol = new_hybridization( mu_0,Lambda_c_0,D_0, Lambda,R, F11_trg,F12D_trg, beta=beta, method="dF")
 fin_time=time.time()
 yeder_time=fin_time-in_time
-x_fdf=pack_params(Lamc_sol,D_sol)
+x_fdf=pack_params(Lamc_sol,D_sol,mu_sol)
 Fdf_residual=residual_LcD(x_fdf,beta,Lambda,R,F11_trg,F12D_trg)
 print("F dF residual:",np.sum(np.abs(Fdf_residual)))
 
-H_sol = build_H(Lambda, Lamc_sol, D_sol, R)
+H_sol = build_H(Lambda, Lamc_sol, D_sol, R,mu_sol)
 Delta_sol = F_of_H(H_sol, beta)
 D11_sol = Delta_sol[:Bsize,:Bsize]
 D12_sol = Delta_sol[:Bsize,Bsize:]
