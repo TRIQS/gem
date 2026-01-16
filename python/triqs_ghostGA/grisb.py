@@ -382,8 +382,9 @@ class Grisb(object):
                     print("double occupancy=", self.docc)
                     break
         print("CHECK RESIDUAL")
-        x_LR=pack_params(self.Lambda,self.R)
-        x_LcD=pack_params(self.Lambda_c,self.D)
+        mu_qp=0.0
+        x_LR=pack_params(self.Lambda,self.R,mu_qp)
+        x_LcD=pack_params(self.Lambda_c,self.D,mu_qp)
         F11_trg = self.Delta_p
         F22_trg = np.eye(self.nbath)-F11_trg
         F12D_trg = sum( [np.dot( np.dot(self.eks[x], self.R.conj().T ), self.rhok_list[x].T ) for x in range(len(self.rhok_list))] ).T/float(len(self.rhok_list))
@@ -423,6 +424,7 @@ class Grisb(object):
         print("D",self.D)
         print("Lc",self.Lambda_c)
         print("########## STARTING THE GHOST-GA LOOP ##########")
+        mu_qp=0.0
 
         self.mu = mu0
         self.diff = 1e20
@@ -454,8 +456,10 @@ class Grisb(object):
             F11_target  = self.Delta_p
             F12D_target = sum( [np.dot( np.dot(self.eks[x], self.R.conj().T ), self.rhok_list[x].T ) for x in range(len(self.rhok_list))] ).T/float(len(self.rhok_list))
 
-            self.Lambda_c, self.D = new_hybridization( self.Lambda_c,self.D, self.Lambda,self.R, F11_target,F12D_target ,beta=beta,method="dF" )
-                
+            self.Lambda_c, self.D, mu_qp = new_hybridization( mu_qp,self.Lambda_c[::2,::2],self.D[::2,::2], self.Lambda[::2,::2],self.R[::2,::2], F11_target[::2,::2],F12D_target[::2,::2] ,beta=beta,method="F" )
+            self.Lambda_c = np.kron( self.Lambda_c , np.eye(2) )
+            self.D = np.kron( self.D , np.eye(2)) 
+                 
             # TODO: Nicer print and options for verbose
             if not silence:
                 if self.spin_sym:
@@ -497,8 +501,9 @@ class Grisb(object):
             F22_target=bdaggerb
             RTF12_target=cdaggerb
 
-            Lambda_new, R_new = new_self_energy(self.Lambda,self.R, self.Lambda_c,self.D,  F22_target,RTF12_target,beta=beta, method="dF")
-                        
+            Lambda_new, R_new, mu_qp = new_self_energy(mu_qp,self.Lambda[::2,::2],self.R[::2,::2], self.Lambda_c[::2,::2],self.D[::2,::2],  F22_target[::2,::2],RTF12_target[::2,::2],beta=beta, method="F")
+            Lambda_new = np.kron( Lambda_new , np.eye(2) )
+            R_new = np.kron( R_new , np.eye(2) )
             # Calculate difference of R and Lambda from prior iteration and check convergence
             # and apply mixing if required
             diff_R = np.abs(self.R-R_new).max()
