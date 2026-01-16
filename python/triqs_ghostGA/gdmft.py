@@ -6,6 +6,7 @@ import numba
 from triqs_ghostGA.utility.utils_TH import denR, denRm1, ddenRm1, realHcombination, inverse_realHcombination, \
     Hermitian_list, get_blocks, funcMat, calc_nf, dF
 from triqs_ghostGA.DIIS import *
+from triqs_ghostGA.utility.delta_fit import * 
 from h5 import *
 from triqs_ghostGA.utility.utils_grisb import calc_rhoks, calc_Delta_p, calc_D, calc_Lambda_c, calc_Lambda
 import sys
@@ -40,7 +41,7 @@ def cost_function_D_Lamc_dmft(x, *args):
     diff += np.linalg.norm( ( (denMat0[:Lambda.shape[0],Lambda.shape[0]:].dot(D)).T - right ) )
     return diff.real
 
-def find_D_Lambdac_dmft(Lambda, R, E, D0, Lambda_c0, Delta_p, right, Hspin_list, beta, method_min='BFGS'):
+def find_D_Lambdac_dmft(Lambda, R, E, D0, Lambda_c0, Delta_p, right, Hspin_list, beta):
     """ Find Lambda for given ffdagger
     """
     #success = False
@@ -50,7 +51,7 @@ def find_D_Lambdac_dmft(Lambda, R, E, D0, Lambda_c0, Delta_p, right, Hspin_list,
     #Lambda0_spin += (fluc + fluc.T)/2
     x = np.hstack((inverse_realHcombination(Lambda_c0_spin, Hspin_list), D0_spin.flatten()))
     args = (Delta_p, right, E, R, Lambda, Hspin_list, beta)
-    result = scipy.optimize.minimize( cost_function_D_Lamc_dmft, x, args=args, tol=1e-5, method=method_min, options={'disp':False, 'eps': 1e-10} )
+    result = scipy.optimize.minimize( cost_function_D_Lamc_dmft, x, args=args, tol=1e-5, method='BFGS', options={'disp':False, 'eps': 1e-10} )
     if ( result.success==False ):
         print("   Minimize mesage ::",result.message)
     print("   Minimize :: Cost function after convergence =", np.sum(result.fun))#/len(result.fun))
@@ -74,7 +75,7 @@ def cost_function_R_Lam_dmft(x, *args):
     diff += np.linalg.norm( ( R.T.dot(denMat0[:Lambda.shape[0],Lambda.shape[0]:]) - denMat[:E.shape[0],E.shape[1]:] ) )
     return diff.real
 
-def find_R_Lambda_dmft(Lambda0, R0, E, D, Lambda_c, denMat, Hspin_list, beta, method_min='BFGS'):
+def find_R_Lambda_dmft(Lambda0, R0, E, D, Lambda_c, denMat, Hspin_list, beta):
     """ Find Lambda for given ffdagger
     """
     #success = False
@@ -83,7 +84,7 @@ def find_R_Lambda_dmft(Lambda0, R0, E, D, Lambda_c, denMat, Hspin_list, beta, me
     Lambda0_spin = Lambda0[::2,::2].real
     x = np.hstack((inverse_realHcombination(Lambda0_spin, Hspin_list), R0_spin.flatten()))
     args = (denMat, E, D, Lambda_c, Hspin_list, beta)
-    result = scipy.optimize.minimize( cost_function_R_Lam_dmft, x, args=args, tol=1e-5, method=method_min, options={'disp':False, 'eps': 1e-10} )
+    result = scipy.optimize.minimize( cost_function_R_Lam_dmft, x, args=args, tol=1e-5, method='BFGS', options={'disp':False, 'eps': 1e-10} )
     if ( result.success==False ):
         print("   Minimize mesage ::",result.message)
     print("   Minimize :: Cost function after convergence =", np.sum(result.fun))#/len(result.fun))
@@ -253,7 +254,7 @@ class Gdmft(object):
         self.epot = self.E2loc + np.trace(self.eloc.dot(self.denMat[:self.nimp,:self.nimp].T))
         self.etot = self.ekin + self.epot - mu*self.nfill
 
-    def run_dmft(self, mu=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., silence=True, spin_pen=0.0, sz_pen=0.0, idx=0, num_eig=2, ed_verbose=0, diis=False, method_min='BFGS'):
+    def run_dmft(self, mu=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., silence=True, spin_pen=0.0, sz_pen=0.0, idx=0, num_eig=2, ed_verbose=0, diis=False, method='minimize'):
         """ Run ghost-RISB self-consistency
 
         :param itmax: Maxiumum iteraction for self-consistency.
@@ -288,7 +289,7 @@ class Gdmft(object):
             self.D=calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
             self.Lambda_c=calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list)
             #right = calc_right(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
-            #self.D, self.Lambda_c = find_D_Lambdac_dmft(self.Lambda, self.R, self.eloc, self.D, self.Lambda_c, self.Delta_p, right,self.Hspin_list, beta, method_min=method_min)
+            #self.D, self.Lambda_c = find_D_Lambdac_dmft(self.Lambda, self.R, self.eloc, self.D, self.Lambda_c, self.Delta_p, right,self.Hspin_list, beta)
             if not silence:
                 if not self.soc:
                     print("Delta_p=")
@@ -321,8 +322,16 @@ class Gdmft(object):
             #R_new = np.transpose(cdaggerf.dot(funcMat(self.Delta_p, denR)))
             #if not self.soc:
             #    R_new = np.kron(R_new[::2,::2],np.eye(2))# symmetrize
-            R_new, Lambda_new = find_R_Lambda_dmft(self.Lambda, self.R, self.eloc, self.D, self.Lambda_c,
-                                                   self.denMat, self.Hspin_list, beta, method_min=method_min)#.real #restrict Lambda to real
+            #R_new, Lambda_new = find_R_Lambda_dmft(self.Lambda, self.R, self.eloc, self.D, self.Lambda_c,
+            #                                       self.denMat, self.Hspin_list, beta)#.real #restrict Lambda to real
+            D11_target=self.denMat[self.nimp:,self.nimp:]
+            D12_target=self.denMat[:self.nimp,self.nimp:]
+            if method == 'minimize':
+                res, Lambda_new, R_new = solve_F_dF_minimize(beta, self.Lambda_c[::2,::2], self.D[::2,::2], self.Lambda[::2,::2], self.R[::2,::2], D11_target[::2,::2], D12_target[::2,::2])
+            elif method == 'root':
+                res, Lambda_new, R_new = solve_F_dF(beta, self.Lambda_c[::2,::2], self.D[::2,::2], self.Lambda[::2,::2], self.R[::2,::2], D11_target[::2,::2], D12_target[::2,::2])
+            R_new = np.kron(R_new, np.eye(2))
+            Lambda_new = np.kron(Lambda_new, np.eye(2))
             diff_R = np.abs(self.R-R_new).max()
             diff_Lambda = np.abs(self.Lambda-Lambda_new).max()
             self.diff = max(diff_R,diff_Lambda)
