@@ -397,10 +397,10 @@ class CI(object):
             for j in range(Umatrix.shape[1]):
                 for k in range(Umatrix.shape[2]):
                     for l in range(Umatrix.shape[3]):
-                        # # check if l==j or i==k or U=0, if true it has 0 contribution
-                        # if l==j or i==k or abs(Umatrix[i,j,k,l])<1e-8:
-                        #     continue # 0 contribution
-                        # else:
+                        # check if l==j or i==k or U=0, if true it has 0 contribution
+                        if l==j or i==k or abs(Umatrix[i,j,k,l])<1e-8:
+                            continue # 0 contribution
+                        else:
                             #print(i,j,k,l,Umatrix[i,j,k,l])
                             row_ind, col_ind, data = build_two_body_ijkl_csc_2(i, j, k, l, self.basis, bit_max, self.norb)
                             self.Htwo +=  0.5*Umatrix[i,j,k,l]*csc_matrix( (data, (row_ind, col_ind)), shape=(self.hsize,self.hsize),dtype=self.data_type)
