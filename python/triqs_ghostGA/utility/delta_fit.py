@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.optimize import root, least_squares, brentq
+from scipy.optimize import root, least_squares, brentq, minimize
 
 # -------------------------
 # Build H
@@ -184,7 +184,7 @@ def residual_LR(x, beta, Lambda_c, D, F22_target, RTF12_target):
     Lambda, R = unpack_params(x, n, p)
 
     H = build_H(Lambda, Lambda_c, D, R)
-    F = F_of_H(H, beta)
+    F = F_of_H(H, beta).T
 
     F22 = F[n:, n:]
     F12 = F[:n, n:]
@@ -455,4 +455,30 @@ def new_hybridization( Lambda_c0,D0, Lambda,R, F11_target, F12D_target, beta=200
         raise ValueError(f"Tried new_hybridization with method={method} - only \"F\" and \"dF\" methods are available")
     
     return new_Lambda_c, new_D
-    
+   
+
+def residual_minimize(x, beta, Lambda_c, D, F22_target, RTF12_target):
+    r = residual_LR(x, beta, Lambda_c, D, F22_target, RTF12_target)
+    return 0.5 * np.dot(r, r)
+
+def jacobian_minimize(x, beta, Lambda_c, D, F22_target, RTF12_target):
+    r = residual_LR(x, beta, Lambda_c, D, F22_target, RTF12_target)
+    J = jacobian_LR(x, beta, Lambda_c, D, F22_target, RTF12_target)
+    return J.T @ r
+
+def solve_F_dF_minimize(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target):
+    x0 = pack_params(Lambda0, R0)
+    res = residual_LR(x0, beta, Lambda_c, D, F22_target, RTF12_target)
+    sol = minimize(
+        residual_minimize,
+        x0,
+        #jac=jacobian_minimize,
+        args=(beta, Lambda_c, D, F22_target, RTF12_target),
+        method="BFGS",
+        tol=1e-5,
+        options={'disp':False, 'eps': 1e-10, 'maxiter': len(x0)*10000}
+        )
+    print('sols.fun=',sol.fun)
+    print('sols.message=',sol.message)
+    Lambda_sol, R_sol = unpack_params(sol.x, Lambda0.shape[0], R0.shape[1])
+    return sol, Lambda_sol, R_sol 
