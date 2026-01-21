@@ -288,8 +288,11 @@ class Gdmft(object):
             self.Delta_p=calc_Delta_p(self.rhok_list)
             self.D=calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
             self.Lambda_c=calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list)
-            #right = calc_right(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
+            self.right = calc_right(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
+            sol, self.Lambda_c, self.D = solve_F_dF_LcD(beta, self.Lambda[::2,::2], self.R[::2,::2], self.Lambda_c[::2,::2], self.D[::2,::2], self.Delta_p[::2,::2], self.right[::2,::2])
             #self.D, self.Lambda_c = find_D_Lambdac_dmft(self.Lambda, self.R, self.eloc, self.D, self.Lambda_c, self.Delta_p, right,self.Hspin_list, beta)
+            self.D = np.kron(self.D, np.eye(2))
+            self.Lambda_c = np.kron(self.Lambda_c, np.eye(2))
             if not silence:
                 if not self.soc:
                     print("Delta_p=")
@@ -326,10 +329,12 @@ class Gdmft(object):
             #                                       self.denMat, self.Hspin_list, beta)#.real #restrict Lambda to real
             D11_target=self.denMat[self.nimp:,self.nimp:]
             D12_target=self.denMat[:self.nimp,self.nimp:]
-            if method == 'minimize':
-                res, Lambda_new, R_new = solve_F_dF_minimize(beta, self.Lambda_c[::2,::2], self.D[::2,::2], self.Lambda[::2,::2], self.R[::2,::2], D11_target[::2,::2], D12_target[::2,::2])
-            elif method == 'root':
-                res, Lambda_new, R_new = solve_F_dF(beta, self.Lambda_c[::2,::2], self.D[::2,::2], self.Lambda[::2,::2], self.R[::2,::2], D11_target[::2,::2], D12_target[::2,::2])
+            #if method == 'minimize':
+            #    res, Lambda_new, R_new = solve_F_dF_minimize(beta, self.Lambda_c[::2,::2], self.D[::2,::2], self.Lambda[::2,::2], self.R[::2,::2], D11_target[::2,::2], D12_target[::2,::2])
+            #elif method == 'root':
+            #    res, Lambda_new, R_new = solve_F_dF(beta, self.Lambda_c[::2,::2], self.D[::2,::2], self.Lambda[::2,::2], self.R[::2,::2], D11_target[::2,::2], D12_target[::2,::2])
+            #res, Lambda_new, R_new = solve_F_only_LR(beta, self.Lambda_c[::2,::2], self.D[::2,::2], self.Lambda[::2,::2], self.R[::2,::2], D11_target[::2,::2], D12_target[::2,::2])
+            res, Lambda_new, R_new = solve_F_dF_LR(beta, self.Lambda_c[::2,::2], self.D[::2,::2], self.Lambda[::2,::2], self.R[::2,::2], D11_target[::2,::2], D12_target[::2,::2])
             R_new = np.kron(R_new, np.eye(2))
             Lambda_new = np.kron(Lambda_new, np.eye(2))
             diff_R = np.abs(self.R-R_new).max()
