@@ -6,6 +6,7 @@
 from triqs_ghostGA.basis import * #table_ep, table_es
 from scipy.sparse import csc_matrix, lil_matrix
 from scipy.sparse.linalg import eigsh
+from scipy.linalg import eigh
 #from primme import eigsh
 from scipy.linalg import block_diag
 import numpy as np
@@ -643,14 +644,19 @@ class CI(object):
         #print(row_ind, col_ind, data)
         return csc_matrix( (data, (row_ind, col_ind)), shape=(self.hsize,self.hsize),dtype=self.data_type)
 
-    def solve_Hemb(self,num_eig=1,which='SA',tol=1e-8, verbose=0):
+    def solve_Hemb(self,num_eig=1,which='SA',tol=1e-8, verbose=0,beta=500.0):
         '''
         diagonalize the Hamiltonian
         '''
         mpi.report('diagonalizing num_eig= {:d}'.format(num_eig))
-        vals, vecs = eigsh(self.Ham,k=num_eig,which=which,tol=tol)
-        so = np.abs(vals).argsort()[::-1]
+        if(self.hsize < 4000):
+            print("Doing FULL diagonalization")
+            vals, vecs = eigh(self.Ham.toarray())
+        else:
+            vals, vecs = eigsh(self.Ham,k=num_eig,which=which,tol=tol)
+        so = vals.argsort()
         vals = vals[so]
+        print('vals:',vals[:5])
         vecs = vecs[:, so]
         self.gs_wf = vecs[:,0]
         self.gs_ene = vals[0]
@@ -659,14 +665,32 @@ class CI(object):
         it = 1
         self.deg = 1
         self.e0 = self.evals[0]
-        if num_eig > 1:
-            for it in range(1,num_eig):
-                if np.abs(self.e0 - self.evals[it]) < 1e-4:#1e-5:
-                    self.deg += 1
-                    it += 1
+        self.Zpart = 1 #partition function for thermal and degeneracies, will replace deg
+        self.Tstates = 1 #number of thermal states
+        self.bw_list = [1] #list of boltzmann weights
+        if(self.thermal):
+            print('Building thermal partition function')
+            for eit in vals[1:]:
+                boltz_weight = np.exp(-beta*(eit-self.gs_ene))
+                if(boltz_weight>1e-8):
+                    self.bw_list.append(boltz_weight*1.0)
+                    self.Zpart += boltz_weight
+                    self.Tstates += 1
+                else:
+                    break
+        else:
+            print('Building GS partition function')
+            if num_eig > 1:
+                for it in range(1,num_eig):
+                    if np.abs(self.e0 - self.evals[it]) < 1e-4:#1e-5:
+                        self.deg += 1
+                        self.Zpart += 1
+                        self.bw_list.append(1.0)
+                        self.Tstates += 1
+                        it += 1
         if mpi.is_master_node():
             print('# Energy\t\tS2\t\t\tSz\t\t\tSx\t\t\tSy\t\t\tSz2\t\t\tSx2\t\t\tSy2')
-            for i in range(num_eig):
+            for i in range(int(self.Tstates)):
                 S2 = vecs[:,i].conj().T.dot(self.S2.dot(vecs[:,i]))
                 Sz = vecs[:,i].conj().T.dot(self.Sz.dot(vecs[:,i]))
                 Sz2 = vecs[:,i].conj().T.dot(self.Sz.dot(self.Sz).dot(vecs[:,i]))
@@ -676,56 +700,90 @@ class CI(object):
                 Sy2 = vecs[:,i].conj().T.dot(self.Sy.dot(self.Sy).dot(vecs[:,i]))
                 print("%.12e  \t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej" %
                       (vals[i], S2.real, S2.imag, Sz.real, Sz.imag, Sx.real, Sx.imag, Sy.real, Sy.imag, Sz2.real, Sz2.imag, Sx2.real, Sx2.imag, Sy2.real, Sy2.imag))
-                print('deg=',self.deg)
+                print('deg=',self.deg,' - Boltzmann weight=',self.bw_list[i])
                 #print('energies=',vals)
-
+        #CHECK THAN LENGTHS ARE CORRECTS FOR BW_LIST VALS AND SO ON
+        self.evals=self.evals[:self.Tstates]
+        self.evecs=self.evecs[:,:self.Tstates]
+        
         return self.gs_wf, self.gs_ene
 
     def calc_density_matrix(self):
         '''
         Compute denstiy matrix.
-        Input:
-          dtype: data dtype
         Return:
           denmat: numpy.array. Densty matrix, <c^\dagger_i c_j>, of the system.
         '''
-        dm = np.zeros((self.norb,self.norb),dtype=self.data_type)
+        dm = np.zeros((self.norb, self.norb), dtype=self.data_type)
+
+        bw = np.asarray(self.bw_list)
+        Z = np.sum(bw)
+        
+        U = self.evecs    # shape (dim, self.Tstates)
+        W = np.diag(bw)   # Boltzmann weights
+
+        print("shapes")
+        print(U.shape)
+        print(W.shape)
+        
         for i in range(self.norb):
             for j in range(self.norb):
-                #denmat[i,j] = self.gs_wf.conj().T.dot(self.denmat_op[(i,j)].dot(self.gs_wf))
-                dm[i,j]=np.trace(self.evecs[:,:self.deg].conj().T.dot(self.denmat_op[(i,j)].dot(self.evecs[:,:self.deg])))/self.deg
+                dm[i, j] = np.trace(
+                    U.conj().T @ self.denmat_op[(i, j)] @ U @ W
+                ) / Z
+
         self.dm = dm
         return dm
 
     def compute_Eloc(self):
         '''
-        Compute local energy including local one and two-body term from a given wavefunction.
+        Compute local energy including local one and two-body term from a given set of thermal states.
+        Works also at zero Temperature
         Input:
         Return:
           Eloc: float. Total local energy.
         '''
-        return self.gs_wf.conj().T.dot((self.Htwo+self.Honeloc).dot(self.gs_wf))
+        U = self.evecs
+        bw = np.asarray(self.bw_list)
+        Z = np.sum(bw)
+
+        Hloc = self.Htwo + self.Honeloc
+        # sum_n bw[n] <n|Hloc|n> / Z
+        return np.trace(U.conj().T @ Hloc @ U @ np.diag(bw)) / Z
 
     def compute_E1loc(self, nimp):
         '''
-        Compute local energy including local one and two-body term from a given wavefunction.
+        Compute local energy including local one and two-body term from a given set od thermal states
+        Works also at zero Temperature
         Input:
         Return:
           Eloc: float. Total local energy.
         '''
-        #return self.gs_wf.conj().T.dot((self.Htwo).dot(self.gs_wf))
-        return np.trace(self.h1e[:nimp,:nimp].dot(self.dm[:nimp,:nimp].T))
+        U = self.evecs
+        bw = np.asarray(self.bw_list)
+        Z = np.sum(bw)
+
+        # dm_imp = sum_n bw[n] |psi_n><psi_n|  restricted to imp block, divided by Z
+        Uimp = U[:nimp, :]  # (nimp, deg)
+        dm_imp = (Uimp * bw) @ Uimp.conj().T / Z  # weights columns
+
+        return np.trace(self.h1e[:nimp, :nimp] @ dm_imp.T)
 
     def compute_E2loc(self):
         '''
-        Compute local energy including local one and two-body term from a given wavefunction.
+        Compute local energy including local one and two-body term from a given set od thermal states
+        Works also at zero Temperature
         Input:
         Return:
           Eloc: float. Total local energy.
         '''
-        #return self.gs_wf.conj().T.dot((self.Htwo).dot(self.gs_wf))
-        return np.trace(self.evecs[:,:self.deg].conj().T.dot(self.Htwo.dot(self.evecs[:,:self.deg])))/self.deg
+        U = self.evecs
+        bw = np.asarray(self.bw_list)
+        Z = np.sum(bw)
 
+        return np.trace(U.conj().T @ self.Htwo @ U @ np.diag(bw)) / Z
+
+    #????
     def compute_denmat_from_phi(self,phi):
         '''
         Compute denstiy matrix.
@@ -777,19 +835,20 @@ class CI(object):
         #print self.rholoc
         return self.rholoc
 
-    def calc_double_occ(self,i):
+    def calc_double_occ(self, i):
         '''
-        Compute double occupancy on orbital i and i+1.
-        Input:
-          i: orbital to compute. has to be even number
-          dtype: data dtype
-        Return:
-          docc: float. double occupancy.
+        Compute thermal double occupancy on orbital i and i+1.
         '''
-        #return self.gs_wf.conj().T.dot(self.docc_op[i].dot(self.gs_wf))
-        #return np.trace(self.evecs[:,:self.deg].conj().T.dot(self.docc_op[i].dot(self.evecs[:,:self.deg])))/self.deg
         docc_op = self.build_docc_op(i)
-        return np.trace(self.evecs[:,:self.deg].conj().T.dot(docc_op.dot(self.evecs[:,:self.deg])))/self.deg
+        
+        U = self.evecs
+        bw = np.asarray(self.bw_list)
+        Z = np.sum(bw)
+        
+        return np.trace(
+            U.conj().T @ docc_op @ U @ np.diag(bw)
+        ) / Z
+
 
     def compute_docc_i_from_phi(self,i,phi):
         '''
