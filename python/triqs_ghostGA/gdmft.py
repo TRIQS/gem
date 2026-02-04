@@ -1,5 +1,6 @@
 import scipy
 from scipy.linalg import sqrtm
+from scipy.optimize import bisect
 import h5py
 import numpy as np
 import numba
@@ -8,8 +9,9 @@ from triqs_ghostGA.utility.utils_TH import denR, denRm1, ddenRm1, realHcombinati
 from triqs_ghostGA.DIIS import *
 from triqs_ghostGA.utility.delta_fit import * 
 from h5 import *
-from triqs_ghostGA.utility.utils_grisb import calc_rhoks, calc_Delta_p, calc_D, calc_Lambda_c, calc_Lambda
+from triqs_ghostGA.utility.utils_grisb import calc_rhoks, calc_Delta_p, calc_D, calc_Lambda_c, calc_Lambda_c_new, calc_Lambda
 import sys
+import time
 
 def calc_right(R, Lambda, Delta_p, eks, rhoks):
     """ Compute the right matrix for DMFT-like algorithm
@@ -240,7 +242,11 @@ class Gdmft(object):
             # TODO: Replace whole if-clause by edsolver.prolog(self) implemented by
             # Solver(AbstractSolver)
 
-        self.edsolver.solve_Hemb(num_eig=num_eig, verbose=ed_verbose )
+        if(self.edsolver.thermal):
+            self.edsolver.solve_Hemb(num_eig=num_eig, verbose=ed_verbose , beta=beta)
+        else:
+            self.edsolver.solve_Hemb(num_eig=num_eig, verbose=ed_verbose )
+            
         self.denMat = self.edsolver.calc_density_matrix()
         self.E2loc = self.edsolver.compute_E2loc()
 
@@ -254,7 +260,7 @@ class Gdmft(object):
         self.epot = self.E2loc + np.trace(self.eloc.dot(self.denMat[:self.nimp,:self.nimp].T))
         self.etot = self.ekin + self.epot - mu*self.nfill
 
-    def run_dmft(self, mu=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., silence=True, spin_pen=0.0, sz_pen=0.0, idx=0, num_eig=2, ed_verbose=0, diis=False, method='minimize'):
+    def run_dmft(self, mu=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., n_target=None, silence=True, spin_pen=0.0, sz_pen=0.0, idx=0, num_eig=2, ed_verbose=0, diis=False, method='minimize'):
         """ Run ghost-RISB self-consistency
 
         :param itmax: Maxiumum iteraction for self-consistency.
@@ -306,8 +312,11 @@ class Gdmft(object):
                     print("Lambda_c=")
                     print(self.Lambda_c[:,:])
             # ED solvers
-            self.solve_embedding(mu, num_eig, ed_verbose, spin_pen, sz_pen, beta)
+            self.solve_embedding(mu, num_eig, ed_verbose, spin_pen, sz_pen, beta=beta)
             #Update R and Update Lambda
+            
+            self.nfill = np.trace(self.denMat[:self.nimp,:self.nimp])
+            print("n_filling:",self.nfill)
             cdaggerf = self.denMat[:self.nimp,self.nimp:]
             ffdagger = self.denMat[self.nimp:,self.nimp:]
             ffdagger = (np.eye(self.nbath,dtype=np.complex128) - ffdagger).T
@@ -338,6 +347,13 @@ class Gdmft(object):
             # mixing 
             self.R = (1.-mix)*np.copy(self.R) + mix*R_new
             self.Lambda = (1.-mix)*np.copy(self.Lambda) + mix*Lambda_new
+            convg_n=True
+            if( (not (n_target is None)) and it>1):
+                print("CHECK DENSITY")
+                if( abs(self.nfill-n_target)>1e-2):
+                    convg_n=False
+                if( abs(self.nfill-n_target)>1e-3):
+                    self.find_mu_qp(n_target,beta)
             if not silence:
                 #print("R_new=")
                 #print(R_new)
@@ -359,7 +375,7 @@ class Gdmft(object):
                 print("density matrix 0=")
                 print(denMat0[::2,::2])
             print("iteration:",it,'diff=',self.diff)
-            if self.diff < tol or it == (itmax-1):
+            if (self.diff < tol and convg_n) or it == (itmax-1):
                 print("--------------------- ghost-RISB converged with diff=%g ---------------------"%(self.diff))
                 print("density matrix=")
                 print(self.denMat)
@@ -368,6 +384,8 @@ class Gdmft(object):
                 for idx in range(0,self.nimp,2):
                     self.docc.append(self.edsolver.calc_double_occ(idx))
                 print("double occupancy=", self.docc)
+                print("convg_n",convg_n)
+                print('lambda eigvals',np.linalg.eigvalsh(self.Lambda))
                 break
 
     def func_mu(self, x, *args):
@@ -420,3 +438,29 @@ class Gdmft(object):
                     Sig[iom,:,:] = (om + 1j*eta + mu)*np.eye(nimp) - ek - eloc - np.linalg.inv(Gf[ik,iom]) #om + 1j*eta - ek - np.linalg.inv(Gf[ik,iom])
         return Gf, Sig
 
+
+        
+    
+    def find_mu_qp(self,n_target,beta):
+
+        def dens_qp(mu, dens_qp_2f,Lambda,R,eks,beta):
+            mu_diag =  np.eye(R.shape[-1])*mu
+            Lambda_tmp = Lambda + R @ mu_diag @ R.T.conj()
+            rhoks = calc_rhoks(R,Lambda_tmp,eks,1/beta)
+            Delta = calc_Delta_p(rhoks)
+            return np.trace(Delta)-dens_qp_2f
+        
+        if( n_target<=0.0 or n_target>=self.nimp ): raise ValueError("Wrong n_target")
+        dens_qp_2f = (self.nbath-self.nimp)/2.0 + n_target
+        eL = np.linalg.eigvalsh(self.Lambda)
+        mu_sol = bisect(f=dens_qp,
+                        a=np.min(eL)-5.0,
+                        b=np.max(eL)+5.0,
+                        xtol=1e-6,
+                        args=(dens_qp_2f,self.Lambda,self.R,self.eks,beta))
+        print('Solution for mu finding is:',mu_sol)
+        mu_diag =  np.eye(self.eloc.shape[0])*mu_sol
+        self.eloc = self.eloc + mu_diag
+        self.Lambda = self.Lambda + self.R @ mu_diag @ self.R.T.conj()
+        print( 'dens_qp',dens_qp( 0.0,0.0,self.Lambda,self.R,self.eks,beta))
+        return
