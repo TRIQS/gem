@@ -669,10 +669,11 @@ class CI(object):
         self.Tstates = 1 #number of thermal states
         self.bw_list = [1] #list of boltzmann weights
         if(self.thermal):
+            if(beta is None): raise ValueError("Solving thermal=True without passing beta")
             print('Building thermal partition function')
             for eit in vals[1:]:
                 boltz_weight = np.exp(-beta*(eit-self.gs_ene))
-                if(boltz_weight>1e-8):
+                if(boltz_weight>1e-8 or True):
                     self.bw_list.append(boltz_weight*1.0)
                     self.Zpart += boltz_weight
                     self.Tstates += 1
