@@ -14,7 +14,7 @@ from scipy.optimize import root, least_squares, brentq, minimize
 # Build H
 # -------------------------
 def build_H(Lambda, Lambda_c, D, R):
-    H11 = Lambda 
+    H11 = Lambda
     H12 = R @ D.T
     H21 = H12.T.conj()
     H22 = -Lambda_c
@@ -154,12 +154,13 @@ def unpack_params(x, n, p):
 
     # rebuild Hermitian Lambda
     Lambda = np.zeros((n, n), dtype=complex)
-    Lambda.real[iu] = Lam_re
-    Lambda.real[(iu[1], iu[0])] = Lam_re
-    Lambda.imag[iu_strict] = Lam_im
-    Lambda.imag[iu_strict[1],iu_strict[0]] = -Lam_im
+    Lambda.real[iu] = Lam_re.real
+    Lambda.real[(iu[1], iu[0])] = Lam_re.real
+    Lambda.imag[iu_strict] = Lam_im.real
+    Lambda.imag[iu_strict[1],iu_strict[0]] = -Lam_im.real
     R = R_re + 1j * R_im
     return Lambda, R
+
 
 
 # ============================================================
@@ -417,6 +418,7 @@ def solve_F_dF_LcD(beta, Lambda, R, Lambda_c0, D0, F11_target, F12D_target):
             jac=jacobian_LcD,
             args=(beta, Lambda, R, F11_target, F12D_target),
             method="trf", # Change from 'hybr' to 'lm'
+            x_scale="jac", # should help
             max_nfev=100,
             ftol=1e-9,
             xtol=1e-9,
@@ -476,6 +478,215 @@ def solve_F_dF_minimize(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target
 
 
 
+#TESTING WITH ADDED NON-LINEAR CONSTRAINTS - NOT WORKING
+
+
+# # objective and gradient from residuals
+# def objective(x, *args):
+#     r = residual_LR(x, *args)
+#     return 0.5 * np.dot(r, r)
+
+# def objective_grad(x, *args):
+#     J = jacobian_LR(x, *args)   # shape (m, nparams)
+#     r = residual_LR(x, *args)   # shape (m,)
+#     return J.T.dot(r)           # grad of 0.5||r||^2 is J^T r
+
+# # constraint: c(x) = 1 - sigma_max(R(x)) >= 0
+# def cons_fun(x, n, p):
+#     # c(x) >= 0
+#     # sigma_max(R) <= 1  <=>  1 - sigma_max(R) >= 0
+#     Lambda, R = unpack_params(x, n, p)
+#     smax = np.linalg.svd(R, compute_uv=False, full_matrices=False)[0]
+#     return 1.0 - smax
+
+
+# def cons_jac(x, n, p):
+#     # Gradient of c(x) wrt the REAL parameter vector x
+
+#     iu = np.triu_indices(n)
+#     iu_strict = np.triu_indices(n, k=1)
+#     n_re = len(iu[0])
+#     n_im = len(iu_strict[0])
+#     offset = n_re + n_im  # where R_re starts
+
+#     Lambda, R = unpack_params(x, n, p)
+
+#     U, S, Vh = np.linalg.svd(R, full_matrices=False)
+#     u = U[:, 0]                 # (n,)
+#     v = Vh.conj().T[:, 0]       # (p,)
+
+#     # coefficient appearing in Re(u^H dR v) is conj(u_i) * v_j
+#     coeff = np.outer(u.conj(), v)   # (n,p)
+
+#     # c = 1 - smax => dc = - d smax
+#     # ds = Re( sum coeff_ij * dR_ij )
+#     # For R = Rre + i Rim:
+#     # d/dRre: Re(coeff)
+#     # d/dRim: -Im(coeff)
+#     dc_dRre = -coeff.real
+#     dc_dRim = +coeff.imag   # because dc = -ds and ds/dRim = -Im(coeff)
+
+#     jac = np.zeros_like(x, dtype=float)
+#     jac[offset : offset + n*p] = dc_dRre.reshape(-1)
+#     jac[offset + n*p : offset + 2*n*p] = dc_dRim.reshape(-1)
+#     return jac
+
+
+
+# def solve_F_dF_minimize_2(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target):
+#     smax0 = np.linalg.svd(R0, compute_uv=False, full_matrices=False)[0]
+#     if smax0 > 1.0:
+#         R0 = R0 / smax0
+#     x0 = pack_params(Lambda0, R0)
+
+#     res = residual_LR(x0, beta, Lambda_c, D, F22_target, RTF12_target)
+
+#     n,p = R0.shape
+#     # Create constraints dict for minimize (ineq expects fun >= 0)
+#     cons = {'type': 'ineq', 'fun': lambda x, n=n, p=p: cons_fun(x, n, p),
+#             'jac': lambda x, n=n, p=p: cons_jac(x, n, p)}
+#     sol = minimize(objective, x0, args=(beta, Lambda_c, D, F22_target, RTF12_target),
+#                    jac=objective_grad, constraints=[cons],
+#                    method='trust-constr',
+#                    options={'verbose': 2, 'maxiter': 500})
+
+#     print('sols.fun=',sol.fun)
+#     print('sols.message=',sol.message)
+#     Lambda_sol, R_sol = unpack_params(sol.x, Lambda0.shape[0], R0.shape[1])
+#     return sol, Lambda_sol, R_sol 
+
+
+
+# def new_self_energy_2(Lambda0,R0, Lambda_c,D, F22_target,RTF12_target, beta=200, method="dF"):
+#     res, new_Lambda, new_R = solve_F_dF_minimize_2(beta, Lambda_c,D,Lambda0,R0,F22_target,RTF12_target)
+#     return new_Lambda, new_R
+
+
+
+#TESTING WITH PENALTY
+# --- helpers for spectral-norm constraint on R ---
+def _smax_and_uv(R):
+    """Return smax, u, v for the largest singular value of R."""
+    U, S, Vh = np.linalg.svd(R, full_matrices=False)
+    return S[0], U[:, 0], Vh.conj().T[:, 0]
+
+def _penalty_residual_and_jac_blocks(R, w):
+    """
+    Penalty residual: r_pen = sqrt(w) * max(0, smax(R) - 1)
+    Returns:
+      r_pen (float)
+      dr_dRre_flat (shape n*p,)
+      dr_dRim_flat (shape n*p,)
+    Derivatives are w.r.t. real decision variables R_re and R_im.
+    """
+    smax, u, v = _smax_and_uv(R)
+    viol = smax - 1.0-1e-5
+    if viol <= 0.0:
+        return 0.0, None, None  # no penalty, jac block is zeros
+
+    # ds = Re(u^H dR v)  => coeff = conj(u) * v
+    coeff = np.outer(u.conj(), v)  # (n,p)
+
+    # r_pen = sqrt(w) * viol
+    # dr/dRre = sqrt(w) * d(smax)/dRre = sqrt(w) * Re(coeff)
+    # dr/dRim = sqrt(w) * d(smax)/dRim = sqrt(w) * (-Im(coeff))
+    sw = np.sqrt(w)
+    dr_dRre = sw * coeff.real
+    dr_dRim = sw * (-coeff.imag)
+
+    return sw * viol, dr_dRre.reshape(-1), dr_dRim.reshape(-1)
+
+
+# --- penalty-augmented residual ---
+def residual_LR_penalty(x, beta, Lambda_c, D, F22_target, RTF12_target, w=1e6):
+    """
+    Original residuals + one scalar penalty residual to enforce ||R||_2 <= 1.
+    """
+    r = residual_LR(x, beta, Lambda_c, D, F22_target, RTF12_target)
+
+    n, p = D.shape
+    Lambda, R = unpack_params(x, n, p)
+    r_pen, _, _ = _penalty_residual_and_jac_blocks(R, w)
+
+    return np.concatenate([r, np.array([r_pen])])
+
+
+# --- penalty-augmented jacobian ---
+def jacobian_LR_penalty(x, beta, Lambda_c, D, F22_target, RTF12_target, w=1e6):
+    """
+    Stack the original Jacobian with one extra row for the penalty residual.
+    This assumes your x packing is:
+      [Lam_re (n(n+1)/2), Lam_im (n(n-1)/2), R_re (n*p), R_im (n*p)]
+    which matches your pack_params/unpack_params.
+    """
+    J = jacobian_LR(x, beta, Lambda_c, D, F22_target, RTF12_target)  # (m, N)
+
+    n, p = D.shape
+    iu = np.triu_indices(n)
+    iu_strict = np.triu_indices(n, k=1)
+    n_re = len(iu[0])
+    n_im = len(iu_strict[0])
+    offset = n_re + n_im  # where R_re starts
+
+    Lambda, R = unpack_params(x, n, p)
+    r_pen, dr_dRre_flat, dr_dRim_flat = _penalty_residual_and_jac_blocks(R, w)
+
+    N = x.size
+    Jpen = np.zeros((1, N), dtype=float)
+
+    if dr_dRre_flat is not None:
+        # penalty does not depend on Lambda
+        Jpen[0, offset:offset + n * p] = dr_dRre_flat
+        Jpen[0, offset + n * p:offset + 2 * n * p] = dr_dRim_flat
+
+    return np.vstack([J, Jpen])
+
+
+# --- drop-in solver using least_squares (recommended) ---
+def solve_F_dF_LR_with_penalty(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target,
+                              w=1e6, max_nfev=200):
+    """
+    Like solve_F_dF_LR but adds a soft constraint ||R||_2 <= 1 via penalty residual.
+    """
+    # optional: start feasible
+    smax0 = np.linalg.svd(R0, compute_uv=False, full_matrices=False)[0]
+    if smax0 > 1.0:
+        R0 = R0 / smax0
+
+    x0 = pack_params(Lambda0, R0)
+
+    sol = least_squares(
+        residual_LR_penalty,
+        x0,
+        jac='2-point',  # switch to '2-point' if you want max robustness
+        args=(beta, Lambda_c, D, F22_target, RTF12_target, w),
+        method="trf",
+        x_scale="jac", # should help
+        max_nfev=max_nfev,
+        ftol=1e-9,
+        xtol=1e-9,
+        gtol=1e-9,
+        verbose=2
+    )
+
+    Lambda_sol, R_sol = unpack_params(sol.x, Lambda0.shape[0], R0.shape[1])
+    return sol, Lambda_sol, R_sol
+
+
+def new_self_energy_penalty(Lambda0, R0, Lambda_c, D, F22_target, RTF12_target,
+                            beta=200, w=1e6):
+    print("New self-energy fitting Lambda and R (penalty ||R||_2<=1)")
+    sol, new_Lambda, new_R = solve_F_dF_LR_with_penalty(
+        beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target, w=w
+    )
+    return new_Lambda, new_R
+
+
+
+
+
+
+
 
 
 
@@ -483,12 +694,7 @@ def solve_F_dF_minimize(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target
 
 # FROM NOW ON ROUTINES WITH MU_QP THAT ARE HERE FOR LEGACY BUT WILL BE REMOVED
 
-
-
-
-
-
-# -------------------------
+#--------------
 # Build H
 # -------------------------
 def build_H_(Lambda, Lambda_c, D, R, mu):

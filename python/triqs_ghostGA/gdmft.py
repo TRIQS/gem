@@ -292,8 +292,20 @@ class Gdmft(object):
             # compute qp density matrix
             self.rhok_list=calc_rhoks(self.R, self.Lambda, self.eks, 1./beta)
             self.Delta_p=calc_Delta_p(self.rhok_list)
+            
+            dvals,dvecs = np.linalg.eigh(self.Delta_p)
+            print('dqp vals:',dvals)
             self.D=calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
             self.Lambda_c=calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list)
+            lcvals,lcvecs = np.linalg.eigh(self.Lambda_c[::2,::2])
+            print('lcvals:',lcvals)
+            print(lcvecs.shape)
+            lcvals=0.5*(lcvals-lcvals[::-1])
+            self.Lambda_c =  np.kron( lcvecs @ np.diag(lcvals) @ lcvecs.T.conj() , np.eye(2) )
+            self.D = np.abs(lcvecs.T.conj() @ self.D[::2,::2])
+            self.D =  0.5*(self.D+self.D[::-1,::-1])
+            self.D = np.kron( lcvecs @ self.D , np.eye(2) )
+            time.sleep(1)
             #right = calc_right(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
             #self.D, self.Lambda_c = find_D_Lambdac_dmft(self.Lambda, self.R, self.eloc, self.D, self.Lambda_c, self.Delta_p, right,self.Hspin_list, beta)
             if not silence:
@@ -316,13 +328,16 @@ class Gdmft(object):
             #Update R and Update Lambda
             
             self.nfill = np.trace(self.denMat[:self.nimp,:self.nimp])
-            print("n_filling:",self.nfill)
+            print("||||||||||||||||||| n_filling:",self.nfill)
             cdaggerf = self.denMat[:self.nimp,self.nimp:]
             ffdagger = self.denMat[self.nimp:,self.nimp:]
             ffdagger = (np.eye(self.nbath,dtype=np.complex128) - ffdagger).T
             #if not silence:
             #print("norm(ffdagger.T-Delta_p)=", np.linalg.norm(ffdagger.T-self.Delta_p)) # not necessary in the DMFT algorithm
             #self.Delta_p = ffdagger.T # not necessary in the DMFT algorithm
+            
+            dvals,dvecs = np.linalg.eigh(ffdagger)
+            print('dbath vals:',dvals)
             #Lambda_new = calc_Lambda(self.R, self.Lambda_c, self.Delta_p, self.D, self.Hfull_list)
             #if not self.soc:
             #    Lambda_new = np.kron(Lambda_new[::2,::2],np.eye(2)) # symmetryize
@@ -335,14 +350,30 @@ class Gdmft(object):
             #                                       self.denMat, self.Hspin_list, beta)#.real #restrict Lambda to real
             D11_target=self.denMat[self.nimp:,self.nimp:]
             D12_target=self.denMat[:self.nimp,self.nimp:]
+            print("D11:",D11_target)
+            print("D12:",D12_target)
+            print("|||||||||||||||||||||||||||||n_tot:",np.trace(self.denMat))
             if method == 'minimize':
                 res, Lambda_new, R_new = solve_F_dF_minimize(beta, self.Lambda_c[::2,::2], self.D[::2,::2], self.Lambda[::2,::2], self.R[::2,::2], D11_target[::2,::2], D12_target[::2,::2])
             elif method == 'root':
-                res, Lambda_new, R_new = solve_F_dF(beta, self.Lambda_c[::2,::2], self.D[::2,::2], self.Lambda[::2,::2], self.R[::2,::2], D11_target[::2,::2], D12_target[::2,::2])
+                Lambda_new, R_new = new_self_energy(self.Lambda[::2,::2],self.R[::2,::2],self.Lambda_c[::2,::2],self.D[::2,::2], D11_target[::2,::2],D12_target[::2,::2], beta=beta, method="dF")
+                
+                U,s,Vh = scipy.linalg.svd(R_new)
+                if(np.any(np.abs(s)>1)):
+                    Lambda_new, R_new = new_self_energy_penalty(self.Lambda[::2,::2],self.R[::2,::2],self.Lambda_c[::2,::2],self.D[::2,::2], D11_target[::2,::2],D12_target[::2,::2], beta=beta)
+
+            L_eval_new, UL_new = np.linalg.eigh(Lambda_new)
+            L_eval_old, UL_old = np.linalg.eigh(self.Lambda[::2,::2])
+            L_eval_new = 0.5*(L_eval_new - L_eval_new[::-1])
+            R_new = np.abs(UL_new.T.conj()@R_new)
+            R_new = 0.5*(R_new+R_new[::-1,::-1])
+            Lambda_new =  np.diag(L_eval_new)
+            diff_R = 0.0 #np.abs(UL_old@self.R[::2,::2]-UL_new@R_new).max()
             R_new = np.kron(R_new, np.eye(2))
             Lambda_new = np.kron(Lambda_new, np.eye(2))
-            diff_R = np.abs(self.R-R_new).max()
-            diff_Lambda = np.abs(self.Lambda-Lambda_new).max()
+            diff_Lambda = np.abs(L_eval_new-L_eval_old).max()
+            print('lambda_evals:',L_eval_new)
+            time.sleep(1)
             self.diff = max(diff_R,diff_Lambda)
             # mixing 
             self.R = (1.-mix)*np.copy(self.R) + mix*R_new
@@ -375,7 +406,7 @@ class Gdmft(object):
                 print("density matrix 0=")
                 print(denMat0[::2,::2])
             print("iteration:",it,'diff=',self.diff)
-            if (self.diff < tol and convg_n) or it == (itmax-1):
+            if (self.diff < tol and it>1) or it == (itmax-1):
                 print("--------------------- ghost-RISB converged with diff=%g ---------------------"%(self.diff))
                 print("density matrix=")
                 print(self.denMat)
