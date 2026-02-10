@@ -17,7 +17,7 @@ class test_hemb_ci_1o3(unittest.TestCase):
     def test_gdmft_ci(self):
 
         # 1 orbital with 2 spins, 3 bath per orbital, total 8
-        B = 3
+        B = 1
         nimp  = 2
         nbath = nimp*B
         ntot  = nimp+nbath
@@ -84,11 +84,11 @@ class test_hemb_ci_1o3(unittest.TestCase):
         gdmft = Gdmft(ntot, nimp, nbath, eks, eloc, Utensor, R=R0,
                       Lambda=Lambda0, D=D0, Lambda_c=Lambda_c0, edsolver=edsolver)
         
-        for T in np.logspace(-2,-1,25):
+        for T in np.logspace(-2,0,26):
             print("")
             print(f" ***** Doing T={T} ***** ")
             time.sleep(2)
-            gdmft.run_dmft(itmax=100, mix=0.5, tol=1e-4, beta=1.0/T, n_target=None,
+            gdmft.run_dmft(itmax=100, mix=0.75, tol=1e-4, beta=1.0/T, n_target=None,
                            silence=False, spin_pen=0.0, method='root')
             T_list.append(T)
             D_list.append(gdmft.docc)
