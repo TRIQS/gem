@@ -1,129 +1,141 @@
-from triqs_ghostGA.utility.delta_fit import *
+import unittest
+from pathlib import Path
+
 import numpy as np
 
-import time
+from triqs_ghostGA.utility.delta_fit import (
+    pack_params,
+    residual_LcD,
+    jacobian_LcD,
+    build_H,
+    F_of_H,
+    new_hybridization,
+)
+
+# --- Configuration ---
+size = 1
+B = 3
+Bsize = int(B * size)
+beta = 300.0
+noise = 1e-3
+data_dir = Path("input_data") / "B3"
 
 
-#TESTS START HERE
-size=1
-B=3
-Bsize=int(B*size)
-beta=100
-noise=1e-3 # 1e-2 is a good test
-fold_data=f"input_data/B3"
+class TestFitLcDB3(unittest.TestCase):
 
-#READING SOLUTIONS OF A B=3 Norb=1 gRISB calculation
+    @classmethod
+    def setUpClass(cls):
+        if not data_dir.exists():
+            raise unittest.SkipTest(f"Missing test data directory: {data_dir}")
 
-Lambda = np.loadtxt(f"{fold_data}/lambda.real")
-Lambda=0.5*(Lambda + Lambda.T.conj() )
-R = np.loadtxt(f"{fold_data}/R.real").reshape((3,1))
-Lambda_c_trg = np.loadtxt(f"{fold_data}/lambdac.real")
-Lambda_c_trg = 0.5*(Lambda_c_trg + Lambda_c_trg.T.conj() )
-D_trg = np.loadtxt(f"{fold_data}/V.real").reshape((3,1))
-mu_trg=0.0
+    def setUp(self):
+        np.random.seed(4201)
+
+        # --- Read reference solution (B=3, Norb=1) ---
+        self.L = np.loadtxt(data_dir / "lambda.real")
+        self.L = 0.5 * (self.L + self.L.T.conj())
+
+        self.R = np.loadtxt(data_dir / "R.real").reshape((B, size))
+
+        self.Lc_trg = np.loadtxt(data_dir / "lambdac.real")
+        self.Lc_trg = 0.5 * (self.Lc_trg + self.Lc_trg.T.conj())
+
+        self.D_trg = np.loadtxt(data_dir / "V.real").reshape((B, size))
+
+        # --- Build targets ---
+        H = build_H(self.L, self.Lc_trg, self.D_trg, self.R)
+        Delta_trg = F_of_H(H, beta)
+
+        self.F11_trg = Delta_trg[:Bsize, :Bsize]
+        F12_trg = Delta_trg[:Bsize, Bsize:]
+        self.F12D_trg = F12_trg @ self.D_trg
+
+    # ------------------------------------------------------------------
+    # Utilities
+    # ------------------------------------------------------------------
+    def _gauge_invariant_error(self, Lc, D):
+        eig_trg, U_trg = np.linalg.eigh(self.Lc_trg)
+        eig_sol, U_sol = np.linalg.eigh(Lc)
+
+        Dg_trg = np.abs(U_trg.T.conj() @ self.D_trg)
+        Dg_sol = np.abs(U_sol.T.conj() @ D)
+
+        return np.sum(np.abs(Dg_trg - Dg_sol)) + np.sum(np.abs(eig_sol - eig_trg))
+
+    def _perturb_initial_guess(self):
+        Lc_pert = 2.0 * (-0.5 + np.random.rand(Bsize, Bsize)) + 2j * (-0.5 + np.random.rand(Bsize, Bsize))
+        Lc_pert = 0.5 * (Lc_pert + Lc_pert.T.conj())
+
+        D_pert = 2.0 * (np.random.rand(Bsize, size) - 0.5) + 2j * (np.random.rand(Bsize, size) - 0.5)
+
+        Lc_0 = self.Lc_trg + noise * Lc_pert
+        D_0 = self.D_trg + noise * D_pert
+        return Lc_0, D_0
+
+    # ------------------------------------------------------------------
+    # Tests
+    # ------------------------------------------------------------------
+    def test_target_is_stationary_point(self):
+        x_trg = pack_params(self.Lc_trg, self.D_trg)
+
+        res0 = residual_LcD(x_trg, beta, self.L, self.R, self.F11_trg, self.F12D_trg)
+        jac0 = jacobian_LcD(x_trg, beta, self.L, self.R, self.F11_trg, self.F12D_trg)
+
+        self.assertLess(
+            float(np.sum(np.abs(res0))),
+            1e-10,
+            msg="Residual at the target parameters should be ~0",
+        )
+
+        self.assertTrue(
+            np.all(np.isfinite(jac0)),
+            msg="Jacobian at the target parameters should be finite",
+        )
+
+    def test_root_finding_without_derivatives(self):
+        Lc_0, D_0 = self._perturb_initial_guess()
+
+        Lc_sol, D_sol = new_hybridization(
+            Lc_0, D_0, self.L, self.R, self.F11_trg, self.F12D_trg, beta=beta, method="F"
+        )
+
+        x_sol = pack_params(Lc_sol, D_sol)
+        res = residual_LcD(x_sol, beta, self.L, self.R, self.F11_trg, self.F12D_trg)
+
+        self.assertLess(
+            float(np.sum(np.abs(res))),
+            1e-8,
+            msg="Residual should be small after root finding (method='F')",
+        )
+
+        self.assertLess(
+            float(self._gauge_invariant_error(Lc_sol, D_sol)),
+            5e-6,
+            msg="Solution should be close to target in gauge-invariant quantities (method='F')",
+        )
+
+    def test_root_finding_with_derivatives(self):
+        Lc_0, D_0 = self._perturb_initial_guess()
+
+        Lc_sol, D_sol = new_hybridization(
+            Lc_0, D_0, self.L, self.R, self.F11_trg, self.F12D_trg, beta=beta, method="dF"
+        )
+
+        x_sol = pack_params(Lc_sol, D_sol)
+        res = residual_LcD(x_sol, beta, self.L, self.R, self.F11_trg, self.F12D_trg)
+
+        self.assertLess(
+            float(np.sum(np.abs(res))),
+            1e-8,
+            msg="Residual should be small after root finding (method='dF')",
+        )
+
+        self.assertLess(
+            float(self._gauge_invariant_error(Lc_sol, D_sol)),
+            5e-6,
+            msg="Solution should be close to target in gauge-invariant quantities (method='dF')",
+        )
 
 
-x_trg = pack_params(Lambda_c_trg, D_trg,mu_trg)
-
-
-
-H = build_H(Lambda, Lambda_c_trg, D_trg, R,mu_trg)
-Delta_trg = F_of_H(H, beta)
-
-
-F11_trg=Delta_trg[:Bsize,:Bsize]
-F22_trg=Delta_trg[Bsize:,Bsize:]
-F12_trg=Delta_trg[:Bsize,Bsize:]
-F12D_trg = F12_trg@D_trg
-
-
-#in principle zero:
-residual0 = residual_LcD(x_trg, beta, Lambda, R, F11_trg, F12D_trg)
-jacobian0 = jacobian_LcD(x_trg, beta, Lambda, R, F11_trg, F12D_trg)
-tot_res0 = np.sum(np.abs(residual0))
-if(tot_res0>1e-10):
-    raise ValueError(f"The residual of the starting point should be zero while it is:{tot_res0}")
-
-
-Lambda_c_0 = 2.0*(-0.5+np.random.rand(Bsize,Bsize)) + 2j*(-0.5+np.random.rand(Bsize,Bsize))
-Lambda_c_0=0.5*(Lambda_c_0 + Lambda_c_0.T.conj() )
-D_0 = 2.0*(np.random.rand(Bsize,size)-0.5 +1j*np.random.rand(Bsize,size)-0.5*1j)
-
-Lambda_c_0 = Lambda_c_trg +noise*Lambda_c_0
-D_0      = D_trg +noise*D_0
-mu_0 = mu_trg + noise*(np.random.rand()-0.5)
-
-print("Starting from:")
-print(Lambda_c_0)
-print(D_0)
-start_x = pack_params(Lambda_c_0, D_0,mu_0)
-start_residual = residual_LcD(start_x, beta, Lambda, R, F11_trg, F12D_trg)
-print("Starting residual:",np.sum(np.abs(start_residual)))
-
-print(" --- TESTING ROOT WITHOUT DERIVATIVES ---")
-
-in_time=time.time()
-Lamc_sol, D_sol, mu_sol = new_hybridization( mu_0,Lambda_c_0,D_0, Lambda,R, F11_trg,F12D_trg, beta=beta, method="F")
-fin_time=time.time()
-noder_time=fin_time-in_time
-x_fonly=pack_params(Lamc_sol,D_sol,mu_sol)
-Fonly_residual=residual_LcD(x_fonly,beta,Lambda,R,F11_trg,F12D_trg)
-print("F only residual:",np.sum(np.abs(Fonly_residual)))
-
-H_sol = build_H(Lambda, Lamc_sol, D_sol, R, mu_sol)
-Delta_sol = F_of_H(H_sol, beta)
-D11_sol=Delta_sol[:Bsize,:Bsize]
-D12_sol=Delta_sol[:Bsize,Bsize:]
-D22_sol=Delta_sol[Bsize:,Bsize:]
-
-print("Final flling:",np.sum(np.diag(Delta_sol)))
-print("")
-print("Without derivatives in ",noder_time,"s")
-print("Distance in D :", np.sum(np.abs(D_trg-D_sol)))
-print("Distance in Lambda_c:", np.sum(np.abs(Lambda_c_trg-Lamc_sol)))
-Lg_trg, Ut = np.linalg.eigh(Lambda_c_trg)
-Lg_sol, Us = np.linalg.eigh(Lamc_sol)
-Dg_trg=np.abs(Ut.T.conj()@D_trg)
-Dg_sol=np.abs(Us.T.conj()@D_sol)
-print(Lg_trg,Lg_sol)
-print(Dg_trg,Dg_sol)
-print("Distance in gauge invariant D:",np.sum(np.abs(Dg_trg-Dg_sol)))
-print("Distance in gauge invariant Lambda_c:", np.sum(np.abs(Lg_sol-Lg_trg)))
-noder_error = np.sum(np.abs(Dg_trg-Dg_sol))+np.sum(np.abs(Lg_sol-Lg_trg))
-print("")
-
-
-
-
-print(" --- TESTING ROOT WITH DERIVATIVES FITTING <bdagb> ---")
-in_time=time.time()
-Lamc_sol, D_sol, mu_sol = new_hybridization( mu_0,Lambda_c_0,D_0, Lambda,R, F11_trg,F12D_trg, beta=beta, method="dF")
-fin_time=time.time()
-yeder_time=fin_time-in_time
-x_fdf=pack_params(Lamc_sol,D_sol,mu_sol)
-Fdf_residual=residual_LcD(x_fdf,beta,Lambda,R,F11_trg,F12D_trg)
-print("F dF residual:",np.sum(np.abs(Fdf_residual)))
-
-H_sol = build_H(Lambda, Lamc_sol, D_sol, R,mu_sol)
-Delta_sol = F_of_H(H_sol, beta)
-D11_sol = Delta_sol[:Bsize,:Bsize]
-D12_sol = Delta_sol[:Bsize,Bsize:]
-D22_sol = Delta_sol[Bsize:,Bsize:]
-
-#print(np.diag(Delta_sol))
-print("Final filling:",np.sum(np.diag(Delta_sol)))
-print("")
-print("With derivatives in ",yeder_time,"s")
-print("Distance in D :", np.sum(np.abs(D_trg-D_sol)))
-print("Distance in Lambda_c:", np.sum(np.abs(Lambda_c_trg-Lamc_sol)))
-Lg_trg, Ut = np.linalg.eigh(Lambda_c_trg)
-Lg_sol, Us = np.linalg.eigh(Lamc_sol)
-Dg_trg=np.abs(Ut.T.conj()@D_trg)
-Dg_sol=np.abs(Us.T.conj()@D_sol)
-print("Distance in gauge invariant D:",np.sum(np.abs(Dg_trg-Dg_sol)))
-print("Distance in gauge invariant Lambda_c:", np.sum(np.abs(Lg_sol-Lg_trg)))
-yeder_error = np.sum(np.abs(Dg_trg-Dg_sol))+np.sum(np.abs(Lg_sol-Lg_trg))
-print("")
-print(" --- OVERALL ---")
-print("Time without derivatives:",noder_time,"s - and error:",noder_error)
-print("Time with derivatives:",yeder_time,"s - and error:",yeder_error)
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

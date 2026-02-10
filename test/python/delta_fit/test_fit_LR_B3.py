@@ -1,127 +1,211 @@
-from triqs_ghostGA.utility.delta_fit import *
+import unittest
 import numpy as np
-
 import time
 
-
-#TESTS START HERE
-size=1
-B=3
-Bsize=int(B*size)
-beta=100
-noise=0.1
-fold_data=f"input_data/B3"
-
-#READING SOLUTIONS OF A B=3 Norb=1 gRISB calculation
-
-Lambda_target = np.loadtxt(f"{fold_data}/lambda.real")
-Lambda_target=0.5*(Lambda_target + Lambda_target.T.conj() )
-R_target = np.loadtxt(f"{fold_data}/R.real").reshape((3,1))
-mu_target = 0.0
-x_target = pack_params(Lambda_target, R_target,mu_target)
+from triqs_ghostGA.utility.delta_fit import (
+    pack_params,
+    residual_LR,
+    jacobian_LR,
+    new_self_energy,
+    build_H,
+    F_of_H,
+)
 
 
-Lambda_c = np.loadtxt(f"{fold_data}/lambdac.real")
-Lambda_c = 0.5*(Lambda_c + Lambda_c.T.conj() )
-D = np.loadtxt(f"{fold_data}/V.real").reshape((3,1))
+class TestSelfEnergySolverB3(unittest.TestCase):
 
-H = build_H(Lambda_target, Lambda_c, D, R_target, mu_target)
-Delta_target = F_of_H(H, beta)
+    @classmethod
+    def setUpClass(cls):
+        # --- Configuration ---
+        cls.size = 1
+        cls.B = 3
+        cls.Bsize = cls.B * cls.size
+        cls.beta = 4
+        cls.noise = 0.1
+        cls.fold_data = "input_data/B3"
+
+        # --- Read reference solution ---
+        cls.Lambda_target = np.loadtxt(f"{cls.fold_data}/lambda.real")
+        cls.Lambda_target = 0.5 * (
+            cls.Lambda_target + cls.Lambda_target.T.conj()
+        )
+
+        cls.R_target = np.loadtxt(
+            f"{cls.fold_data}/R.real"
+        ).reshape((cls.Bsize, cls.size))
+
+        cls.x_target = pack_params(
+            cls.Lambda_target, cls.R_target
+        )
+
+        cls.Lambda_c = np.loadtxt(f"{cls.fold_data}/lambdac.real")
+        cls.Lambda_c = 0.5 * (
+            cls.Lambda_c + cls.Lambda_c.T.conj()
+        )
+
+        cls.D = np.loadtxt(f"{cls.fold_data}/V.real").reshape(
+            (cls.Bsize, cls.size)
+        )
+
+        # --- Build target hybridization ---
+        H = build_H(
+            cls.Lambda_target,
+            cls.Lambda_c,
+            cls.D,
+            cls.R_target,
+        )
+
+        Delta_target = F_of_H(H, cls.beta)
+
+        cls.D11_target = Delta_target[:cls.Bsize, :cls.Bsize]
+        cls.D22_target = Delta_target[cls.Bsize:, cls.Bsize:]
+        D12_target = Delta_target[:cls.Bsize, cls.Bsize:]
+        cls.RTD12_target = cls.R_target.T @ D12_target
+
+    # ------------------------------------------------------------------
+    # Test: reference point is exact root
+    # ------------------------------------------------------------------
+    def test_reference_residual_is_zero(self):
+        residual0 = residual_LR(
+            self.x_target,
+            self.beta,
+            self.Lambda_c,
+            self.D,
+            self.D22_target,
+            self.RTD12_target,
+        )
+
+        tot_res = np.sum(np.abs(residual0))
+
+        self.assertLess(
+            tot_res,
+            1e-10,
+            msg=f"Residual at target point should be zero, got {tot_res:.3e}",
+        )
+
+        print("[OK] Reference solution is an exact root")
+
+    # ------------------------------------------------------------------
+    # Utility: noisy initial condition
+    # ------------------------------------------------------------------
+    def make_noisy_start(self):
+        np.random.seed(123)
+
+        Lambda_0 = 2.0 * (
+            np.random.rand(self.Bsize, self.Bsize) - 0.5
+            + 1j * (np.random.rand(self.Bsize, self.Bsize) - 0.5)
+        )
+        Lambda_0 = 0.5 * (Lambda_0 + Lambda_0.T.conj())
+
+        R_0 = 2.0 * (
+            np.random.rand(self.Bsize, self.size) - 0.5
+            + 1j * (np.random.rand(self.Bsize, self.size) - 0.5)
+        )
+
+        Lambda_0 = self.Lambda_target + self.noise * Lambda_0
+        R_0 = self.R_target + self.noise * R_0
+
+        return Lambda_0, R_0
+
+    # ------------------------------------------------------------------
+    # Test: solver without derivatives
+    # ------------------------------------------------------------------
+    def test_solver_without_derivatives(self):
+        Lambda_0, R_0 = self.make_noisy_start()
+
+        t0 = time.time()
+        Lam_sol, R_sol = new_self_energy(
+            Lambda_0,
+            R_0,
+            self.Lambda_c,
+            self.D,
+            self.D22_target,
+            self.RTD12_target,
+            beta=self.beta,
+            method="F",
+        )
+        t1 = time.time()
+
+        x_sol = pack_params(Lam_sol, R_sol)
+        res = residual_LR(
+            x_sol,
+            self.beta,
+            self.Lambda_c,
+            self.D,
+            self.D22_target,
+            self.RTD12_target,
+        )
+
+        res_norm = np.sum(np.abs(res))
+        self.assertLess(res_norm, 1e-5)
+
+        # Gauge-invariant comparison
+        Lg_trg, Ut = np.linalg.eigh(self.Lambda_target)
+        Lg_sol, Us = np.linalg.eigh(Lam_sol)
+        Rg_trg = np.abs(Ut.T.conj() @ self.R_target)
+        Rg_sol = np.abs(Us.T.conj() @ R_sol)
+
+        error = (
+            np.sum(np.abs(Rg_trg - Rg_sol))
+            + np.sum(np.abs(Lg_sol - Lg_trg))
+        )
+
+        self.assertLess(error, 1e-5)
+
+        print(
+            f"[OK] Solver without derivatives converged "
+            f"(time={t1-t0:.2f}s, error={error:.2e})"
+        )
+
+    # ------------------------------------------------------------------
+    # Test: solver with derivatives
+    # ------------------------------------------------------------------
+    def test_solver_with_derivatives(self):
+        Lambda_0, R_0 = self.make_noisy_start()
+
+        t0 = time.time()
+        Lam_sol, R_sol = new_self_energy(
+            Lambda_0,
+            R_0,
+            self.Lambda_c,
+            self.D,
+            self.D22_target,
+            self.RTD12_target,
+            beta=self.beta,
+            method="dF",
+        )
+        t1 = time.time()
+
+        x_sol = pack_params(Lam_sol, R_sol)
+        res = residual_LR(
+            x_sol,
+            self.beta,
+            self.Lambda_c,
+            self.D,
+            self.D22_target,
+            self.RTD12_target,
+        )
+
+        res_norm = np.sum(np.abs(res))
+        self.assertLess(res_norm, 1e-5)
+
+        Lg_trg, Ut = np.linalg.eigh(self.Lambda_target)
+        Lg_sol, Us = np.linalg.eigh(Lam_sol)
+        Rg_trg = np.abs(Ut.T.conj() @ self.R_target)
+        Rg_sol = np.abs(Us.T.conj() @ R_sol)
+
+        error = (
+            np.sum(np.abs(Rg_trg - Rg_sol))
+            + np.sum(np.abs(Lg_sol - Lg_trg))
+        )
+
+        self.assertLess(error, 1e-6)
+
+        print(
+            f"[OK] Solver with derivatives converged "
+            f"(time={t1-t0:.2f}s, error={error:.2e})"
+        )
 
 
-D11_target=Delta_target[:Bsize,:Bsize]
-D22_target=Delta_target[Bsize:,Bsize:]
-D12_target=Delta_target[:Bsize,Bsize:]
-RTD12_target = R_target.T@D12_target
-
-print("D11_target:",D11_target.real)
-print("D22_target:",D22_target.real)
-
-#in principle zero:
-residual0 = residual_LR(x_target, beta, Lambda_c, D, D22_target, RTD12_target)
-jacobian0 = jacobian_LR(x_target, beta, Lambda_c, D, D22_target, RTD12_target)
-tot_res0 = np.sum(np.abs(residual0))
-if(tot_res0>1e-10):
-    raise ValueError(f"The residual of the starting point should be zero while it is:{tot_res0}")
-
-
-Lambda_0 = 2.0*(-0.5+np.random.rand(Bsize,Bsize)) + 2j*(-0.5+np.random.rand(Bsize,Bsize))
-Lambda_0=0.5*(Lambda_0 + Lambda_0.T.conj() )
-R_0 = 2.0*(np.random.rand(Bsize,size)-0.5 +1j*np.random.rand(Bsize,size)-0.5*1j)
-
-Lambda_0 = Lambda_target +noise*Lambda_0
-R_0      = R_target +noise*R_0
-mu_0     = mu_target+noise*(np.random.rand()-0.5)
-
-print("Starting from:")
-print(Lambda_0)
-print(R_0)
-start_x = pack_params(Lambda_0, R_0,mu_0)
-start_residual = residual_LR(start_x, beta, Lambda_c, D, D22_target, RTD12_target)
-print("Starting residual:",np.sum(np.abs(start_residual)))
-
-
-print(" --- TESTING ROOT WITHOUT DERIVATIVES ---")
-in_time=time.time()
-Lam_sol, R_sol, mu_sol = new_self_energy(mu_0, Lambda_0,R_0, Lambda_c,D, D22_target,RTD12_target, beta=beta, method="F")
-fin_time=time.time()
-noder_time=fin_time-in_time
-x_fonly=pack_params(Lam_sol,R_sol,mu_sol)
-Fonly_residual=residual_LR(x_fonly,beta,Lambda_c,D,D22_target,RTD12_target)
-print("F only residual:",np.sum(np.abs(Fonly_residual)))
-
-H_sol = build_H(Lam_sol, Lambda_c, D, R_sol,mu_sol)
-Delta_sol = F_of_H(H_sol, beta)
-D11_sol=Delta_sol[:Bsize,:Bsize]
-D12_sol=Delta_sol[:Bsize,Bsize:]
-D22_sol=Delta_sol[Bsize:,Bsize:]
-
-print("Final flling:",np.sum(np.diag(Delta_sol)))
-print("")
-print("Without derivatives in ",noder_time,"s")
-print("Distance in R :", np.sum(np.abs(R_target-R_sol)))
-print("Distance in Lambda:", np.sum(np.abs(Lambda_target-Lam_sol)))
-Lg_trg, Ut = np.linalg.eigh(Lambda_target)
-Lg_sol, Us = np.linalg.eigh(Lam_sol)
-Rg_trg=np.abs(Ut.T.conj()@R_target)
-Rg_sol=np.abs(Us.T.conj()@R_sol)
-print("Distance in gauge invariant R:",np.sum(np.abs(Rg_trg-Rg_sol)))
-print("Distance in gauge invariant Lambda:", np.sum(np.abs(Lg_sol-Lg_trg)))
-noder_error = np.sum(np.abs(Rg_trg-Rg_sol))+np.sum(np.abs(Lg_sol-Lg_trg))
-print("")
-
-
-
-
-print(" --- TESTING ROOT WITH DERIVATIVES FITTING <bdagb> ---")
-in_time=time.time()
-Lam_sol, R_sol, mu_sol = new_self_energy(mu_0, Lambda_0,R_0, Lambda_c,D, D22_target,RTD12_target, beta=beta, method="dF")
-fin_time=time.time()
-yeder_time=fin_time-in_time
-x_fdf=pack_params(Lam_sol,R_sol,mu_sol)
-Fdf_residual=residual_LR(x_fdf,beta,Lambda_c,D,D22_target,RTD12_target)
-print("F dF residual:",np.sum(np.abs(Fdf_residual)))
-
-H_sol = build_H(Lam_sol, Lambda_c, D, R_sol,mu_sol)
-Delta_sol = F_of_H(H_sol, beta)
-D11_sol = Delta_sol[:Bsize,:Bsize]
-D12_sol = Delta_sol[:Bsize,Bsize:]
-D22_sol = Delta_sol[Bsize:,Bsize:]
-
-#print(np.diag(Delta_sol))
-print("Final filling:",np.sum(np.diag(Delta_sol)))
-print("")
-print("With derivatives in ",yeder_time,"s")
-print("Distance in R :", np.sum(np.abs(R_target-R_sol)))
-print("Distance in Lambda:", np.sum(np.abs(Lambda_target-Lam_sol)))
-Lg_trg, Ut = np.linalg.eigh(Lambda_target)
-Lg_sol, Us = np.linalg.eigh(Lam_sol)
-Rg_trg=np.abs(Ut.T.conj()@R_target)
-Rg_sol=np.abs(Us.T.conj()@R_sol)
-print("Distance in gauge invariant R:",np.sum(np.abs(Rg_trg-Rg_sol)))
-print("Distance in gauge invariant Lambda:", np.sum(np.abs(Lg_sol-Lg_trg)))
-yeder_error = np.sum(np.abs(Rg_trg-Rg_sol))+np.sum(np.abs(Lg_sol-Lg_trg))
-print("")
-print(" --- OVERALL ---")
-print("Time without derivatives:",noder_time,"s - and error:",noder_error)
-print("Time with derivatives:",yeder_time,"s - and error:",yeder_error)
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

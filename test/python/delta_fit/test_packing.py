@@ -1,16 +1,43 @@
+import unittest
 import numpy as np
-from triqs_ghostGA.utility.delta_fit import *
+from triqs_ghostGA.utility.delta_fit import pack_params, unpack_params
 
-m, n = 23,7
-R = np.random.rand( m, n) + 1j*np.random.rand( m, n)
-L = np.random.rand( m, m) + 1j*np.random.rand( m, m)
-L = L + L.T.conj()
-mu = np.random.rand()
 
-x=pack_params(L,R,mu)
+class TestPackUnpackParams(unittest.TestCase):
 
-Lu, Ru, muu = unpack_params(x, m, n)
+    def setUp(self):
+        np.random.seed(1234)
 
-print(np.sum(np.abs(L-Lu)))
-print(np.sum(np.abs(R-Ru)))
-print(np.abs(mu-muu))
+        self.m, self.n = 23, 7
+
+        self.R = np.random.rand(self.m, self.n) + 1j * np.random.rand(self.m, self.n)
+        L = np.random.rand(self.m, self.m) + 1j * np.random.rand(self.m, self.m)
+        self.L = L + L.T.conj()  # Hermitian
+
+    def test_pack_unpack_consistency(self):
+        x = pack_params(self.L, self.R)
+        Lu, Ru = unpack_params(x, self.m, self.n)
+
+        np.testing.assert_allclose(
+            Lu,
+            self.L,
+            atol=1e-12,
+            err_msg="Unpacked L does not match original L"
+        )
+
+        np.testing.assert_allclose(
+            Ru,
+            self.R,
+            atol=1e-12,
+            err_msg="Unpacked R does not match original R"
+        )
+
+        # Success message (printed only if assertions pass)
+        print(
+            f"[OK] test_pack_unpack_consistency "
+            f"(m={self.m}, n={self.n})"
+        )
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
