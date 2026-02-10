@@ -18,11 +18,23 @@ def build_H(Lambda, Lambda_c, D, R):
 # -------------------------------------------------
 def fermi(eps, beta):
     # avoids overflow using where since else is zero
-    return np.where(
-        beta * eps > 0,
-        np.exp(-beta * eps) / (1 + np.exp(-beta * eps)),
-        1 / (1 + np.exp(beta * eps))
-    )
+    #return np.where(
+    #    beta * eps > 0,
+    #    np.exp(-beta * eps) / (1 + np.exp(-beta * eps)),
+    #    1 / (1 + np.exp(beta * eps))
+    #)
+    f=[]
+    for xx in eps*beta:
+        # This one is used to stablize selective Mott, but would lead to suprious OSMT if temperature is too high.
+        #f.append(1./(1+np.exp(500*xx))) 
+        # This one is important to get the correct phase diagram (especially for criyical t2/t1), but not stable in OSMP.
+        if abs(xx)<500:
+            f.append(1./(1+np.exp(xx)))
+        elif xx< -500:
+            f.append(1)
+        elif xx> 500:
+            f.append(0)
+    return np.array(f)
 
 # -------------------------------------------------
 # F(H) via diagonalization
@@ -463,7 +475,7 @@ def solve_F_dF_LR(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target):
     Least_squares() proved to be faster than root()
     '''
     x0 = pack_params(Lambda0, R0)
-    if(True):
+    if(False):
         sol = least_squares(
             residual_LR,
             x0,
@@ -477,14 +489,15 @@ def solve_F_dF_LR(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target):
             loss="linear",
             verbose=1
         )
-    elif(False):
+    elif(True):
         sol = minimize(
                   fun=lambda x: minimize_LR(x, beta, Lambda_c, D, F22_target, RTF12_target),
                   x0=x0,
-                  jac=lambda x: grad_LR(x, beta, Lambda_c, D, F22_target, RTF12_target),
-                  method="L-BFGS-B",
+                  #jac=lambda x: grad_LR(x, beta, Lambda_c, D, F22_target, RTF12_target),
+                  method="BFGS",
                   options={"maxiter": 20000,
                            #"maxcor": 20,
+                           "eps": 1e-13,
                            "ftol": 1e-12,
                            "gtol": 1e-12,
                   }
@@ -554,8 +567,13 @@ def solve_F_dF_LcD(beta, Lambda, R, Lambda_c0, D0, Delta_target, right_target):
               fun=lambda x: minimize_LcD(x, beta, Lambda, R, Delta_target, right_target),
               x0=x0,
               jac=lambda x: grad_LcD(x, beta, Lambda, R, Delta_target, right_target),
-              method="BFGS",
-              options={"gtol": 1e-12, "maxiter": 20000}
+              method="L-BFGS-B", #"L-BFGS-B" "SLSQP" "BFGS",
+              options={"maxiter": 10000,
+                       #"maxcor": 50,
+                       #"maxls": 50,
+                       "ftol": 1e-15,
+                       "eps": 1e-12,
+                       "gtol": 1e-15,}
               )
         print('sol.message=', sol.message)
         print('sol.fun=', sol.fun)

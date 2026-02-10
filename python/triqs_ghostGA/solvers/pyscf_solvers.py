@@ -155,6 +155,7 @@ class Pyscf_dmrg(Pyscf_ccsd):
         self.nbath = nbath
         self.hsize = 2**ntot
         self.maxM = maxM
+        self.type= 'PySCFDMRG'
         print('maxM=',maxM)
         # initialize pyscf solvers
 

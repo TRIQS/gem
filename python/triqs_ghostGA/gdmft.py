@@ -232,6 +232,9 @@ class Gdmft(object):
         elif self.edsolver.type == "PySCFCCSD":
             self.edsolver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor, spin_pen=spin_pen)
 
+        elif self.edsolver.type == "PySCFDMRG":
+            self.edsolver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor, spin_pen=spin_pen)
+
         elif self.edsolver.type == "Block2NSZ":
             self.edsolver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor, spin_pen=spin_pen)
 
@@ -352,6 +355,132 @@ class Gdmft(object):
                 print(Lambda_new[::2,::2])
                 print("Lambda=")
                 print(self.Lambda[::2,::2])
+                print("ffdagger.T")
+                print(ffdagger[::2,::2].T)
+                print(np.linalg.eigh(ffdagger[::2,::2].T)[0])
+                print("Delta_p")
+                print(self.Delta_p[::2,::2])
+                print(np.linalg.eigh(self.Delta_p[::2,::2])[0])
+                print("density matrix=")
+                print(self.denMat[::2,::2])
+                denMat0 = calc_denMat0(self.R, self.Lambda, self.D, self.Lambda_c, beta)
+                print("density matrix 0=")
+                print(denMat0[::2,::2])
+            print("iteration:",it,'diff=',self.diff)
+            if self.diff < tol or it == (itmax-1):
+                print("--------------------- ghost-RISB converged with diff=%g ---------------------"%(self.diff))
+                print("density matrix=")
+                print(self.denMat)
+                self.nfill = np.trace(self.denMat[:self.nimp,:self.nimp])
+                self.docc = []
+                for idx in range(0,self.nimp,2):
+                    self.docc.append(self.edsolver.calc_double_occ(idx))
+                print("double occupancy=", self.docc)
+                break
+
+    def run_dmft_hyb(self, mu=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., silence=True, spin_pen=0.0, sz_pen=0.0, idx=0, num_eig=2, ed_verbose=0, diis=False):
+        """ Run ghost-RISB self-consistency
+
+        :param itmax: Maxiumum iteraction for self-consistency.
+        :type itmax: int
+    
+        :param tol: Tolerence for convergence
+        :type tol: float
+    
+        :param beta: Inverse temperature (equivalent to smearing temperature).
+        :type beta: float
+
+        :param silence: Silence the printing.
+        :type silence: bool
+ 
+        :param spin_pen: Penalty for S2 conservation.
+        :type spin_pen: float
+    
+        :param silence: Orbital index for computing double occupancy.
+        :type idx: int
+
+        """
+        print("mu = ", mu)
+        self.diff = 1e20
+        for it in range(itmax):
+            #print(self.R)
+            # ED solvers
+            self.solve_embedding(mu, num_eig, ed_verbose, spin_pen, sz_pen, beta)
+            #Update R and Update Lambda
+            cdaggerf = self.denMat[:self.nimp,self.nimp:]
+            ffdagger = self.denMat[self.nimp:,self.nimp:]
+            ffdagger = (np.eye(self.nbath,dtype=np.complex128) - ffdagger).T
+            #if not silence:
+            #print("norm(ffdagger.T-Delta_p)=", np.linalg.norm(ffdagger.T-self.Delta_p)) # not necessary in the DMFT algorithm
+            self.Delta_p = ffdagger.T # not necessary in the DMFT algorithm
+            Lambda_new = calc_Lambda(self.R, self.Lambda_c, self.Delta_p, self.D, self.Hfull_list)
+            if not self.soc:
+                Lambda_new = np.kron(Lambda_new[::2,::2],np.eye(2)) # symmetryize
+            #self.rhok_list=calc_rhoks(self.R, self.Lambda, self.eks, 1./beta)
+            #self.Delta_p=calc_Delta_p(self.rhok_list)
+            R_new = np.transpose(cdaggerf.dot(funcMat(self.Delta_p, denR)))
+            if not self.soc:
+                R_new = np.kron(R_new[::2,::2],np.eye(2))# symmetrize
+            self.R = R_new
+            self.Lambda = Lambda_new
+            #R_new, Lambda_new = find_R_Lambda_dmft(self.Lambda, self.R, self.eloc, self.D, self.Lambda_c, self.denMat, self.Hspin_list, beta)#.real #restrict Lambda to real
+#            D11_target=self.denMat[self.nimp:,self.nimp:]
+#            D12_target=self.denMat[:self.nimp,self.nimp:]
+#            if not silence:
+#                print('D11=')
+#                print(D11_target.real)
+#                print('D12=')
+#                print(D12_target.real)
+##            res, Lambda_new, R_new = solve_F_only_LR(beta, self.Lambda_c[::2,::2], self.D[::2,::2], self.Lambda[::2,::2], self.R[::2,::2], D11_target[::2,::2], D12_target[::2,::2])
+#            res, Lambda_new, R_new = solve_F_dF_LR(beta, self.Lambda_c[::2,::2], self.D[::2,::2], self.Lambda[::2,::2], self.R[::2,::2], D11_target[::2,::2], D12_target[::2,::2])
+##            res, Lambda_new, R_new = solve_F_only_jax_minimize(beta, self.Lambda_c[::2,::2], self.D[::2,::2], self.Lambda[::2,::2], self.R[::2,::2], D11_target[::2,::2], D12_target[::2,::2])
+##            res, Lambda_new, R_new = solve_F_dF_jax_minimize(beta, self.Lambda_c[::2,::2], self.D[::2,::2], self.Lambda[::2,::2], self.R[::2,::2], D11_target[::2,::2], D12_target[::2,::2])
+##            res, Lambda_new, R_new = solve_F_only_jax(beta, self.Lambda_c[::2,::2], self.D[::2,::2], self.Lambda[::2,::2], self.R[::2,::2], D11_target[::2,::2], D12_target[::2,::2])
+##            res, Lambda_new, R_new = solve_F_dF_jax(beta, self.Lambda_c[::2,::2], self.D[::2,::2], self.Lambda[::2,::2], self.R[::2,::2], D11_target[::2,::2], D12_target[::2,::2])
+#            self.R = np.kron(R_new, np.eye(2))
+#            self.Lambda = np.kron(Lambda_new, np.eye(2))
+            # compute qp density matrix
+            self.rhok_list=calc_rhoks(self.R, self.Lambda, self.eks, 1./beta)
+            self.Delta_p=calc_Delta_p(self.rhok_list)
+#            D_new=calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
+#            Lambda_c_new=calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list)
+            # fittin approach
+            self.right = calc_right(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
+            sol, Lambda_c_new, D_new = solve_F_dF_LcD(beta, self.Lambda[::2,::2], self.R[::2,::2], self.Lambda_c[::2,::2], self.D[::2,::2], self.Delta_p[::2,::2], self.right[::2,::2])
+            #sol, Lambda_c_new, D_new = solve_F_only_LcD(beta, self.Lambda[::2,::2], self.R[::2,::2], self.Lambda_c[::2,::2], self.D[::2,::2], self.Delta_p[::2,::2], self.right[::2,::2])
+            D_new = np.kron(D_new, np.eye(2))
+            Lambda_c_new = np.kron(Lambda_c_new, np.eye(2))
+            #D_new, Lambda_c_new = find_D_Lambdac_dmft(self.Lambda, self.R, self.eloc, self.D, self.Lambda_c, self.Delta_p, right, self.Hspin_list, beta)
+            if not silence:
+                if not self.soc:
+                    print("Delta_p=")
+                    print(self.Delta_p[::2,::2])
+                    print("D=")
+                    print(self.D[::2,::2])
+                    print("Lambda_c=")
+                    print(self.Lambda_c[::2,::2])
+                else:
+                    print("Delta_p=")
+                    print(self.Delta_p[:,:])
+                    print("D=")
+                    print(self.D[:,:])
+                    print("Lambda_c=")
+                    print(self.Lambda_c[:,:])
+            diff_D = np.abs(self.D-D_new).max()
+            diff_Lambda_c = np.abs(self.Lambda_c-Lambda_c_new).max()
+            self.diff = max(diff_D,diff_Lambda_c)
+            # mixing 
+            self.D = (1.-mix)*np.copy(self.D) + mix*D_new
+            self.Lambda_c = (1.-mix)*np.copy(self.Lambda_c) + mix*Lambda_c_new
+            if not silence:
+                print("D_new=")
+                print(D_new[::2,::2])
+                print("D=")
+                print(self.D[::2,::2])
+                print("Lambda_c_new=")
+                print(Lambda_c_new[::2,::2])
+                print("Lambda_c=")
+                print(self.Lambda_c[::2,::2])
                 print("ffdagger.T")
                 print(ffdagger[::2,::2].T)
                 print(np.linalg.eigh(ffdagger[::2,::2].T)[0])
