@@ -3,8 +3,8 @@
 import unittest
 
 from triqs_ghostGA import LatticeSolver
-from triqs_ghostGA.grisb import *
-from triqs_ghostGA.utility.utils_TH import U_matrix_kanamori
+from triqs_ghostGA.gdmft import *
+from triqs_ghostGA.utility.utilities import U_matrix_kanamori
 from triqs_ghostGA.utility.e_list import EList_SemiCircular
 import numpy as np
 from triqs_ghostGA.solvers.ci import CI
@@ -13,7 +13,7 @@ import os
 
 class test_hemb_ci_1o3(unittest.TestCase):
 
-    def test_grisb_ci(self):
+    def test_gdmft_ci(self):
 
         # 1 orbital with 2 spins, 3 bath per orbital, total 8
         nimp, nbath, ntot = 2, 6, 8
@@ -46,8 +46,8 @@ class test_hemb_ci_1o3(unittest.TestCase):
 
         # test CI solver
         edsolver = CI(ntot, use_Ntot=True,
-                      use_Sz=True, dtype=np.complex128, spin_pen=0.05)
-        grisb = Grisb(ntot, nimp, nbath, eks, eloc, Utensor, R=R0,
+                      use_Sz=True, dtype=np.complex128)
+        grisb = Gdmft(ntot, nimp, nbath, eks, eloc, Utensor, R=R0,
                       Lambda=Lambda0, edsolver=edsolver)
         grisb.run(itmax=30, mix=1, tol=1e-5, beta=500,
                   silence=True)

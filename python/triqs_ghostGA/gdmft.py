@@ -4,12 +4,13 @@ from scipy.optimize import bisect
 import h5py
 import numpy as np
 import numba
-from triqs_ghostGA.utility.utils_TH import denR, denRm1, ddenRm1, realHcombination, inverse_realHcombination, \
-    Hermitian_list, get_blocks, funcMat, calc_nf, dF
-from triqs_ghostGA.DIIS import *
+from triqs_ghostGA.utility.utilities import denR, denRm1, ddenRm1, realHcombination, inverse_realHcombination, \
+    Hermitian_list, funcMat, calc_nf, dF
+from triqs_ghostGA.utility.DIIS import *
 from triqs_ghostGA.utility.delta_fit import * 
 from h5 import *
-from triqs_ghostGA.utility.utils_grisb import calc_rhoks, calc_Delta_p, calc_D, calc_Lambda_c, calc_Lambda_c_new, calc_Lambda
+from triqs_ghostGA.utility.aim_space import calc_Lambda
+from triqs_ghostGA.utility.qp_space import calc_rhoks, calc_D, calc_Lambda_c, calc_Lambda_c_new
 import sys
 import time
 
@@ -19,82 +20,6 @@ def calc_right(R, Lambda, Delta_p, eks, rhoks):
     right=[np.dot( np.dot(eks[x], R.conj().T ), rhoks[x].T ) for x in range(len(rhoks))]
     right=sum(right)/float(len(rhoks))
     return right
-
-def calc_denMat0(R, Lambda, D, Lambda_c, beta):
-    Hbar = np.zeros((Lambda.shape[0]*2,Lambda.shape[1]*2),dtype=Lambda.dtype)
-    Hbar[:Lambda.shape[0],:Lambda.shape[1]] = Lambda
-    Hbar[:Lambda.shape[0],Lambda.shape[1]:] = (D.real.dot(R.T)).T
-    Hbar[Lambda.shape[0]:,:Lambda.shape[1]] = (D.real.dot(R.T)).conj()
-    Hbar[Lambda.shape[0]:,Lambda.shape[1]:] = -Lambda_c.real
-    denMat0 = calc_nf(Hbar,1./beta).T
-    return denMat0
-
-def cost_function_D_Lamc_dmft(x, *args):
-    ''' Cost function for finding D and Lambdac Lambda within DMFT-like algorithm
-    '''
-    Delta_p, right, E, R, Lambda, Hspin_list, beta = args
-    Lambda_c_spin = realHcombination(x[:len(Hspin_list)], Hspin_list)
-    D_spin = x[len(Hspin_list):].reshape((Lambda.shape[0]//2,E.shape[0]//2))
-    Lambda_c = np.kron(Lambda_c_spin,np.eye(2))
-    D = np.kron(D_spin,np.eye(2))
-    denMat0 = calc_denMat0(R, Lambda, D, Lambda_c, beta)
-    #print(Hbar.shape, D.shape, right.shape)
-    diff = np.linalg.norm( ( denMat0[:Lambda.shape[0],:Lambda.shape[0]] - Delta_p ) )
-    diff += np.linalg.norm( ( (denMat0[:Lambda.shape[0],Lambda.shape[0]:].dot(D)).T - right ) )
-    return diff.real
-
-def find_D_Lambdac_dmft(Lambda, R, E, D0, Lambda_c0, Delta_p, right, Hspin_list, beta):
-    """ Find Lambda for given ffdagger
-    """
-    #success = False
-    #while not success:
-    D0_spin = D0[::2,::2].real
-    Lambda_c0_spin = Lambda_c0[::2,::2].real
-    #Lambda0_spin += (fluc + fluc.T)/2
-    x = np.hstack((inverse_realHcombination(Lambda_c0_spin, Hspin_list), D0_spin.flatten()))
-    args = (Delta_p, right, E, R, Lambda, Hspin_list, beta)
-    result = scipy.optimize.minimize( cost_function_D_Lamc_dmft, x, args=args, tol=1e-5, method='BFGS', options={'disp':False, 'eps': 1e-10} )
-    if ( result.success==False ):
-        print("   Minimize mesage ::",result.message)
-    print("   Minimize :: Cost function after convergence =", np.sum(result.fun))#/len(result.fun))
-    success = result.success
-    print('success=',success)
-    Lambda_c = np.kron(realHcombination(result.x[:len(Hspin_list)], Hspin_list),np.eye(2))
-    D = np.kron(result.x[len(Hspin_list):].reshape(D0_spin.shape),np.eye(2))
-    return D.real, Lambda_c.real # restrict to real for testing
-
-def cost_function_R_Lam_dmft(x, *args):
-    ''' Cost function for finding D and Lambdac Lambda within DMFT-like algorithm
-    '''
-    denMat, E, D, Lambda_c, Hspin_list, beta = args
-    Lambda_spin = realHcombination(x[:len(Hspin_list)], Hspin_list)
-    R_spin = x[len(Hspin_list):].reshape((D.shape[0]//2,D.shape[1]//2))
-    Lambda = np.kron(Lambda_spin,np.eye(2))
-    R = np.kron(R_spin,np.eye(2))
-    denMat0 = calc_denMat0(R, Lambda, D, Lambda_c, beta)
-    #print(denMat0.shape, denMat.shape)
-    diff = np.linalg.norm( ( denMat0[Lambda.shape[0]:,Lambda.shape[0]:] - denMat[E.shape[0]:,E.shape[1]:] ) )
-    diff += np.linalg.norm( ( R.T.dot(denMat0[:Lambda.shape[0],Lambda.shape[0]:]) - denMat[:E.shape[0],E.shape[1]:] ) )
-    return diff.real
-
-def find_R_Lambda_dmft(Lambda0, R0, E, D, Lambda_c, denMat, Hspin_list, beta):
-    """ Find Lambda for given ffdagger
-    """
-    #success = False
-    #while not success:
-    R0_spin = R0[::2,::2].real
-    Lambda0_spin = Lambda0[::2,::2].real
-    x = np.hstack((inverse_realHcombination(Lambda0_spin, Hspin_list), R0_spin.flatten()))
-    args = (denMat, E, D, Lambda_c, Hspin_list, beta)
-    result = scipy.optimize.minimize( cost_function_R_Lam_dmft, x, args=args, tol=1e-5, method='BFGS', options={'disp':False, 'eps': 1e-10} )
-    if ( result.success==False ):
-        print("   Minimize mesage ::",result.message)
-    print("   Minimize :: Cost function after convergence =", np.sum(result.fun))#/len(result.fun))
-    success = result.success
-    print('success=',success)
-    Lambda = np.kron(realHcombination(result.x[:len(Hspin_list)], Hspin_list),np.eye(2))
-    R = np.kron(result.x[len(Hspin_list):].reshape(R0_spin.shape),np.eye(2))
-    return R.real, Lambda.real # restrict to real for testing
 
 
 class Gdmft(object):
@@ -267,7 +192,7 @@ class Gdmft(object):
         self.diff = 1e20
         for it in range(itmax):
             self.rhok_list=calc_rhoks(self.R, self.Lambda, self.eks, 1./beta)
-            self.Delta_p=calc_Delta_p(self.rhok_list)
+            self.Delta_p=sum(self.rhok_list)/len(self.rhok_list)
             F11_trg  = self.Delta_p.copy()
             F12D_trg = sum([self.eks[ik] @ self.R.T.conj() @ self.rhok_list[ik].T for ik in range(len(self.eks)) ])/len(self.eks)
             F12D_trg = F12D_trg.T
@@ -387,6 +312,180 @@ class Gdmft(object):
         
 # -------
 
+# Run with linear equations
+
+    def run(self, mu0=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., silence=True, idx=0, num_eig=2, ed_verbose=0, diis=False, nfix=None, dmu=0.1, mu_tol=1e-8, nfix_tol=0.01, spin_pen=0.0, sz_pen=0.0):
+        """ Run ghost-RISB self-consistency
+
+        :param itmax: Maxiumum iteraction for self-consistency.
+        :type itmax: int
+
+        :param tol: Tolerence for convergence
+        :type tol: float
+
+        :param beta: Inverse temperature (equivalent to smearing temperature).
+        :type beta: float
+
+        :param silence: Silence the printing.
+        :type silence: bool
+
+        :param spin_pen: Penalty for S2 conservation.
+        :type spin_pen: float
+
+        :param silence: Orbital index for computing double occupancy.
+        :type idx: int
+
+        """
+
+        print("########## STARTING THE GHOST-GA LOOP ##########")
+
+        self.mu = mu0
+        self.diff = 1e20
+
+        if nfix is not None:
+            print("### Calculation performed in the canonical ensemble, starting with mu=", self.mu)
+
+        if diis is True:
+            #RDIIS = DIIS(7)
+            LDIIS = DIIS(7)
+            numNonDIIS = 4
+        for it in range(itmax):
+            print("### Iteration %d" % it)
+
+            # If number of electron is fixed, recalculate chemical potential to get the right number of electrons
+            if nfix is not None:
+                # Sometimes you want to start from a given chemical potential
+                if it > 1:
+                    # Target number of particle in the embedded space
+                    # TODO: I don't understand this
+                    nfix_qp = (self.nbath - self.nimp)/2 + nfix
+                    # Optimize to find chemical potential mu
+                    self.mu = find_mu(self.mu, self.R, self.Lambda, self.eks, nfix_qp, beta, dmu=dmu, mu_tol=mu_tol)
+
+            # From Lambda and R, calculate Delta_p, D and Lambda_c
+            print("# With Lambda and R, compute Delta_p, D and Lambda_c")
+            self.rhok_list = calc_rhoks(self.R, self.Lambda, self.eks, 1./beta, self.mu)
+            # self.rhok_list = np.real(calc_rhoks(self.R, self.Lambda, self.eks, 1./beta, self.mu))
+            self.Delta_p = sum(self.rhok_list)/len(self.rhok_list)
+            # self.Delta_p = np.real(calc_Delta_p(self.rhok_list))
+            # self.D = np.real(calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list))
+            self.D = calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)    
+            self.Lambda_c = calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list)
+            # self.Lambda_c = np.real(calc_Lambda_c(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list))
+
+            # TODO: Nicer print and options for verbose
+            if not silence:
+                if self.spin_sym:
+                    print("Delta_p=")
+                    print(self.Delta_p[::2,::2])
+                    print("D=")
+                    print(self.D[::2,::2])
+                    print("Lambda_c=")
+                    print(self.Lambda_c[::2,::2])
+                    print()
+                else:
+                    print("Delta_p=")
+                    print(self.Delta_p[:,:])
+                    print("D=")
+                    print(self.D[:,:])
+                    print("Lambda_c=")
+                    print(self.Lambda_c[:,:])
+                    print()
+            sys.stdout.flush()
+
+            # With Lambda, R, Delta_p, D and Lambda_c, we have constructed the embedding Hamiltonian.
+            # We now solve with the solver passed as an argument.
+            print()
+            print("# Solving the embedding Hamiltonian:")
+            self.solve_embedding(self.mu, num_eig, ed_verbose, spin_pen, sz_pen, beta=beta)
+
+            # Extract relevant quantities from the density matrix, such as Delta_p
+            cdaggerf = self.denMat[:self.nimp,self.nimp:]
+            ffdagger = self.denMat[self.nimp:,self.nimp:]
+            ffdagger = (np.eye(self.nbath,dtype=np.complex128) - ffdagger).T
+            if not silence:
+                # Compare previous Delta_p with new
+                print("norm(ffdagger.T-Delta_p)=", np.linalg.norm(ffdagger.T-self.Delta_p))
+                print("new Delta_p =")
+                print(ffdagger.T)
+                print()
+            self.Delta_p = ffdagger.T
+            # self.Delta_p = np.real(ffdagger.T)
+
+            # TODO: Separate function
+            r"""Calculate R matrix, where the element are given by
+
+            .. math:
+                R_{b\alpha} = \sum_a \langle \Phi | c^\dagger_\alpha f_a | \Phi \rangle \left[ \Delta ( 1 - \Delta ) \right]^{-1/2}_{ad}
+            """
+            R_new = np.transpose(cdaggerf.dot(funcMat(self.Delta_p, denR)))
+            if self.spin_sym:
+                R_new = np.kron(R_new[::2,::2],np.eye(2))# symmetrize
+            Lambda_new = calc_Lambda(R_new, self.Lambda_c, self.Delta_p, self.D, self.Hfull_list)
+            if self.spin_sym:
+                Lambda_new = np.kron(Lambda_new[::2,::2],np.eye(2)) # symmetryize
+
+            # Calculate difference of R and Lambda from prior iteration and check convergence
+            # and apply mixing if required
+            diff_R = np.abs(self.R-R_new).max()
+            diff_Lambda = np.abs(self.Lambda-Lambda_new).max()
+            self.diff = max(diff_R,diff_Lambda)
+            if diis and ( it >= numNonDIIS ):
+                error = Lambda_new - self.Lambda
+                error = np.reshape( error, error.shape[0]*error.shape[1] )
+                LDIIS.append( error, Lambda_new )
+                self.R = R_new#RDIIS.Solve()
+                self.Lambda = LDIIS.Solve()
+            else:
+                self.R = (1.-mix)*np.copy(self.R) + mix*R_new
+                self.Lambda = (1.-mix)*np.copy(self.Lambda) + mix*Lambda_new
+
+
+            if not silence:
+                print("R_new=")
+                print(R_new)
+                print("R=")
+                print(self.R)
+                print("Lambda_new=")
+                print(Lambda_new)
+                print("Lambda=")
+                print(self.Lambda)
+                print("ffdagger.T")
+                print(ffdagger.T)
+                print("density matrix=")
+                print(self.denMat)
+                print()
+
+            if nfix is not None:
+                # occ = occupation_vs_mu(self.mu, self.R, self.Lambda, self.eks, beta)
+                occ = np.trace(self.denMat[:self.nimp, :self.nimp])
+                print(self.denMat[:self.nimp, :self.nimp])
+                print("# New occupation : ", occ, ", nfix : ", nfix)
+                print()
+
+            print("# iteration:",it,'diff=',self.diff)
+            print()
+
+            # TODO: Add other criteria for convergence, example total energy
+            if self.diff < tol or it == (itmax-1):
+                if nfix is None or (nfix is not None and (occ - nfix < nfix_tol)):
+                    print("--------------------- ghost-RISB converged with diff=%g ---------------------"%(self.diff))
+                    print("density matrix=")
+                    print(self.denMat)
+                    self.nfill = np.trace(self.denMat[:self.nimp,:self.nimp])
+                    self.docc = []
+                    for idx in range(0,self.nimp,2):
+                        self.docc.append(self.edsolver.calc_double_occ(idx))
+                    print("double occupancy=", self.docc)
+                    break
+
+
+
+
+
+
+# ----
+
     def run_dmft(self, mu=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., n_target=None, silence=True, spin_pen=0.0, sz_pen=0.0, idx=0, num_eig=2, ed_verbose=0, diis=False, method='minimize'):
         """ Run ghost-RISB self-consistency
 
@@ -418,8 +517,8 @@ class Gdmft(object):
             #print(self.R)
             # compute qp density matrix
             self.rhok_list=calc_rhoks(self.R, self.Lambda, self.eks, 1./beta)
-            self.Delta_p=calc_Delta_p(self.rhok_list)
-            
+            self.Delta_p=sum(self.rhok_list)/len(self.rhok_list)
+
             dvals,dvecs = np.linalg.eigh(self.Delta_p)
             print('dqp vals:',dvals)
             self.D=calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
@@ -606,7 +705,7 @@ class Gdmft(object):
             mu_diag =  np.eye(R.shape[-1])*mu
             Lambda_tmp = Lambda + R @ mu_diag @ R.T.conj()
             rhoks = calc_rhoks(R,Lambda_tmp,eks,1/beta)
-            Delta = calc_Delta_p(rhoks)
+            Delta = sum(rhoks)/len(rhoks)
             return np.trace(Delta)-dens_qp_2f
         
         if( n_target<=0.0 or n_target>=self.nimp ): raise ValueError("Wrong n_target")
