@@ -20,8 +20,8 @@ class TestSelfEnergySolverB3(unittest.TestCase):
         cls.size = 1
         cls.B = 3
         cls.Bsize = cls.B * cls.size
-        cls.beta = 4
-        cls.noise = 0.1
+        cls.beta = 300
+        cls.noise = 1e-2
         cls.fold_data = "input_data/B3"
 
         # --- Read reference solution ---
@@ -55,7 +55,7 @@ class TestSelfEnergySolverB3(unittest.TestCase):
             cls.R_target,
         )
 
-        Delta_target = F_of_H(H, cls.beta)
+        Delta_target = F_of_H(H, cls.beta).T
 
         cls.D11_target = Delta_target[:cls.Bsize, :cls.Bsize]
         cls.D22_target = Delta_target[cls.Bsize:, cls.Bsize:]

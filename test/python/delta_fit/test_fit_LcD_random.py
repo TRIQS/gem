@@ -1,6 +1,4 @@
 import unittest
-from pathlib import Path
-
 import numpy as np
 
 from triqs_ghostGA.utility.delta_fit import (
@@ -18,31 +16,37 @@ B = 3
 Bsize = int(B * size)
 beta = 300.0
 noise = 1e-3
-data_dir = Path("input_data") / "B3"
 
 
-class TestFitLcDB3(unittest.TestCase):
+def random_hermitian(n: int, rng: np.random.Generator, scale: float = 1.0) -> np.ndarray:
+    """Random complex Hermitian matrix of shape (n, n)."""
+    A = (rng.standard_normal((n, n)) + 1j * rng.standard_normal((n, n))) * scale + np.diag(np.linspace(-1.5,1.5,B,endpoint=True))
+    return 0.5 * (A + A.T.conj())
 
-    @classmethod
-    def setUpClass(cls):
-        if not data_dir.exists():
-            raise unittest.SkipTest(f"Missing test data directory: {data_dir}")
 
+def random_complex(shape, rng: np.random.Generator, scale: float = 1.0) -> np.ndarray:
+    """Random complex array."""
+    return (rng.standard_normal(shape) + 1j * rng.standard_normal(shape)) * scale
+
+
+class TestFitLcDB3_random_generated(unittest.TestCase):
     def setUp(self):
-        np.random.seed(4201)
+        rng = np.random.default_rng(4201)
 
-        # --- Read reference solution (B=3, Norb=1) ---
-        self.L = np.loadtxt(data_dir / "lambda.real")
-        self.L = 0.5 * (self.L + self.L.T.conj())
+        # --- Generate a random consistent target problem ---
+        # Lambda (Hermitian B*size x B*size)
+        self.L = random_hermitian(Bsize, rng, scale=1.0)
 
-        self.R = np.loadtxt(data_dir / "R.real").reshape((B, size))
+        # Lambda_c target (Hermitian B*size x B*size)
+        self.Lc_trg = random_hermitian(Bsize, rng, scale=0.7)
 
-        self.Lc_trg = np.loadtxt(data_dir / "lambdac.real")
-        self.Lc_trg = 0.5 * (self.Lc_trg + self.Lc_trg.T.conj())
+        # R (complex B x size) -> for size=1, Bx1
+        self.R = random_complex((B, size), rng, scale=1.0)
 
-        self.D_trg = np.loadtxt(data_dir / "V.real").reshape((B, size))
+        # D target (complex B*size x size) -> for size=1, Bx1
+        self.D_trg = random_complex((Bsize, size), rng, scale=0.8)
 
-        # --- Build targets ---
+        # --- Build targets F11 and F12D from the target parameters ---
         H = build_H(self.L, self.Lc_trg, self.D_trg, self.R)
         Delta_trg = F_of_H(H, beta).T
 
@@ -63,10 +67,10 @@ class TestFitLcDB3(unittest.TestCase):
         return np.sum(np.abs(Dg_trg - Dg_sol)) + np.sum(np.abs(eig_sol - eig_trg))
 
     def _perturb_initial_guess(self):
-        Lc_pert = 2.0 * (-0.5 + np.random.rand(Bsize, Bsize)) + 2j * (-0.5 + np.random.rand(Bsize, Bsize))
-        Lc_pert = 0.5 * (Lc_pert + Lc_pert.T.conj())
+        rng = np.random.default_rng(12345)
 
-        D_pert = 2.0 * (np.random.rand(Bsize, size) - 0.5) + 2j * (np.random.rand(Bsize, size) - 0.5)
+        Lc_pert = random_hermitian(Bsize, rng, scale=1.0)
+        D_pert = random_complex((Bsize, size), rng, scale=1.0)
 
         Lc_0 = self.Lc_trg + noise * Lc_pert
         D_0 = self.D_trg + noise * D_pert
@@ -108,6 +112,7 @@ class TestFitLcDB3(unittest.TestCase):
             msg="Residual should be small after root finding (method='F')",
         )
 
+        # Gauge-invariant closeness (may need slight loosening depending on conditioning)
         self.assertLess(
             float(self._gauge_invariant_error(Lc_sol, D_sol)),
             5e-6,
