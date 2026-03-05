@@ -260,6 +260,133 @@ class Gdmft(object):
         self.epot = self.E2loc + np.trace(self.eloc.dot(self.denMat[:self.nimp,:self.nimp].T))
         self.etot = self.ekin + self.epot - mu*self.nfill
 
+# THIS FOR TEMP
+    def run_double_fit(self, mu=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., n_target=None, silence=True, spin_pen=0.0, sz_pen=0.0, idx=0, num_eig=2, ed_verbose=0, diis=False, fit_method='dF'):
+
+        print("mu = ", mu)
+        self.diff = 1e20
+        for it in range(itmax):
+            self.rhok_list=calc_rhoks(self.R, self.Lambda, self.eks, 1./beta)
+            self.Delta_p=calc_Delta_p(self.rhok_list)
+            F11_trg  = self.Delta_p.copy()
+            F12D_trg = sum([self.eks[ik] @ self.R.T.conj() @ self.rhok_list[ik].T for ik in range(len(self.eks)) ])/len(self.eks)
+            F12D_trg = F12D_trg.T
+            print('F11_target:',F11_trg)
+            print('F12D_trg:', F12D_trg)
+            Lc_sol, D_sol = new_hybridization(self.Lambda_c, self.D, self.Lambda, self.R, F11_trg, F12D_trg, beta=beta, method=fit_method)
+            self.Lambda_c=Lc_sol
+            self.D=D_sol
+            
+            
+            #self.D=calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
+            #self.Lambda_c=calc_Lambda_c_new(self.R, self.Lambda, self.Delta_p, self.D, self.Hfull_list)
+            if(False):
+                lcvals,lcvecs = np.linalg.eigh(self.Lambda_c[::2,::2])
+                print('lcvals:',lcvals)
+                print(lcvecs.shape)
+                lcvals=0.5*(lcvals-lcvals[::-1])
+                self.Lambda_c =  np.kron( lcvecs @ np.diag(lcvals) @ lcvecs.T.conj() , np.eye(2) )
+                self.D = np.abs(lcvecs.T.conj() @ self.D[::2,::2])
+                self.D =  0.5*(self.D+self.D[::-1,::-1])
+                self.D = np.kron( lcvecs @ self.D , np.eye(2) )
+                time.sleep(1)
+            #right = calc_right(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list)
+            #self.D, self.Lambda_c = find_D_Lambdac_dmft(self.Lambda, self.R, self.eloc, self.D, self.Lambda_c, self.Delta_p, right,self.Hspin_list, beta)
+            if not silence:
+                if not self.soc:
+                    print("Delta_p=")
+                    print(self.Delta_p[::2,::2])
+                    print("D=")
+                    print(self.D[::2,::2])
+                    print("Lambda_c=")
+                    print(self.Lambda_c[::2,::2])
+                else:
+                    print("Delta_p=")
+                    print(self.Delta_p[:,:])
+                    print("D=")
+                    print(self.D[:,:])
+                    print("Lambda_c=")
+                    print(self.Lambda_c[:,:])
+            # ED solvers
+            self.solve_embedding(mu, num_eig, ed_verbose, spin_pen, sz_pen, beta=beta)
+            #Update R and Update Lambda
+            
+            self.nfill = np.trace(self.denMat[:self.nimp,:self.nimp])
+            print("||||||||||||||||||| n_filling:",self.nfill)
+            F22_target=self.denMat[self.nimp:,self.nimp:]
+            RTF12_target=self.denMat[:self.nimp,self.nimp:]
+            print("F22:",F22_target)
+            print("RTF12 :",RTF12_target)
+            print("|||||||||||||||||||||||||||||n_tot:",np.trace(self.denMat))
+
+#            Lambda_new, R_new = new_self_energy_penalty(self.Lambda[::2,::2],self.R[::2,::2],self.Lambda_c[::2,::2],self.D[::2,::2], F22_target[::2,::2],RTF12_target[::2,::2], beta=beta)
+
+            Lambda_new, R_new = new_self_energy(self.Lambda[::2,::2],self.R[::2,::2],self.Lambda_c[::2,::2],self.D[::2,::2], F22_target[::2,::2],RTF12_target[::2,::2], beta=beta, method=fit_method)
+
+
+            L_eval_new, UL_new = np.linalg.eigh(Lambda_new)
+            L_eval_old, UL_old = np.linalg.eigh(self.Lambda[::2,::2])
+            if(False):
+                L_eval_new = 0.5*(L_eval_new - L_eval_new[::-1])
+                R_new = np.abs(UL_new.T.conj()@R_new)
+                R_new = 0.5*(R_new+R_new[::-1,::-1])
+                Lambda_new =  np.diag(L_eval_new)
+            diff_R = np.abs(UL_old@self.R[::2,::2]-UL_new@R_new).max()
+
+            R_new = np.kron(R_new, np.eye(2))
+            Lambda_new = np.kron(Lambda_new, np.eye(2))
+
+            diff_Lambda = np.abs(L_eval_new-L_eval_old).max()
+            print('lambda_evals:',L_eval_new)
+            print('diff_R:',diff_R)
+            print('diff_L:',diff_Lambda)
+            time.sleep(1)
+            self.diff = max(diff_R,diff_Lambda)
+            # mixing 
+            self.R = (1.-mix)*np.copy(self.R) + mix*R_new
+            self.Lambda = (1.-mix)*np.copy(self.Lambda) + mix*Lambda_new
+            convg_n=True
+            if( (not (n_target is None)) and it>1):
+                print("CHECK DENSITY")
+                if( abs(self.nfill-n_target)>1e-2):
+                    convg_n=False
+                if( abs(self.nfill-n_target)>1e-3):
+                    self.find_mu_qp(n_target,beta)
+            if not silence:
+                #print("R_new=")
+                #print(R_new)
+                print("R=")
+                print(self.R[::2,::2])
+                print("Lambda_new=")
+                print(Lambda_new[::2,::2])
+                print("Lambda=")
+                print(self.Lambda[::2,::2])
+                print("Delta_p")
+                print(self.Delta_p[::2,::2])
+                print(np.linalg.eigh(self.Delta_p[::2,::2])[0])
+                print("density matrix=")
+                print(self.denMat[::2,::2])
+                denMat0 = calc_denMat0(self.R, self.Lambda, self.D, self.Lambda_c, beta)
+                print("density matrix 0=")
+                print(denMat0[::2,::2])
+            print("iteration:",it,'diff=',self.diff)
+            if (self.diff < tol and it>1) or it == (itmax-1):
+                print("--------------------- ghost-RISB converged with diff=%g ---------------------"%(self.diff))
+                print("density matrix=")
+                print(self.denMat)
+                self.nfill = np.trace(self.denMat[:self.nimp,:self.nimp])
+                self.docc = []
+                for idx in range(0,self.nimp,2):
+                    self.docc.append(self.edsolver.calc_double_occ(idx))
+                print("double occupancy=", self.docc)
+                print("convg_n",convg_n)
+                print('lambda eigvals',np.linalg.eigvalsh(self.Lambda))
+                break
+
+
+        
+# -------
+
     def run_dmft(self, mu=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., n_target=None, silence=True, spin_pen=0.0, sz_pen=0.0, idx=0, num_eig=2, ed_verbose=0, diis=False, method='minimize'):
         """ Run ghost-RISB self-consistency
 
