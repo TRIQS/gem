@@ -475,30 +475,43 @@ def solve_F_dF_LR(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target):
     Least_squares() proved to be faster than root()
     '''
     x0 = pack_params(Lambda0, R0)
+    #print('x0=',x0)
+    #print('beta=',beta)
+    #print('Lambda_c=')
+    #print(Lambda_c)
+    #print('D=')
+    #print(D)
+    #print('F22_target=')
+    #print(F22_target)
+    #print('RTF12_target=')
+    #print(RTF12_target)
+    #print(residual_LR(x0,beta, Lambda_c, D, F22_target, RTF12_target))
+    #quit()
     if(False):
         sol = least_squares(
             residual_LR,
             x0,
             jac=jacobian_LR,
+            #jac="2-point",
+            #x_scale='jac',
             args=(beta, Lambda_c, D, F22_target, RTF12_target),
-            method="trf",
-            max_nfev=5000,
-            ftol=1e-12,
-            xtol=1e-12,
-            gtol=1e-12,
-            loss="linear",
-            verbose=1
+            method="trf", # Change from 'hybr' to 'lm'
+            x_scale="jac", # should help
+            max_nfev=100,
+            ftol=1e-9,
+            xtol=1e-9,
+            verbose=2
         )
     elif(True):
         sol = minimize(
                   fun=lambda x: minimize_LR(x, beta, Lambda_c, D, F22_target, RTF12_target),
                   x0=x0,
-                  #jac=lambda x: grad_LR(x, beta, Lambda_c, D, F22_target, RTF12_target),
-                  method="BFGS",
+                  jac=lambda x: grad_LR(x, beta, Lambda_c, D, F22_target, RTF12_target),
+                  method="BFGS",#"BFGS",
                   options={"maxiter": 20000,
                            #"maxcor": 20,
-                           "eps": 1e-13,
-                           "ftol": 1e-12,
+                           #"ftol": 1e-12,
+                           "eps": 1e-12,
                            "gtol": 1e-12,
                   }
               )
@@ -511,7 +524,7 @@ def solve_F_dF_LR(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target):
             jac=jacobian_LR,
             args=(beta, Lambda_c, D, F22_target, RTF12_target),
             method="lm", # Change from 'hybr' to 'lm'
-            options={'ftol': 1e-9, 'xtol': 1e-9}
+            options={'eps': 1e-9, 'factor': 0.5, 'xtol': 1e-9}
         )
         print('sol.success=', sol.success)
         print('sol.fun=', sol.fun)
@@ -553,27 +566,28 @@ def solve_F_dF_LcD(beta, Lambda, R, Lambda_c0, D0, Delta_target, right_target):
             residual_LcD,
             x0,
             jac=jacobian_LcD,
+            #jac='2-point',
             args=(beta, Lambda, R, Delta_target, right_target),
             method="trf", # Change from 'hybr' to 'lm'
-            max_nfev=5000,
-            ftol=1e-12,
-            xtol=1e-12,
-            gtol=1e-12,
-            loss="linear",
-            verbose=1
+            x_scale="jac", # should help
+            max_nfev=100,
+            ftol=1e-9,
+            xtol=1e-9,
+            verbose=2
         )
     elif(True):
         sol = minimize(
               fun=lambda x: minimize_LcD(x, beta, Lambda, R, Delta_target, right_target),
               x0=x0,
               jac=lambda x: grad_LcD(x, beta, Lambda, R, Delta_target, right_target),
-              method="L-BFGS-B", #"L-BFGS-B" "SLSQP" "BFGS",
-              options={"maxiter": 10000,
-                       #"maxcor": 50,
-                       #"maxls": 50,
-                       "ftol": 1e-15,
+              method="BFGS", # BFGS, SLSQP, L-BFGS-B
+              options={"maxiter": 5000,
+                       #"maxcor": 20,
+                       #"ftol": 1e-12,
                        "eps": 1e-12,
-                       "gtol": 1e-15,}
+                       "gtol": 1e-12,
+              }
+
               )
         print('sol.message=', sol.message)
         print('sol.fun=', sol.fun)

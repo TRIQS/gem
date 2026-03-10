@@ -223,6 +223,9 @@ class Gdmft(object):
             h1e = self.build_h1e(mu)
             self.edsolver.build_Hemb(h1e, self.Utensor, spin_pen=spin_pen, sz_pen=sz_pen)
 
+        elif self.edsolver.type == "Fed":
+            self.edsolver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor, spin_pen=spin_pen)
+
         elif self.edsolver.type == "FTPS":
             self.edsolver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor, spin_pen=spin_pen)
 
@@ -244,8 +247,12 @@ class Gdmft(object):
             # Solver(AbstractSolver)
 
         self.edsolver.solve_Hemb(num_eig=num_eig, verbose=ed_verbose )
-        self.denMat = self.edsolver.calc_density_matrix()
-        self.E2loc = self.edsolver.compute_E2loc()
+        if self.edsolver.type == "Fed":
+            self.denMat = self.edsolver.calc_density_matrix(1./beta)
+            self.E2loc = self.edsolver.compute_E2loc(1./beta)
+        else:
+            self.denMat = self.edsolver.calc_density_matrix()
+            self.E2loc = self.edsolver.compute_E2loc()
 
     def compute_energy(self,beta=200.,mu=0.0):
         """ Compute total energy, kinetic energy, and potential energy
