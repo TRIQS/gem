@@ -261,7 +261,7 @@ class Gdmft(object):
         self.etot = self.ekin + self.epot - mu*self.nfill
 
 # THIS FOR TEMP
-    def run_double_fit(self, mu=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., n_target=None, silence=True, spin_pen=0.0, sz_pen=0.0, idx=0, num_eig=2, ed_verbose=0, diis=False, fit_method='dF'):
+    def run_double_fit(self, mu=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., n_target=None, silence=True, spin_pen=0.0, sz_pen=0.0, idx=0, num_eig=2, ed_verbose=0, diis=False, fit_method='dF',move_penalty=1e-5):
 
         print("mu = ", mu)
         self.diff = 1e20
@@ -273,7 +273,10 @@ class Gdmft(object):
             F12D_trg = F12D_trg.T
             print('F11_target:',F11_trg)
             print('F12D_trg:', F12D_trg)
-            Lc_sol, D_sol = new_hybridization(self.Lambda_c, self.D, self.Lambda, self.R, F11_trg, F12D_trg, beta=beta, method=fit_method)
+            if(move_penalty>0.0):
+                Lc_sol, D_sol = new_hybridization_movement(self.Lambda_c, self.D, self.Lambda, self.R, F11_trg, F12D_trg, beta=beta, method=fit_method,alpha=move_penalty)
+            else:
+                Lc_sol, D_sol = new_hybridization(self.Lambda_c, self.D, self.Lambda, self.R, F11_trg, F12D_trg, beta=beta, method=fit_method)
             self.Lambda_c=Lc_sol
             self.D=D_sol
             
@@ -310,7 +313,7 @@ class Gdmft(object):
             # ED solvers
             self.solve_embedding(mu, num_eig, ed_verbose, spin_pen, sz_pen, beta=beta)
             #Update R and Update Lambda
-            
+
             self.nfill = np.trace(self.denMat[:self.nimp,:self.nimp])
             print("||||||||||||||||||| n_filling:",self.nfill)
             F22_target=self.denMat[self.nimp:,self.nimp:]
@@ -319,9 +322,10 @@ class Gdmft(object):
             print("RTF12 :",RTF12_target)
             print("|||||||||||||||||||||||||||||n_tot:",np.trace(self.denMat))
 
-#            Lambda_new, R_new = new_self_energy_penalty(self.Lambda[::2,::2],self.R[::2,::2],self.Lambda_c[::2,::2],self.D[::2,::2], F22_target[::2,::2],RTF12_target[::2,::2], beta=beta)
-
-            Lambda_new, R_new = new_self_energy(self.Lambda[::2,::2],self.R[::2,::2],self.Lambda_c[::2,::2],self.D[::2,::2], F22_target[::2,::2],RTF12_target[::2,::2], beta=beta, method=fit_method)
+            if(move_penalty):
+                Lambda_new, R_new = new_self_energy_movement(self.Lambda[::2,::2],self.R[::2,::2],self.Lambda_c[::2,::2],self.D[::2,::2], F22_target[::2,::2],RTF12_target[::2,::2], beta=beta, method=fit_method,alpha=move_penalty)
+            else:
+                Lambda_new, R_new = new_self_energy(self.Lambda[::2,::2],self.R[::2,::2],self.Lambda_c[::2,::2],self.D[::2,::2], F22_target[::2,::2],RTF12_target[::2,::2], beta=beta, method=fit_method)
 
 
             L_eval_new, UL_new = np.linalg.eigh(Lambda_new)
