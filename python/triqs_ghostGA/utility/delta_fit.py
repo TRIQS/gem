@@ -477,6 +477,148 @@ def solve_F_dF_minimize(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target
 
 
 
+# In the following penalty from moving away from previous solution
+
+# ---------- Movement-penalized residuals / jacobians for Lambda+R -----------
+def residual_LR_movement(x, beta, Lambda_c, D, F22_target, RTF12_target, x0, alpha=1e-5):
+    """Original residuals + movement-penalty residuals sqrt(2*alpha)*(x-x0)."""
+    r = residual_LR(x, beta, Lambda_c, D, F22_target, RTF12_target)
+    # movement residuals
+    if alpha <= 0.0:
+        return r
+    factor = np.sqrt(2.0 * alpha)
+    r_move = factor * (x - x0)
+    return np.concatenate([r, r_move])
+
+def jacobian_LR_movement(x, beta, Lambda_c, D, F22_target, RTF12_target, x0, alpha=1e-5):
+    """Stack original Jacobian with movement-penalty rows: factor * I."""
+    J = jacobian_LR(x, beta, Lambda_c, D, F22_target, RTF12_target)  # shape (m, N)
+    if alpha <= 0.0:
+        return J
+    N = x.size
+    factor = np.sqrt(2.0 * alpha)
+    # create extra rows: factor * identity (N rows x N cols)
+    Jpen = factor * np.eye(N, dtype=float)
+    # stack (original m x N) with (N x N) => (m+N, N)
+    return np.vstack([J, Jpen])
+
+def solve_F_dF_LR_with_movement(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target,
+                                alpha=1e-5, use_analytic_jac=True, max_nfev=200):
+    """
+    Least-squares solve with quadratic movement penalty around starting x0.
+    alpha: penalty strength for sum_j (x_j-x0_j)^2 in objective.
+    If use_analytic_jac True, provides jacobian via jacobian_LR_movement to least_squares.
+    """
+    x0 = pack_params(Lambda0, R0)
+    if use_analytic_jac:
+        sol = least_squares(
+            residual_LR_movement,
+            x0,
+            jac=jacobian_LR_movement,
+            args=(beta, Lambda_c, D, F22_target, RTF12_target, x0, alpha),
+            method="trf",
+            x_scale="jac",
+            max_nfev=max_nfev,
+            ftol=1e-9,
+            xtol=1e-9,
+            gtol=1e-9,
+            verbose=2
+        )
+    else:
+        sol = least_squares(
+            residual_LR_movement,
+            x0,
+            jac='2-point',
+            args=(beta, Lambda_c, D, F22_target, RTF12_target, x0, alpha),
+            method="trf",
+            x_scale="jac",
+            max_nfev=max_nfev,
+            ftol=1e-9,
+            xtol=1e-9,
+            gtol=1e-9,
+            verbose=2
+        )
+    Lambda_sol, R_sol = unpack_params(sol.x, Lambda0.shape[0], R0.shape[1])
+    return sol, Lambda_sol, R_sol
+
+def new_self_energy_movement(Lambda0, R0, Lambda_c, D, F22_target, RTF12_target,
+                             beta=200, alpha=1e-5, method="dF"):
+    """
+    Replacement of new_self_energy that includes movement penalty alpha * ||x-x0||^2.
+    method is passed to choose between analytic/numeric jacobian inside the solver.
+    """
+    print("New self-energy fitting Lambda and R (movement penalty)")
+    sol, Lambda_sol, R_sol = solve_F_dF_LR_with_movement(
+        beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target,
+        alpha=alpha, use_analytic_jac=(method=="dF")
+    )
+    return Lambda_sol, R_sol
+
+
+# ---------- Movement-penalized residuals / jacobians for Lambda_c + D -----------
+def residual_LcD_movement(x, beta, Lambda, R, F11_target, F12D_target, x0, alpha=1e-5):
+    r = residual_LcD(x, beta, Lambda, R, F11_target, F12D_target)
+    if alpha <= 0.0:
+        return r
+    factor = np.sqrt(2.0 * alpha)
+    r_move = factor * (x - x0)
+    return np.concatenate([r, r_move])
+
+def jacobian_LcD_movement(x, beta, Lambda, R, F11_target, F12D_target, x0, alpha=1e-5):
+    J = jacobian_LcD(x, beta, Lambda, R, F11_target, F12D_target)  # (m, N)
+    if alpha <= 0.0:
+        return J
+    N = x.size
+    factor = np.sqrt(2.0 * alpha)
+    Jpen = factor * np.eye(N, dtype=float)
+    return np.vstack([J, Jpen])
+
+def solve_F_dF_LcD_with_movement(beta, Lambda, R, Lambda_c0, D0, F11_target, F12D_target,
+                                 alpha=1e-5, use_analytic_jac=True, max_nfev=200):
+    x0 = pack_params(Lambda_c0, D0)
+    if use_analytic_jac:
+        sol = least_squares(
+            residual_LcD_movement,
+            x0,
+            jac=jacobian_LcD_movement,
+            args=(beta, Lambda, R, F11_target, F12D_target, x0, alpha),
+            method="trf",
+            x_scale="jac",
+            max_nfev=max_nfev,
+            ftol=1e-9,
+            xtol=1e-9,
+            gtol=1e-9,
+            verbose=2
+        )
+    else:
+        sol = least_squares(
+            residual_LcD_movement,
+            x0,
+            jac='2-point',
+            args=(beta, Lambda, R, F11_target, F12D_target, x0, alpha),
+            method="trf",
+            x_scale="jac",
+            max_nfev=max_nfev,
+            ftol=1e-9,
+            xtol=1e-9,
+            gtol=1e-9,
+            verbose=2
+        )
+    Lambda_c_sol, D_sol = unpack_params(sol.x, D0.shape[0], D0.shape[1])
+    return sol, Lambda_c_sol, D_sol
+
+def new_hybridization_movement(Lambda_c0, D0, Lambda, R, F11_target, F12D_target,
+                               beta=200, alpha=1e-5, method="dF"):
+    print("New hybridization fitting Lambda_c and D (movement penalty)")
+    sol, Lambda_c_sol, D_sol = solve_F_dF_LcD_with_movement(
+        beta, Lambda, R, Lambda_c0, D0, F11_target, F12D_target,
+        alpha=alpha, use_analytic_jac=(method=="dF")
+    )
+    return Lambda_c_sol, D_sol
+
+
+
+
 
 #TESTING WITH ADDED NON-LINEAR CONSTRAINTS - NOT WORKING
 
