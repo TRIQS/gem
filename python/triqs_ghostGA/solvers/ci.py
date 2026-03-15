@@ -10,6 +10,7 @@ from scipy.linalg import eigh
 #from primme import eigsh
 from scipy.linalg import block_diag
 import numpy as np
+import warnings
 from numba import jit
 import h5py
 import triqs.utility.mpi as mpi
@@ -649,7 +650,7 @@ class CI(object):
         diagonalize the Hamiltonian
         '''
         mpi.report('diagonalizing num_eig= {:d}'.format(num_eig))
-        if(self.hsize < 4000):
+        if(self.hsize < 4100):
             print("Doing FULL diagonalization")
             vals, vecs = eigh(self.Ham.toarray())
         else:
@@ -673,12 +674,15 @@ class CI(object):
             print('Building thermal partition function')
             for eit in vals[1:]:
                 boltz_weight = np.exp(-beta*(eit-self.gs_ene))
-                if(boltz_weight>1e-8 or True):
+                if(boltz_weight>1e-8):
                     self.bw_list.append(boltz_weight*1.0)
                     self.Zpart += boltz_weight
                     self.Tstates += 1
                 else:
                     break
+            if( self.Tstates == len(vals) ):
+                warning_message=" THE NUMBER OF THERMAL STATES EQUATES THE NUMBER OF COMPUTED EIGENSTATES \n MAKE SURE YOUR THERMAL CALCULATION IS COMPUTING ENOUGH EIGENSTATES "
+                warnings.warn(warning_message)
         else:
             print('Building GS partition function')
             if num_eig > 1:
