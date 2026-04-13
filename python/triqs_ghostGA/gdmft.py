@@ -134,7 +134,7 @@ class Gdmft(object):
     :type Hfull_list: list
 
     """
-    def __init__(self, ntot, nimp, nbath, eks, eloc, Utensor, spin_sym=True, soc=False, R=None, Lambda=None, D=None, Lambda_c=None, edsolver=None, suff=''):
+    def __init__(self, ntot, nimp, nbath, eks, eloc, Utensor, spin_sym=True, soc=False, R=None, Lambda=None, D=None, Lambda_c=None, edsolver=None, ek_weights=None, suff=''):
         print("##### INITIALIZATON OF THE GRISB OBJECT (DMFT-like algorithm)#####")
         self.ntot = ntot
         self.nimp = nimp
@@ -143,6 +143,7 @@ class Gdmft(object):
         self.eloc = eloc
         self.Utensor = Utensor
         self.soc = soc
+        self.ek_weights = ek_weights
         self.spin_sym = spin_sym
         self.gs_wf = None
         self.suff = suff    # Suffixe for file writting when many cpu at same time
@@ -260,6 +261,33 @@ class Gdmft(object):
         self.epot = self.E2loc + np.trace(self.eloc.dot(self.denMat[:self.nimp,:self.nimp].T))
         self.etot = self.ekin + self.epot - mu*self.nfill
 
+    def compute_functional(self,beta=200,mu=0.0):
+        """ Compute the value of the finite temperature functional
+        """
+        
+        # Embedding Hamiltonian:
+        Omega_imp = self.edsolver.gs_ene
+        if( self.edsolver.thermal):
+            Omega_imp = -(1/beta)*np.log( self.edsolver.Zpart/np.exp(beta*self.edsolver.gs_ene) )
+        # Quasi-particle Hamiltonian
+        Omega_qp=0.0
+        eqp_weight=1/len(self.eks)
+        for ik, ek in enumerate(self.eks):
+            if( not self.ek_weights is None): eqp_weight=self.ek_weights[ik]
+            Hk = self.R@ek@self.R.conj().T +self.Lambda
+            ek_vals = np.linalg.eigvals( Hk )
+            Omega_qp += np.sum(np.log(1+np.exp(-beta*ek_vals) ) )*eqp_weight
+        Omega_qp *= (-1/beta)
+        # Mixing Embedding
+        Omega_mix=0.0
+        H_mix = build_H(self.Lambda, self.Lambda_c, self.D, self.R)
+        emix_vals=np.linalg.eigvals(H_mix)
+        Omega_mix += np.sum(np.log(1+np.exp(-beta*emix_vals) ) )
+        Omega_mix *= +(1/beta)
+        Omega_tot = Omega_qp+Omega_imp+Omega_mix
+        return Omega_tot, Omega_qp, Omega_mix, Omega_imp
+        
+
 # THIS FOR TEMP
     def run_double_fit(self, mu=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., n_target=None, silence=True, spin_pen=0.0, sz_pen=0.0, idx=0, num_eig=2, ed_verbose=0, diis=False, fit_method='dF',move_penalty=1e-5):
 
@@ -267,6 +295,9 @@ class Gdmft(object):
         self.diff = 1e20
         for it in range(itmax):
             self.rhok_list=calc_rhoks(self.R, self.Lambda, self.eks, 1./beta)
+            if( not self.ek_weights is None):
+                print('using weights!')
+                self.rhok_list = [ rho*weight*len(self.rhok_list)/sum(self.ek_weights) for (rho,weight) in zip(self.rhok_list,self.ek_weights) ]
             self.Delta_p=calc_Delta_p(self.rhok_list)
             F11_trg  = self.Delta_p.copy()
             F12D_trg = sum([self.eks[ik] @ self.R.T.conj() @ self.rhok_list[ik].T for ik in range(len(self.eks)) ])/len(self.eks)
