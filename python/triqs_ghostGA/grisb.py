@@ -6,6 +6,7 @@ import numba
 from h5 import *
 import sys
 
+
 from triqs_ghostGA.utility.utils_TH import denR, denRm1, ddenRm1, realHcombination, inverse_realHcombination, \
     Hermitian_list, get_blocks, funcMat, calc_nf, dF
 from triqs_ghostGA.utility.utils_grisb import calc_rhoks, calc_Delta_p, calc_D, calc_Lambda_c, calc_Lambda, \
@@ -13,19 +14,75 @@ from triqs_ghostGA.utility.utils_grisb import calc_rhoks, calc_Delta_p, calc_D, 
 from triqs_ghostGA.utility.delta_fit import * #new_hybridization, new_self_energy
 from triqs_ghostGA.DIIS import *
 
-def occupation_vs_mu(mu, *args):
+
+def calc_rhoks_in(R, Lambda, eks, T, mu=0):
+    r"""Calculate rho_ks, an object that contains elements necessary to compute Delta_p and D.
+    It requires R, Lambda, the dispersion espilon_k and the temperature. It is given as
+
+    .. math::
+        \rho_k = f(R \ \epsilon_k \ R^\dagger + \lambda - \mu, T)^T
+
+    where :math:`f` is the Fermi-Dirac function, :math:`R, Lambda` are objects used in the ghostGA formalism,
+    :math:`\epsilon_k` is the non-interacting dispersion, :math:`T` is the temperature (necessary for the Fermi-Dirac function)
+    and :math:`\mu` is the chemical potential.
+
+    Now there is an additional transpose here, that is necessary in the equation later but can be performed here already.
+
+    The resulting object is an array of the length of the number of k-points, where each element is a matrix with the shape of Lambda.
+    """
+
+    return [calc_nf( np.dot(R, np.dot(x- mu*np.eye(x.shape[0]), R.conj().T ) ) + Lambda , T).T for x in eks]
+
+def occupation_vs_mu_in(mu, *args):
     ''' Cost function for find Lambda
     '''
-    R, Lambda, eks, beta = args
-    rhok_list=calc_rhoks(R, Lambda, eks, 1./beta, mu)
+    R, Lambda, eks, ek_weights, beta = args
+    rhok_list=calc_rhoks_in(R, Lambda, eks, 1./beta, mu)
+    if( not ek_weights is None):
+        rhok_list = [ rho*weight*len(rhok_list)/sum(ek_weights) for (rho,weight) in zip(rhok_list,ek_weights) ]   
     Delta_p=calc_Delta_p(rhok_list)
     return np.trace(Delta_p).real
 
-def find_mu(mu0, R, Lambda, eks, nfix_qp, beta, dmu=0.1, mu_tol=1e-8):
+def find_mu_in(mu0, R, Lambda, eks, ek_weights, nfix_qp, beta, dmu=0.1, mu_tol=1e-8):
     """ Find chemical potential for given ffdagger
     """
     print('# Optimizing chemical potential: target is nfix_qp = ', nfix_qp)
-    args = (R, Lambda, eks, beta)
+    args = (R, Lambda, eks, ek_weights, beta)
+    coeff_dmu = 1
+
+    def cost_function_mu(mu, *args):
+        return occupation_vs_mu_in(mu, *args) - nfix_qp
+
+    while (True):
+        try:
+            mu = scipy.optimize.bisect(cost_function_mu, mu0-coeff_dmu*dmu, mu0+coeff_dmu*dmu, args=args, xtol=mu_tol)
+            break
+        except ValueError:
+            coeff_dmu *= 2
+
+    print('# Optimal chemical potential shift: dmu = ',mu)
+    print()
+    return mu
+
+
+
+
+
+def occupation_vs_mu(mu, *args):
+    ''' Cost function for find Lambda
+    '''
+    R, Lambda, eks, ek_weights, beta = args
+    rhok_list=calc_rhoks(R, Lambda, eks, 1./beta, mu)
+    if( not ek_weights is None):
+        rhok_list = [ rho*weight*len(rhok_list)/sum(ek_weights) for (rho,weight) in zip(rhok_list,ek_weights) ]   
+    Delta_p=calc_Delta_p(rhok_list)
+    return np.trace(Delta_p).real
+
+def find_mu(mu0, R, Lambda, eks, ek_weights, nfix_qp, beta, dmu=0.1, mu_tol=1e-8):
+    """ Find chemical potential for given ffdagger
+    """
+    print('# Optimizing chemical potential: target is nfix_qp = ', nfix_qp)
+    args = (R, Lambda, eks, ek_weights, beta)
     coeff_dmu = 1
 
     def cost_function_mu(mu, *args):
@@ -79,7 +136,7 @@ class Grisb(object):
     :type Hfull_list: list
 
     """
-    def __init__(self, ntot, nimp, nbath, eks, eloc, Utensor, spin_sym=True, soc=False, R=None, Lambda=None, Lambda_c=None, D=None,edsolver=None, write=True, suff=''):
+    def __init__(self, ntot, nimp, nbath, eks, eloc, Utensor, spin_sym=True, soc=False, R=None, Lambda=None, Lambda_c=None, D=None,ek_weights=None,edsolver=None, write=True, suff=''):
         print("##### INITIALIZATON OF THE GRISB OBJECT #####")
         self.ntot = ntot
         self.nimp = nimp
@@ -90,6 +147,7 @@ class Grisb(object):
         self.soc = soc
         self.spin_sym = spin_sym
         self.gs_wf = None
+        self.ek_weights = ek_weights
         self.write = write
         self.suff = suff    # Suffixe for file writting when many cpu at same time
         # initialize R and Lambda
@@ -138,7 +196,7 @@ class Grisb(object):
         print("\n\n")
 
 
-    def solve_embedding(self, mu, num_eig, ed_verbose):
+    def solve_embedding(self, mu, num_eig, spin_pen, ed_verbose):
         """ Solve embedding problem using a variety of impurity solver
         """
 
@@ -194,7 +252,7 @@ class Grisb(object):
             A[timestamp] = tmp_dict
 
     # TODO: move sz_pen, etc to the solvers.
-    def run(self, mu0=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., silence=True, idx=0, num_eig=2, ed_verbose=0, diis=False, nfix=None, dmu=0.1, mu_tol=1e-8, nfix_tol=0.01,regularisation=False):
+    def run(self, mu0=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., silence=True, idx=0, num_eig=2, ed_verbose=0, diis=False, nfix=None, dmu=0.1, mu_tol=1e-8, nfix_tol=0.01,regularisation=False, spin_pen=0.0,nfix_method='QP'):
         """ Run ghost-RISB self-consistency
 
         :param itmax: Maxiumum iteraction for self-consistency.
@@ -219,8 +277,12 @@ class Grisb(object):
 
         print("########## STARTING THE GHOST-GA LOOP ##########")
 
+        print('start run, eloc:',self.eloc)
+        print('start utensor:',self.Utensor)
+        
         self.mu = mu0
         self.diff = 1e20
+        mu_old=None
 
         if nfix is not None:
             print("### Calculation performed in the canonical ensemble, starting with mu=", self.mu)
@@ -233,19 +295,29 @@ class Grisb(object):
             print("### Iteration %d" % it)
 
             # If number of electron is fixed, recalculate chemical potential to get the right number of electrons
-            if nfix is not None:
+            if( (nfix is not None) and (nfix_method=='QP') ) :
                 # Sometimes you want to start from a given chemical potential
+                import time
+                print('Fixing N QP')
+                time.sleep(1)
                 if it > 1:
                     # Target number of particle in the embedded space
                     # TODO: I don't understand this
                     nfix_qp = (self.nbath - self.nimp)/2 + nfix
                     # Optimize to find chemical potential mu
-                    self.mu = find_mu(self.mu, self.R, self.Lambda, self.eks, nfix_qp, beta, dmu=dmu, mu_tol=mu_tol)
-
+                    #self.mu = find_mu(self.mu, self.R, self.Lambda, self.eks, self.ek_weights, nfix_qp, beta, dmu=dmu, mu_tol=mu_tol)
+                    new_mu = find_mu(0.0, self.R, self.Lambda, self.eks, self.ek_weights, nfix_qp, beta, dmu=dmu, mu_tol=mu_tol)
+                    self.mu += new_mu
+                    self.Lambda += self.R @ self.R.T.conj()*new_mu
             # From Lambda and R, calculate Delta_p, D and Lambda_c
             print("# With Lambda and R, compute Delta_p, D and Lambda_c")
-            self.rhok_list = calc_rhoks(self.R, self.Lambda, self.eks, 1./beta, self.mu)
+            
+            #self.rhok_list = calc_rhoks(self.R, self.Lambda, self.eks, 1./beta, self.mu) #PREVIOUS
+            self.rhok_list = calc_rhoks(self.R, self.Lambda, self.eks, 1./beta, 0.0)
             # self.rhok_list = np.real(calc_rhoks(self.R, self.Lambda, self.eks, 1./beta, self.mu))
+            # ADDED
+            if( not self.ek_weights is None):
+                self.rhok_list = [ rho*weight*len(self.rhok_list)/sum(self.ek_weights) for (rho,weight) in zip(self.rhok_list,self.ek_weights) ]
             self.Delta_p = calc_Delta_p(self.rhok_list)
             # self.Delta_p = np.real(calc_Delta_p(self.rhok_list))
             # self.D = np.real(calc_D(self.R, self.Lambda, self.Delta_p, self.eks, self.rhok_list))
@@ -282,7 +354,22 @@ class Grisb(object):
             # We now solve with the solver passed as an argument.
             print()
             print("# Solving the embedding Hamiltonian:")
-            self.solve_embedding(self.mu, num_eig, ed_verbose)
+            self.solve_embedding(self.mu, num_eig, spin_pen, ed_verbose)
+            self.nfill = np.trace(self.denMat[:self.nimp,:self.nimp])
+            if( (nfix is not None) and (nfix_method=='AIM') ) :
+                # Sometimes you want to start from a given chemical potential
+                print('Fixing N AIM')
+                if (np.abs(self.nfill-nfix)>nfix_tol):
+                    if(mu_old is None):
+                        dmu = 1e-1*(self.nfill-nfix)
+                    else:
+                        m_mu = (mu_old - self.mu)/(n_old-self.nfill)
+                        q_mu = (n_old*self.mu-self.nfill*mu_old)/(n_old-self.nfill)
+                        dmu = m_mu*nfix +q_mu -self.mu
+                    mu_old = self.mu
+                    n_old = self.nfill
+                    self.mu += dmu
+            
 
             # Extract relevant quantities from the density matrix, such as Delta_p
             cdaggerf = self.denMat[:self.nimp,self.nimp:]
@@ -321,8 +408,9 @@ class Grisb(object):
 
             # Calculate difference of R and Lambda from prior iteration and check convergence
             # and apply mixing if required
-            diff_R = np.abs(self.R-R_new).max()
-            diff_Lambda = np.abs(self.Lambda-Lambda_new).max()
+            diff_R = 0.0 # np.abs(np.abs(self.R)-np.abs(R_new)).max()
+            diff_Lambda = np.abs(np.sort(np.linalg.eigvals(self.Lambda))-np.sort(np.linalg.eigvals(Lambda_new))).max()
+            print('Lambda eigvals:',np.linalg.eigvals(Lambda_new) )
             self.diff = max(diff_R,diff_Lambda)
             if diis and ( it >= numNonDIIS ):
                 error = Lambda_new - self.Lambda
@@ -360,7 +448,7 @@ class Grisb(object):
                 print()
 
             if nfix is not None:
-                # occ = occupation_vs_mu(self.mu, self.R, self.Lambda, self.eks, beta)
+                # occ = occupation_vs_mu(self.mu, self.R, self.Lambda, self.eks, self.ek_weights, beta)
                 occ = np.trace(self.denMat[:self.nimp, :self.nimp])
                 print(self.denMat[:self.nimp, :self.nimp])
                 print("# New occupation : ", occ, ", nfix : ", nfix)
@@ -380,22 +468,13 @@ class Grisb(object):
                     for idx in range(0,self.nimp,2):
                         self.docc.append(self.edsolver.calc_double_occ(idx))
                     print("double occupancy=", self.docc)
+                    print('electron filling=',self.nfill)
                     break
-        print("CHECK RESIDUAL")
-        mu_qp=0.0
-        x_LR=pack_params(self.Lambda,self.R,mu_qp)
-        x_LcD=pack_params(self.Lambda_c,self.D,mu_qp)
-        F11_trg = self.Delta_p
-        F22_trg = np.eye(self.nbath)-F11_trg
-        F12D_trg = sum( [np.dot( np.dot(self.eks[x], self.R.conj().T ), self.rhok_list[x].T ) for x in range(len(self.rhok_list))] ).T/float(len(self.rhok_list))
-        RTF12_trg=cdaggerf
-        print("residual LR :",residual_LR(x_LR,beta, self.Lambda_c,self.D,F22_trg,RTF12_trg ))
-        print("residual LcD:",residual_LcD(x_LcD,beta, self.Lambda,self.R,F11_trg,F12D_trg ))
         
 
         
     # TODO: move sz_pen, etc to the solvers.
-    def run_gdmet(self, mu0=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., silence=True, idx=0, num_eig=2, ed_verbose=0, diis=False, nfix=None, dmu=0.1, mu_tol=1e-8, nfix_tol=0.01,regularisation=False):
+    def run_gdmet(self, mu0=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., silence=True, idx=0, num_eig=2, ed_verbose=0, diis=False, nfix=None, dmu=0.1, mu_tol=1e-8, nfix_tol=0.01,regularisation=False, spin_pen=0.0):
         """ Run ghost-RISB self-consistency with new unification formulation
 
         :param itmax: Maxiumum iteraction for self-consistency.
@@ -447,7 +526,7 @@ class Grisb(object):
                     # TODO: I don't understand this
                     nfix_qp = (self.nbath - self.nimp)/2 + nfix
                     # Optimize to find chemical potential mu
-                    self.mu = find_mu(self.mu, self.R, self.Lambda, self.eks, nfix_qp, beta, dmu=dmu, mu_tol=mu_tol)
+                    self.mu = find_mu(self.mu, self.R, self.Lambda, self.eks, self.ek_weights, nfix_qp, beta, dmu=dmu, mu_tol=mu_tol)
 
             # From Lambda and R solve QP to get Delta_p and sum_k (eps_k R Delta_k)
             print("# With Lambda and R solve QP")
@@ -484,7 +563,7 @@ class Grisb(object):
             # We now solve with the solver passed as an argument.
             print()
             print("# Solving the embedding Hamiltonian:")
-            self.solve_embedding(self.mu, num_eig, ed_verbose)
+            self.solve_embedding(self.mu, num_eig, spin_pen, ed_verbose)
 
             # Extract relevant quantities from the density matrix, such as Delta_p
             cdaggerb = self.denMat[:self.nimp,self.nimp:]
