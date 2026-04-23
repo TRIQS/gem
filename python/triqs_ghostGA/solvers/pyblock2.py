@@ -2,6 +2,9 @@ from pyblock2.driver.core import DMRGDriver, SymmetryTypes
 import block2 as b2
 import numpy
 
+#SAMUELE's COMMENTS
+# - implement docc
+
 class Pyblock2_N(object):
     """ Wrapper for pyblock2 solvers with N symmetry
     """

@@ -3,6 +3,9 @@ from pyscf.scf import diis
 import numpy
 import os
 
+#SAMUELE'S COMMENT
+# - implement docc
+
 class Pyscf_ccsd(object):
     """ Wrapper for pyscf ccsd solvers
     """

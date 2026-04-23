@@ -14,20 +14,11 @@ import triqs.utility.mpi as mpi
 from math import factorial
 from itertools import combinations
 
+#SAMUELE'S QUESTION
+# Global change of debug with verbose options for printing
+
+
 # Binary basis utilities
-
-def reverseBits(norb,n):
-  strb = '{0:0'+str(norb)+'b}'
-  rb = strb.format(n)[::-1]
-  return int(rb,2)
-
-@jit(nopython=True)#,cache=True)
-def countSetBits(n):
-    count = 0
-    while (n):
-        count += n & 1
-        n >>= 1
-    return count
 
 
 def table_ep(nstate,nparticle,dtype=np.int64):
@@ -66,27 +57,6 @@ def table_es(nstate,nparticle,spinz,dtype=np.int64):
     result.sort()
     return result
 
-def table_es_sc(nstate,spinz,dtype=np.int64):
-    '''
-    This function generates the table of binary representations of a particle-non-conserved and spin-conserved basis.
-    '''
-    strb = '{0:0'+str(nstate)+'b}'
-    tmp = np.arange(0,2**nstate)
-    result = []
-    for bs in tmp:
-        print(bs, strb.format(bs) )
-        # Get all even bits of x
-        even_bits = bs & 0xAAAAAAAA
-        # Get all odd bits of x
-        odd_bits = bs & 0x55555555
-        nup = countSetBits(even_bits)
-        ndn = countSetBits(odd_bits)
-        print(nup,ndn)
-        if nup-ndn==spinz:
-            result.append(bs)
-    result = np.array(result)
-    result.sort()
-    return result
 
 @jit(nopython=True)#,cache=True)
 def residues(norb,determinant):
@@ -149,74 +119,30 @@ def single_and_double_determinants(norb, determinant, use_Sz=False):
     #print("finished cisd basis")
     return result
 
-def build_no_trial_states(norb, nimp, nelc):
-    """ Natural orbital convention as (nimp|empty|inter|filled) for example
-        1-orbital impurity
-        (01|00000|01|11111)
-        (10|00000|10|11111)
-
-        3-orbital impurity
-        (010101|000000|010101|111111)
-        (101010|000000|101010|111111)
-    """
-    print("building cisd basis")
-    strb = '{0:0'+str(norb)+'b}'
-    result = []
-    for i in range(2):#spin-block
-        tmp = 0
-        for j in range(nimp//2):# impurity orbital block
-            tmp += 1 <<(2*j+i)
-        #print('tmp=',strb.format(tmp))
-        tmp = tmp << (norb - nimp)
-        #print('tmp1=',strb.format(tmp))
-        tmp2 = 0
-        for j in range(nimp//2):# intermediate obirtal block
-            tmp2 += 1 <<(2*j+(1-i))
-        tmp2 = tmp2 << (nelc - nimp)
-        #print('tmp2=',strb.format(tmp2))
-        tmp = tmp | tmp2
-        for j in range(nelc-nimp):
-            tmp = tmp | (1<<j)
-        #print(strb.format(tmp))
-        result.append(tmp)
-    result = np.array(result)
-    return result
-
 
 
 
 # CI solver
 
-Instance = None
-is_ci_initialized = False
-
-def getInstance(*args):#singleton
-    global Instance
-    if Instance is None:
-        Instance = simple_ed(*args)
-    return Instance
-
-@jit(nopython=True)
-def search_bsl(basis, bsl):
-    #return  np.where(basis==bsl)[0]
-    return np.searchsorted(basis, bsl)
 
 @jit(nopython=True)
 def find_count(i,j,bsr,norb,bsltmp):
-    # extract the first j bits from bsr and count the 1s
-    bit_tmp = ( ((1 << j) - 1)  &  (bsr >> (norb-j) ) )
-    #print 'bsr', j, self.strb.format(bsr), self.strb.format(bit_tmp), self.strb.format(bsr)[:j]
-    count = 0
-    while ( bit_tmp ):
-        count += bit_tmp &1
-        bit_tmp >>=1
-    # extract the first i bits from bsltmp and count the 1s
-    bit_tmp = ( ((1 << i) - 1)  &  (bsltmp >> (norb-i) ) )
-    #print 'bsltmp', i, self.strb.format(bsltmp), self.strb.format(bit_tmp), self.strb.format(bsltmp)[:i]
-    while ( bit_tmp ):
-        count += bit_tmp &1
-        bit_tmp >>=1
-    return count
+  """
+  Count occupied orbitals (1-bits) before j in bsr and before i in bsltmp.
+  Used to compute the fermionic sign: (-1)**count for c_i^† c_j.
+  """
+  # extract the first j bits from bsr and count the 1s
+  bit_tmp = ( ((1 << j) - 1)  &  (bsr >> (norb-j) ) )
+  count = 0
+  while ( bit_tmp ):
+    count += bit_tmp &1
+    bit_tmp >>=1
+  # extract the first i bits from bsltmp and count the 1s
+  bit_tmp = ( ((1 << i) - 1)  &  (bsltmp >> (norb-i) ) )
+  while ( bit_tmp ):
+    count += bit_tmp &1
+    bit_tmp >>=1
+  return count
 
 @jit(nopython=True)
 def build_cid_cj_csc(i, j, basis, bit_max, norb, debug=False):
@@ -229,8 +155,6 @@ def build_cid_cj_csc(i, j, basis, bit_max, norb, debug=False):
         # temporary bit for fliping the bit on j and i.
         tmp_bit1 = bit_max>>j
         tmp_bit2 = bit_max>>i
-        #print i,j,'bsrid=',bsrid,'bsr=',bsr,'',self.strb.format(bsr),'tmp_bit1=',tmp_bit1,self.strb.format(tmp_bit1),'tmp_bit2=',tmp_bit2,self.strb.format(tmp_bit2), self.strb.format(bit_max>>j), self.strb.format(bit_max>>i)
-
         # check if bit on j is 1 and if bit on i is 0 and i!=j
         if (tmp_bit1&bsr)!=tmp_bit1 or (tmp_bit2&bsr)==tmp_bit2 and i!=j:
             continue
@@ -240,44 +164,23 @@ def build_cid_cj_csc(i, j, basis, bit_max, norb, debug=False):
         bsl = bsltmp | tmp_bit2
         # binary search the index for the final state bsl
         id_bsl = search_bsl(basis,bsl)
-        #print( id_bsl, bsl, basis[id_bsl], len(basis) )
         if bsl != basis[id_bsl] or id_bsl>=len(basis): # The c_i^\dagger c_j may lead to a state that is not in the symmetry constrained states.
             continue
         else:
             bslid = id_bsl
         #determine sign
-        # Bitwise method to calculate sign
-        # extract the first j bits from bsr and count the 1s
-        #bit_tmp = ( ((1 << j) - 1)  &  (bsr >> (norb-j) ) )
-        #print 'bsr', j, self.strb.format(bsr), self.strb.format(bit_tmp), self.strb.format(bsr)[:j]
-        #count = 0
-        #while ( bit_tmp ):
-        #    count += bit_tmp &1
-        #    bit_tmp >>=1
-        # extract the first i bits from bsltmp and count the 1s
-        #bit_tmp = ( ((1 << i) - 1)  &  (bsltmp >> (norb-i) ) )
-        #print 'bsltmp', i, self.strb.format(bsltmp), self.strb.format(bit_tmp), self.strb.format(bsltmp)[:i]
-        #while ( bit_tmp ):
-        #    count += bit_tmp &1
-        #    bit_tmp >>=1
         count = find_count(i,j,bsr,norb,bsltmp)
         sign = 1
         if count&1 ==1: # equivlaent
             sign = -1
-        #if debug:
-        #  print i, j, k, l, 'bsrid=',bsrid,'bsr=',bsr, self.strb.format(bsr),'bslid=',bslid,'bsl=',bsl, self.strb.format(bsl)
         #construct csc matrix index, pointer, and data
         row_ind.append(bslid)
         col_ind.append(bsrid)
         data.append(sign)
-    #print(row_ind, col_ind, data)
     return row_ind, col_ind, data
 
 @jit(nopython=True)
 def build_two_body_ijkl_csc_2(i, j, k, l, basis, bit_max, norb, debug=False):
-    # for debug no jit
-    #print('norb=',norb)
-    #strb = '{0:0'+str(norb)+'b}'
     row_ind = []
     col_ind = []
     data = []
@@ -288,26 +191,9 @@ def build_two_body_ijkl_csc_2(i, j, k, l, basis, bit_max, norb, debug=False):
         tmp_bit2 = bit_max>>l #2**(self.norb-1-l)
         tmp_bit3 = bit_max>>k #2**(self.norb-1-k)
         tmp_bit4 = bit_max>>i #2**(self.norb-1-i)
-        #print(strb.format(tmp_bit1))
-        #print(strb.format(tmp_bit2))
-        #print(strb.format(tmp_bit3))
-        #print(strb.format(tmp_bit4))
-        #print(strb.format(tmp_bit1&bsr),(tmp_bit1&bsr)!=tmp_bit1)
-        #print(strb.format(tmp_bit2&bsr),(tmp_bit2&bsr)!=tmp_bit2)
-        #print(strb.format(tmp_bit3&bsr),(tmp_bit3&bsr)==tmp_bit3)
-        #print(strb.format(tmp_bit4&bsr),(tmp_bit4&bsr)==tmp_bit4)
-        #if self.strb.format(bsr)[j] != '1' or self.strb.format(bsr)[l] != '1' or abs(Umatrix[i,j,k,l])<1e-12:#HERE
         if ((tmp_bit1&bsr)!=tmp_bit1 or (tmp_bit2&bsr)!=tmp_bit2): # if j is 0 or if l is 0 continue
             #print('continue')
             continue
-        # BUG BELOW?
-        #elif ( (tmp_bit3&bsr)==tmp_bit3 or (tmp_bit4&bsr)==tmp_bit4 ) and ( i!=j and i!=l): # if i is 1 or k is 1 and not repeated with j and l continue
-        #    #print(i!=j)
-        #    #print(i!=l)
-        #    #print (i!=j and i!=l)
-        #    #print((tmp_bit3&bsr)==tmp_bit3 or (tmp_bit4&bsr)==tmp_bit4 and i!=j and i!=l)
-        #    #print('continue')
-        #    continue
         #annhilate particle j
         bsltmp1 = bsr ^ tmp_bit1
         #annhilate particle l
@@ -318,7 +204,6 @@ def build_two_body_ijkl_csc_2(i, j, k, l, basis, bit_max, norb, debug=False):
         bsl = bsltmp3 | tmp_bit4
         #check if bsl is in basis
         id_bsl = np.searchsorted(basis, bsl)
-        #print( id_bsl, bsl, bsr, strb.format(bsl), strb.format(bsr), basis[id_bsl], len(basis) )
         if bsl != basis[id_bsl] or id_bsl>=len(basis): # The c_i^\dagger c_j may lead to the state that is not in the symmetry constrained states.
             continue
         else:
@@ -331,7 +216,6 @@ def build_two_body_ijkl_csc_2(i, j, k, l, basis, bit_max, norb, debug=False):
             bit_tmp >>=1
         # extract the first i bits from bsltmp and count the 1s
         bit_tmp = ( ((1 << l) - 1)  &  (bsltmp1 >> (norb-l) ) )
-        #print 'bsltmp', i, self.strb.format(bsltmp), self.strb.format(bit_tmp), self.strb.format(bsltmp)[:i]
         while ( bit_tmp ):
             count += bit_tmp &1
             bit_tmp >>=1
@@ -341,7 +225,6 @@ def build_two_body_ijkl_csc_2(i, j, k, l, basis, bit_max, norb, debug=False):
             bit_tmp >>=1
         # extract the first i bits from bsltmp and count the 1s
         bit_tmp = ( ((1 << i) - 1)  &  (bsltmp3 >> (norb-i) ) )
-        #print 'bsltmp', i, self.strb.format(bsltmp), self.strb.format(bit_tmp), self.strb.format(bsltmp)[:i]
         while ( bit_tmp ):
             count += bit_tmp &1
             bit_tmp >>=1
@@ -349,13 +232,10 @@ def build_two_body_ijkl_csc_2(i, j, k, l, basis, bit_max, norb, debug=False):
         #if count%2 == 1:
         if count&1 ==1: # equivlaent
             sign = -1
-        #if debug:
-        #  print i, j, k, l, 'bsrid=',bsrid,'bsr=',bsr, self.strb.format(bsr),'bslid=',bslid,'bsl=',bsl, self.strb.format(bsl), 'cumu=',cumu
         #construct csc matrix index, pointer, and data
         row_ind.append(bslid)
         col_ind.append(bsrid)
         data.append(sign)
-    #print(row_ind, col_ind, data)
     return row_ind, col_ind, data
 
 @jit(nopython=True)
@@ -365,13 +245,8 @@ def build_rholoc_onfly(basis,gs_wf,rholoc,bipart_smap):
     '''
     for i in range(len(basis)):
         for j in range(len(basis)):
-            #iidx = np.where(basis==bipart_smap[i,0])[0][0]
-            #jidx = np.where(basis==bipart_smap[j,0])[0][0]
-            #print(iidx, basis[iidx], bipart_smap[i,0], jidx, basis[jidx], bipart_smap[j,0])
-            #if bipart_smap[i,2] == bipart_smap[j,2] and abs(gs_wf[iidx]*gs_wf[jidx]) > 1e-12:
-            #    rholoc[bipart_smap[i,1],bipart_smap[j,1]] += gs_wf[iidx]*gs_wf[jidx]#M[iidx,jidx]
             if bipart_smap[i,2] == bipart_smap[j,2] and abs(gs_wf[i]*gs_wf[j]) > 1e-12:
-                rholoc[bipart_smap[i,1],bipart_smap[j,1]] += gs_wf[i]*gs_wf[j]#M[iidx,jidx]
+                rholoc[bipart_smap[i,1],bipart_smap[j,1]] += gs_wf[i]*gs_wf[j]
     return rholoc
 
 # TODO Make basic solver Class?
@@ -451,111 +326,8 @@ class CI(object):
     #    #is_ci_initialized = False
     #    print("Destructor called")
 
-    def build_bipart_smap(self,debug=False):
-        '''
-        build the bipartite state map between system, local and enviroment in to a dictionary
-        with key: system state, element: [local state, enviornment state]
-        Another way is 2D array row index correspond to basis set, column index correspond to
-        representation of [system, local, environment].
-        '''
-        #self.bipart_smap = {}
-        self.bipart_smap = np.zeros((len(self.basis),3),dtype=np.int32)
-        #for s in self.basis:
-        #    bs = self.strb.format(s)
-        #    #print s, bs
-        #    smap[s] = strb.format(s)
-        #    # site-1
-        #    self.bipart_smap[s] = [int(bs[:self.norb/2],2)]
-        #    # site-2
-        #    self.bipart_smap[s].append(int(bs[self.norb/2:],2))
-        for i in range(len(self.basis)):
-            self.bipart_smap[i,0] = self.basis[i]
-            bs = self.strb.format(self.basis[i])
-            self.bipart_smap[i,1] = int(bs[:self.norb//2],2)
-            self.bipart_smap[i,2] = int(bs[self.norb//2:],2)
-        if debug:
-            #for s in self.basis:
-                #print self.strb.format(s), self.strb_red.format(self.bipart_smap[s][0]), self.strb_red.format(self.bipart_smap[s][1])
-            for i in range(len(self.basis)):
-                print(self.strb.format(self.bipart_smape[i][0]), self.strb_red.format(self.bipart_smape[i][1]),  self.strb_red.format(self.bipart_smape[i][2]))
 
-    def trenv(self, M):
-        '''
-        trace out the environment degrees of freedom of a matrix M
-        Input:
-          M: numpy.array
-        '''
-        #print self.bipart_smap
-        #ns = len(self.basis)
-        no = 2**(self.norb//2)# special case for single-orbital#int(np.log2(ns))
 
-        #enlarge M to Mijkl tensor, where i,j is the state index for site 1, and
-        #k,l is the state index for site 2.
-        #Mijkl = np.zeros((no,no,no,no),dtype=M.dtype) # The size of this ndarray is too large for more than 3 orbital
-        #for i in self.basis:#loop over system basis
-        #    for j in self.basis:#loop over system basis
-        #        iidx = np.where(self.basis==i)[0][0]
-        #        jidx = np.where(self.basis==j)[0][0]
-        #        Mijkl[self.bipart_smap[i][0],self.bipart_smap[i][1],self.bipart_smap[j][0],self.bipart_smap[j][1]] = M[iidx,jidx]
-        #trenvM = np.einsum("ikjk",Mijkl)
-
-        trenvM = lil_matrix((no,no),dtype=M.dtype)
-        for i in range(len(self.basis)):
-            for j in range(len(self.basis)):
-                #iidx = np.where(self.basis==self.basis[i])[0][0]
-                #jidx = np.where(self.basis==self.basis[j])[0][0]
-                #if self.bipart_smap[i,2] == self.bipart_smap[j,2] and abs(M[iidx,jidx]) > 1e-12:
-                #    trenvM[self.bipart_smap[i,1],self.bipart_smap[j,1]] += M[iidx,jidx]
-                if self.bipart_smap[i,2] == self.bipart_smap[j,2] and abs(M[i,j]) > 1e-12:
-                    trenvM[self.bipart_smap[i,1],self.bipart_smap[j,1]] += M[i,j]
-
-        return trenvM
-
-    def trloc(self, M):
-        '''
-        trace out the local degrees of freedom of a matrix M
-        Input:
-          M: numpy.array
-        '''
-        #ns = len(self.basis)
-        no = 2**(self.norb//2)# special case for single-orbital#int(np.log2(ns))
-
-        #enlarge M to Mijkl tensor, where i,j is the state index for site 1, and
-        #k,l is the state index for site 2.
-        Mijkl = np.zeros((no,no,no,no),dtype=M.dtype)
-        for i in self.basis:#loop over system basis
-            for j in self.basis:#loop over system basis
-                iidx = np.where(self.basis==i)[0][0]
-                jidx = np.where(self.basis==j)[0][0]
-                Mijkl[self.bipart_smap[i][0],self.bipart_smap[i][1],self.bipart_smap[j][0],self.bipart_smap[j][1]] = M[iidx,jidx]
-        trlocM = np.einsum("kikj",Mijkl)
-        return trlocM
-
-    def enlarge_loc2sys(self,M):
-        '''
-        enlarge a local matrix M to system Hilbert space, i.e., the operation M \otimes I.
-        Input:
-          M: numpy.array
-        '''
-        Msys = np.zeros((self.hsize,self.hsize),dtype=M.dtype)
-        for i,s1 in enumerate(self.basis):
-            for j,s2 in enumerate(self.basis):
-                if self.bipart_smap[s1][1] == self.bipart_smap[s2][1]:
-                    Msys[i,j] += M[self.bipart_smap[s1][0],self.bipart_smap[s2][0]]
-        return Msys
-
-    def enlarge_env2sys(self,M):
-        '''
-        enlarge a environment matrix M to system Hilbert space, i.e., the operation M \otimes I.
-        Input:
-          M: numpy.array
-        '''
-        Msys = np.zeros((self.hsize,self.hsize),dtype=M.dtype)
-        for i,s1 in enumerate(self.basis):
-            for j,s2 in enumerate(self.basis):
-                if self.bipart_smap[s1][0] == self.bipart_smap[s2][0]:
-                    Msys[i,j] = M[self.bipart_smap[s1][1],self.bipart_smap[s2][1]]
-        return Msys
 
     def build_two_body(self,Umatrix, debug=False):
         '''
@@ -575,14 +347,10 @@ class CI(object):
                         if l==j or i==k or abs(Umatrix[i,j,k,l])<1e-8:
                             continue # 0 contribution
                         else:
-                            #print(i,j,k,l,Umatrix[i,j,k,l])
                             row_ind, col_ind, data = build_two_body_ijkl_csc_2(i, j, k, l, self.basis, bit_max, self.norb)
                             self.Htwo +=  0.5*Umatrix[i,j,k,l]*csc_matrix( (data, (row_ind, col_ind)), shape=(self.hsize,self.hsize),dtype=self.data_type)
-                            #indptr, indices, bsrids, data, cumu = build_two_body_ijkl_csc(i, j, k, l, self.basis, bit_max, self.norb)
-                            #self.Htwo +=  0.5*Umatrix[i,j,k,l]*csc_matrix( (data, indices, indptr), shape=(self.hsize,self.hsize),dtype=self.data_type)
-                        #print i,j,k,l,Umatrix[i,j,k,l]
 
-    def build_h1e(self, eloc, D, Lambdac, mu):
+    def build_h1e(self, eloc, D, Lambdac, mu, verbose=0):
         self.h1e = np.zeros((self.norb,self.norb), dtype=np.complex128)
         nimp = eloc.shape[0]
         self.h1e[:nimp,:nimp] = eloc - mu*np.eye(nimp)
@@ -590,10 +358,11 @@ class CI(object):
         self.h1e[nimp:,nimp:] = -Lambdac
         self.h1e[nimp:,:nimp] = D.conj()
 
-        print("h1e")
-        print(self.h1e)
+        if(verbose>3):
+          print("h1e")
+          print(self.h1e)
 
-    def build_one_body(self, H1E, debug=False):
+    def build_one_body(self, H1E):
         '''
         build one body part of Hamiltonian using denmat operators.
         Input:
@@ -608,15 +377,14 @@ class CI(object):
                 if np.abs(H1E[i,j])<1e-8:
                     continue # 0 contribution
                 else:
-                    #print(i,j,H1E[i,j])
                     self.Hone += H1E[i,j]*self.denmat_op[(i,j)]
 
-    def build_Hemb(self, D, eloc, Lambdac, V2E, debug=False):
+    def build_Hemb(self, D, eloc, Lambdac, V2E, debug=False, verbose=0):
         '''
         build the Hamiltonian and return Hamiltonian
         '''
         mpi.report('build one-body')
-        self.build_h1e(eloc, D, Lambdac, 0)
+        self.build_h1e(eloc, D, Lambdac, 0, verbose=verbose)
         self.build_one_body(self.h1e)
         mpi.report('build two-body')
         if self.Htwo is None:
@@ -626,7 +394,6 @@ class CI(object):
         self.Ham = self.Hone + self.Htwo + self.spin_pen*self.S2
         self.Ham += self.sz_pen*self.Sz.dot(self.Sz) + self.sx_pen*self.Sx.dot(self.Sx) + self.sy_pen*self.Sy.dot(self.Sy)
         mpi.report('done')
-#        assert(abs( (self.Ham - self.Ham.getH()).max() ) < 1e-12), 'Hamiltonian is not Hermitian! H.getH()-H='
         if debug:
             return self.Ham
 
@@ -643,7 +410,6 @@ class CI(object):
             for j in range(self.norb):
                 row_ind, col_ind, data = build_cid_cj_csc(i, j, self.basis, bit_max, self.norb, debug=False)
                 if len(row_ind) > 0:
-                    #print('max(row_ind)=',np.max(row_ind), self.hsize)
                     if np.max(row_ind) >= self.hsize:
                         print(self.basis)
                         print(row_ind)
@@ -674,76 +440,6 @@ class CI(object):
         self.Sx = 0.5*(Sp + Sm)
         self.Sy = 0.5*(Sp - Sm)/1j
 
-    #def build_docc_op(self,debug=False):
-    #    '''
-    #    build the double occupancy operators into a dictionary.
-    #    denmat_op: key: int i indicating the orbital i (even number).
-    #               element: scipy.sparse.csc_matrix storing the operator C^\dagger_{i}C_{i}C^\dagger_{i+1}C_{i+1}
-    #    '''
-    #    self.docc_op = {}
-    #    bit_max = 2**(self.norb-1)
-    #    for i in range(0,self.norb,2):
-    #        indptr = []
-    #        indices = []
-    #        bsrids = []
-    #        data = []
-    #        cumu = 0
-    #        for bsrid,bsr in enumerate(self.basis):
-    #            indptr.append(cumu)
-    #            tmp_bit1 = bit_max>>(i+1) #2**(self.norb-1-(i+1))
-    #            tmp_bit2 = bit_max>>(i+1) #2**(self.norb-1-(i+1))
-    #            tmp_bit3 = bit_max>>i #2**(self.norb-1-i)
-    #            tmp_bit4 = bit_max>>i #2**(self.norb-1-i)
-    #            if self.strb.format(bsr)[i] != '1' or self.strb.format(bsr)[i+1] != '1': #HERE
-    #                continue
-    #            # annhilate particles on l and j
-    #            #bsltmp = bsr ^ tmp_bit1
-    #            # create particles on i and k
-    #            #bsl = bsltmp | tmp_bit2
-    #            #annhilate particle i
-    #            bsltmp1 = bsr ^ tmp_bit1
-    #            #create particle i+1
-    #            bsltmp2 = bsltmp1 | tmp_bit2
-    #            #annhilate particle i
-    #            bsltmp3 = bsltmp2 ^ tmp_bit3
-    #            #create particle k
-    #            bsl = bsltmp3 | tmp_bit4
-    #            if bsl not in self.basis: #continue if bsl is not in the basis set
-    #                continue
-    #            else: # look up basis id
-    #                bslid = np.where(self.basis==bsl)[0][0]
-    #            # compute the sign
-    #            sign = 0
-    #            #for s in self.strb.format(bsr)[:i+1]:#HERE
-    #            #  sign += int(s)
-    #            #for s in self.strb.format(bsltmp1)[:i+1]:#HERE
-    #            #  sign += int(s)
-    #            #for s in self.strb.format(bsltmp2)[:i]:#HERE
-    #            #  sign += int(s)
-    #            #for s in self.strb.format(bsltmp3)[:i]:#HERE
-    #            #  sign += int(s)
-    #            sign += self.strb.format(bsr)[:i+1].count('1')
-    #            sign += self.strb.format(bsltmp1)[:i+1].count('1')
-    #            sign += self.strb.format(bsltmp2)[:i].count('1')
-    #            sign += self.strb.format(bsltmp3)[:i].count('1')
-    #            sign = (-1.)**sign#HERE
-    #            if debug:
-    #                print(i, 'bsrid=',bsrid,'bsr=',bsr, self.strb.format(bsr),'bslid=',bslid,'bsl=',bsl, self.strb.format(bsl), 'cumu=',cumu)
-    #            #construct csc matrix index, pointer, and data
-    #            if bslid not in indices or bsrids[indices.index(bslid)]!= bsrid: # if new element
-    #                indices.append(bslid)
-    #                data.append(sign*1.0)
-    #                bsrids.append(bsrid)
-    #                cumu += 1
-    #            else: # else add to data
-    #                idx = indices.index(bslid)
-    #                data[idx] += sign*1.0
-    #        indptr.append(cumu)
-    #        #print i,j
-    #        #print indices
-    #        #print indptr
-    #        #print data
-    #        self.docc_op[i] = csc_matrix( (data, indices, indptr), shape=(self.hsize,self.hsize),dtype=self.data_type)
 
     def build_docc_op(self,i,debug=False):
         '''
@@ -829,7 +525,6 @@ class CI(object):
             vals, vecs = eigsh(self.Ham,k=num_eig,which=which,tol=tol)
         so = vals.argsort()
         vals = vals[so]
-        print('vals:',vals[:5])
         vecs = vecs[:, so]
         self.gs_wf = vecs[:,0]
         self.gs_ene = vals[0]
@@ -846,7 +541,7 @@ class CI(object):
             print('Building thermal partition function')
             for eit in vals[1:]:
                 boltz_weight = np.exp(-beta*(eit-self.gs_ene))
-                if(boltz_weight>1e-8 or True):
+                if(boltz_weight>1e-8):
                     self.bw_list.append(boltz_weight*1.0)
                     self.Zpart += boltz_weight
                     self.Tstates += 1
@@ -864,7 +559,8 @@ class CI(object):
                         it += 1
         if mpi.is_master_node():
             print('# Energy\t\tS2\t\t\tSz\t\t\tSx\t\t\tSy\t\t\tSz2\t\t\tSx2\t\t\tSy2')
-            for i in range(int(self.Tstates)):
+            if(verbose>1):
+              for i in range(int(self.Tstates)):
                 S2 = vecs[:,i].conj().T.dot(self.S2.dot(vecs[:,i]))
                 Sz = vecs[:,i].conj().T.dot(self.Sz.dot(vecs[:,i]))
                 Sz2 = vecs[:,i].conj().T.dot(self.Sz.dot(self.Sz).dot(vecs[:,i]))
@@ -875,7 +571,7 @@ class CI(object):
                 print("%.12e  \t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej" %
                       (vals[i], S2.real, S2.imag, Sz.real, Sz.imag, Sx.real, Sx.imag, Sy.real, Sy.imag, Sz2.real, Sz2.imag, Sx2.real, Sx2.imag, Sy2.real, Sy2.imag))
                 print('deg=',self.deg,' - Boltzmann weight=',self.bw_list[i])
-                #print('energies=',vals)
+                print('')
         #CHECK THAN LENGTHS ARE CORRECTS FOR BW_LIST VALS AND SO ON
         self.evals=self.evals[:self.Tstates]
         self.evecs=self.evecs[:,:self.Tstates]
@@ -895,10 +591,6 @@ class CI(object):
         
         U = self.evecs    # shape (dim, self.Tstates)
         W = np.diag(bw)   # Boltzmann weights
-
-        print("shapes")
-        print(U.shape)
-        print(W.shape)
         
         for i in range(self.norb):
             for j in range(self.norb):
@@ -909,21 +601,7 @@ class CI(object):
         self.dm = dm
         return dm
 
-    def compute_Eloc(self):
-        '''
-        Compute local energy including local one and two-body term from a given set of thermal states.
-        Works also at zero Temperature
-        Input:
-        Return:
-          Eloc: float. Total local energy.
-        '''
-        U = self.evecs
-        bw = np.asarray(self.bw_list)
-        Z = np.sum(bw)
 
-        Hloc = self.Htwo + self.Honeloc
-        # sum_n bw[n] <n|Hloc|n> / Z
-        return np.trace(U.conj().T @ Hloc @ U @ np.diag(bw)) / Z
 
     def compute_E1loc(self, nimp):
         '''
@@ -957,6 +635,316 @@ class CI(object):
 
         return np.trace(U.conj().T @ self.Htwo @ U @ np.diag(bw)) / Z
 
+
+
+
+    def calc_double_occ(self, i):
+        '''
+        Compute thermal double occupancy on orbital i and i+1.
+        '''
+        docc_op = self.build_docc_op(i)
+        
+        U = self.evecs
+        bw = np.asarray(self.bw_list)
+        Z = np.sum(bw)
+        
+        return np.trace(
+            U.conj().T @ docc_op @ U @ np.diag(bw)
+        ) / Z
+
+
+
+
+#UNSURE
+    def h5write_gs(self,filename,group_path,name):
+        #check that group at group_path exists
+        with h5py.File(filename,"a") as f:
+            if group_path not in f:
+                f.create_group(group_path)
+            f[group_path][name] = self.gs_wf
+        return
+
+    def h5read_state(self,filename,group_path,name):
+        #check that group at group_path exists
+        with h5py.File(filename,"r") as f:
+            return f[group_path][name][:]
+
+    def inner(self,bra,ket,operator=None):
+        if operator is not None:
+            return np.vdot(bra,operator.dot(ket))
+        else:
+            return np.vdot(bra,ket)
+
+
+
+# ********** REPLACEABLE **********
+#HERE ONE CAN USE DIRECTLY WITHIN PYTHON:
+# n.bit_count()
+@jit(nopython=True)#,cache=True)
+def countSetBits(n):
+    count = 0
+    while (n):
+        count += n & 1
+        n >>= 1
+    return count
+
+
+#HERE ONE CAN USE DIRECTLY np.searchsorted
+@jit(nopython=True)
+def search_bsl(basis, bsl):
+  '''
+  Helper function to find element in sorted list
+  '''
+    return np.searchsorted(basis, bsl)
+
+
+  
+# ********** POSSIBLE JUNK ***********
+
+#NEVER USED
+def reverseBits(norb,n):
+  strb = '{0:0'+str(norb)+'b}'
+  rb = strb.format(n)[::-1]
+  return int(rb,2)
+
+#NEVER USED - NO SC
+def table_es_sc(nstate,spinz,dtype=np.int64):
+    '''
+    This function generates the table of binary representations of a particle-non-conserved and spin-conserved basis.
+    '''
+    strb = '{0:0'+str(nstate)+'b}'
+    tmp = np.arange(0,2**nstate)
+    result = []
+    for bs in tmp:
+        print(bs, strb.format(bs) )
+        # Get all even bits of x
+        even_bits = bs & 0xAAAAAAAA
+        # Get all odd bits of x
+        odd_bits = bs & 0x55555555
+        nup = countSetBits(even_bits)
+        ndn = countSetBits(odd_bits)
+        print(nup,ndn)
+        if nup-ndn==spinz:
+            result.append(bs)
+    result = np.array(result)
+    result.sort()
+    return result
+
+# NEVER USED
+def build_no_trial_states(norb, nimp, nelc):
+    """ Natural orbital convention as (nimp|empty|inter|filled) for example
+        1-orbital impurity
+        (01|00000|01|11111)
+        (10|00000|10|11111)
+
+        3-orbital impurity
+        (010101|000000|010101|111111)
+        (101010|000000|101010|111111)
+    """
+    print("building cisd basis")
+    strb = '{0:0'+str(norb)+'b}'
+    result = []
+    for i in range(2):#spin-block
+        tmp = 0
+        for j in range(nimp//2):# impurity orbital block
+            tmp += 1 <<(2*j+i)
+        #print('tmp=',strb.format(tmp))
+        tmp = tmp << (norb - nimp)
+        #print('tmp1=',strb.format(tmp))
+        tmp2 = 0
+        for j in range(nimp//2):# intermediate obirtal block
+            tmp2 += 1 <<(2*j+(1-i))
+        tmp2 = tmp2 << (nelc - nimp)
+        #print('tmp2=',strb.format(tmp2))
+        tmp = tmp | tmp2
+        for j in range(nelc-nimp):
+            tmp = tmp | (1<<j)
+        #print(strb.format(tmp))
+        result.append(tmp)
+    result = np.array(result)
+    return result
+
+
+
+#NEVER USED ALSO WE DO NOT WANT A SINGLETON TO DO INEQUIVALENT SITES!
+Instance = None
+is_ci_initialized = False
+def getInstance(*args):#singleton
+    global Instance
+    if Instance is None:
+        Instance = simple_ed(*args)
+    return Instance
+
+
+#USED IN SOME COMMENTED PARTS
+    def build_bipart_smap(self,debug=False):
+        '''
+        build the bipartite state map between system, local and enviroment in to a dictionary
+        with key: system state, element: [local state, enviornment state]
+        Another way is 2D array row index correspond to basis set, column index correspond to
+        representation of [system, local, environment].
+        '''
+        #self.bipart_smap = {}
+        self.bipart_smap = np.zeros((len(self.basis),3),dtype=np.int32)
+        #for s in self.basis:
+        #    bs = self.strb.format(s)
+        #    #print s, bs
+        #    smap[s] = strb.format(s)
+        #    # site-1
+        #    self.bipart_smap[s] = [int(bs[:self.norb/2],2)]
+        #    # site-2
+        #    self.bipart_smap[s].append(int(bs[self.norb/2:],2))
+        for i in range(len(self.basis)):
+            self.bipart_smap[i,0] = self.basis[i]
+            bs = self.strb.format(self.basis[i])
+            self.bipart_smap[i,1] = int(bs[:self.norb//2],2)
+            self.bipart_smap[i,2] = int(bs[self.norb//2:],2)
+        if debug:
+            #for s in self.basis:
+                #print self.strb.format(s), self.strb_red.format(self.bipart_smap[s][0]), self.strb_red.format(self.bipart_smap[s][1])
+            for i in range(len(self.basis)):
+                print(self.strb.format(self.bipart_smape[i][0]), self.strb_red.format(self.bipart_smape[i][1]),  self.strb_red.format(self.bipart_smape[i][2]))
+
+#NEVER USED
+    def trloc(self, M):
+        '''
+        trace out the local degrees of freedom of a matrix M
+        Input:
+          M: numpy.array
+        '''
+        #ns = len(self.basis)
+        no = 2**(self.norb//2)# special case for single-orbital#int(np.log2(ns))
+
+        #enlarge M to Mijkl tensor, where i,j is the state index for site 1, and
+        #k,l is the state index for site 2.
+        Mijkl = np.zeros((no,no,no,no),dtype=M.dtype)
+        for i in self.basis:#loop over system basis
+            for j in self.basis:#loop over system basis
+                iidx = np.where(self.basis==i)[0][0]
+                jidx = np.where(self.basis==j)[0][0]
+                Mijkl[self.bipart_smap[i][0],self.bipart_smap[i][1],self.bipart_smap[j][0],self.bipart_smap[j][1]] = M[iidx,jidx]
+        trlocM = np.einsum("kikj",Mijkl)
+        return trlocM
+
+#NEVER USED
+    def enlarge_loc2sys(self,M):
+        '''
+        enlarge a local matrix M to system Hilbert space, i.e., the operation M \otimes I.
+        Input:
+          M: numpy.array
+        '''
+        Msys = np.zeros((self.hsize,self.hsize),dtype=M.dtype)
+        for i,s1 in enumerate(self.basis):
+            for j,s2 in enumerate(self.basis):
+                if self.bipart_smap[s1][1] == self.bipart_smap[s2][1]:
+                    Msys[i,j] += M[self.bipart_smap[s1][0],self.bipart_smap[s2][0]]
+        return Msys
+
+#NEVER USED
+    def enlarge_env2sys(self,M):
+        '''
+        enlarge a environment matrix M to system Hilbert space, i.e., the operation M \otimes I.
+        Input:
+          M: numpy.array
+        '''
+        Msys = np.zeros((self.hsize,self.hsize),dtype=M.dtype)
+        for i,s1 in enumerate(self.basis):
+            for j,s2 in enumerate(self.basis):
+                if self.bipart_smap[s1][0] == self.bipart_smap[s2][0]:
+                    Msys[i,j] = M[self.bipart_smap[s1][1],self.bipart_smap[s2][1]]
+        return Msys
+
+    #def build_docc_op(self,debug=False):
+    #    '''
+    #    build the double occupancy operators into a dictionary.
+    #    denmat_op: key: int i indicating the orbital i (even number).
+    #               element: scipy.sparse.csc_matrix storing the operator C^\dagger_{i}C_{i}C^\dagger_{i+1}C_{i+1}
+    #    '''
+    #    self.docc_op = {}
+    #    bit_max = 2**(self.norb-1)
+    #    for i in range(0,self.norb,2):
+    #        indptr = []
+    #        indices = []
+    #        bsrids = []
+    #        data = []
+    #        cumu = 0
+    #        for bsrid,bsr in enumerate(self.basis):
+    #            indptr.append(cumu)
+    #            tmp_bit1 = bit_max>>(i+1) #2**(self.norb-1-(i+1))
+    #            tmp_bit2 = bit_max>>(i+1) #2**(self.norb-1-(i+1))
+    #            tmp_bit3 = bit_max>>i #2**(self.norb-1-i)
+    #            tmp_bit4 = bit_max>>i #2**(self.norb-1-i)
+    #            if self.strb.format(bsr)[i] != '1' or self.strb.format(bsr)[i+1] != '1': #HERE
+    #                continue
+    #            # annhilate particles on l and j
+    #            #bsltmp = bsr ^ tmp_bit1
+    #            # create particles on i and k
+    #            #bsl = bsltmp | tmp_bit2
+    #            #annhilate particle i
+    #            bsltmp1 = bsr ^ tmp_bit1
+    #            #create particle i+1
+    #            bsltmp2 = bsltmp1 | tmp_bit2
+    #            #annhilate particle i
+    #            bsltmp3 = bsltmp2 ^ tmp_bit3
+    #            #create particle k
+    #            bsl = bsltmp3 | tmp_bit4
+    #            if bsl not in self.basis: #continue if bsl is not in the basis set
+    #                continue
+    #            else: # look up basis id
+    #                bslid = np.where(self.basis==bsl)[0][0]
+    #            # compute the sign
+    #            sign = 0
+    #            #for s in self.strb.format(bsr)[:i+1]:#HERE
+    #            #  sign += int(s)
+    #            #for s in self.strb.format(bsltmp1)[:i+1]:#HERE
+    #            #  sign += int(s)
+    #            #for s in self.strb.format(bsltmp2)[:i]:#HERE
+    #            #  sign += int(s)
+    #            #for s in self.strb.format(bsltmp3)[:i]:#HERE
+    #            #  sign += int(s)
+    #            sign += self.strb.format(bsr)[:i+1].count('1')
+    #            sign += self.strb.format(bsltmp1)[:i+1].count('1')
+    #            sign += self.strb.format(bsltmp2)[:i].count('1')
+    #            sign += self.strb.format(bsltmp3)[:i].count('1')
+    #            sign = (-1.)**sign#HERE
+    #            if debug:
+    #                print(i, 'bsrid=',bsrid,'bsr=',bsr, self.strb.format(bsr),'bslid=',bslid,'bsl=',bsl, self.strb.format(bsl), 'cumu=',cumu)
+    #            #construct csc matrix index, pointer, and data
+    #            if bslid not in indices or bsrids[indices.index(bslid)]!= bsrid: # if new element
+    #                indices.append(bslid)
+    #                data.append(sign*1.0)
+    #                bsrids.append(bsrid)
+    #                cumu += 1
+    #            else: # else add to data
+    #                idx = indices.index(bslid)
+    #                data[idx] += sign*1.0
+    #        indptr.append(cumu)
+    #        #print i,j
+    #        #print indices
+    #        #print indptr
+    #        #print data
+    #        self.docc_op[i] = csc_matrix( (data, indices, indptr), shape=(self.hsize,self.hsize),dtype=self.data_type)
+
+
+#NEVER USED
+    def compute_Eloc(self):
+        '''
+        Compute local energy including local one and two-body term from a given set of thermal states.
+        Works also at zero Temperature
+        Input:
+        Return:
+          Eloc: float. Total local energy.
+        '''
+        U = self.evecs
+        bw = np.asarray(self.bw_list)
+        Z = np.sum(bw)
+
+        Hloc = self.Htwo + self.Honeloc
+        # sum_n bw[n] <n|Hloc|n> / Z
+        return np.trace(U.conj().T @ Hloc @ U @ np.diag(bw)) / Z
+
+
+#NEVER USED
     #????
     def compute_denmat_from_phi(self,phi):
         '''
@@ -971,6 +959,8 @@ class CI(object):
             for j in range(self.norb):
                 denmat[i,j] = phi.conj().T.dot(self.denmat_op[(i,j)].dot(phi))
         return denmat
+
+#NEVER USED
 
     def compute_rholoc_onfly(self):
         '''
@@ -989,6 +979,10 @@ class CI(object):
         self.rholoc = build_rholoc_onfly(self.basis, self.gs_wf, rholoc, self.bipart_smap)
         return self.rholoc
 
+
+
+
+#NEVER USED
     def compute_rho(self):
         '''
         Compute many-body density matrix
@@ -1008,20 +1002,22 @@ class CI(object):
         #print 'rholoc='
         #print self.rholoc
         return self.rholoc
+      
 
-    def calc_double_occ(self, i):
+    def trenv(self, M):
         '''
-        Compute thermal double occupancy on orbital i and i+1.
+        trace out the environment degrees of freedom of a matrix M
+        Input:
+          M: numpy.array
         '''
-        docc_op = self.build_docc_op(i)
-        
-        U = self.evecs
-        bw = np.asarray(self.bw_list)
-        Z = np.sum(bw)
-        
-        return np.trace(
-            U.conj().T @ docc_op @ U @ np.diag(bw)
-        ) / Z
+        no = 2**(self.norb//2)# special case for single-orbital#int(np.log2(ns))
+        trenvM = lil_matrix((no,no),dtype=M.dtype)
+        for i in range(len(self.basis)):
+            for j in range(len(self.basis)):
+                if self.bipart_smap[i,2] == self.bipart_smap[j,2] and abs(M[i,j]) > 1e-12:
+                    trenvM[self.bipart_smap[i,1],self.bipart_smap[j,1]] += M[i,j]
+
+        return trenvM
 
 
     def compute_docc_i_from_phi(self,i,phi):
@@ -1033,6 +1029,8 @@ class CI(object):
           docc: float. double occupancy.
         '''
         return phi.conj().T.dot(self.docc_op[i].dot(phi))
+
+
 
     def compute_Eloc_from_phi(self,phi):
         '''
@@ -1048,22 +1046,3 @@ class CI(object):
         '''
         compute local impurity Green's function
         '''
-
-    def h5write_gs(self,filename,group_path,name):
-        #check that group at group_path exists
-        with h5py.File(filename,"a") as f:
-            if group_path not in f:
-                f.create_group(group_path)
-            f[group_path][name] = self.gs_wf
-        return
-
-    def h5read_state(self,filename,group_path,name):
-        #check that group at group_path exists
-        with h5py.File(filename,"r") as f:
-            return f[group_path][name][:]
-
-    def inner(self,bra,ket,operator=None):
-        if operator is not None:
-            return np.vdot(bra,operator.dot(ket))
-        else:
-            return np.vdot(bra,ket)

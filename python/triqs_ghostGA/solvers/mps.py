@@ -20,7 +20,10 @@ from itertools import product as itp
 import triqs_ghostGA
 from triqs_ghostGA.solvers.utility.utils_mps import setup_MPS, rotateBath, rotateDensityMatrix, rotateToTsungHanConvention
 
-
+#SAMUELE's COMMENT
+# - implement docc
+# - prevent thermal calculation with some error
+# - is EHint the same as E2loc? then do not use different names
 
 class ITensorMPSSolver(object):
     ''' FTPS solver class'''
