@@ -22,7 +22,7 @@ def calc_rhoks(R, Lambda, eks, T, mu=0):
 
 #########################################
 
-def calc_D(R, Lambda, Delta_p, eks, rhoks):
+def OLD_calc_D(R, Lambda, Delta_p, eks, rhoks):
     r"""Compute the D matrix from R, Lambda and Delta, which is given by
 
     .. math::
@@ -37,7 +37,7 @@ def calc_D(R, Lambda, Delta_p, eks, rhoks):
 
 #########################################
 
-def calc_Lambda_c(R, Lambda, Delta_p, D, H_list):
+def calc_Lambda_c_old(R, Lambda, Delta_p, D, H_list):
     r"""Compute Lambda_c matrix from R, D, Lambda and Delta. It is given by
 
     .. math::

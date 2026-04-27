@@ -26,5 +26,5 @@ Module containing the ghost-Gutzwiller approximation lattice solver
 
 """
 
-from .lattice import LatticeSolver
-__all__ = ["LatticeSolver"]
+#from .lattice import LatticeSolver
+#__all__ = ["LatticeSolver"]

@@ -6,10 +6,6 @@ from scipy.optimize import root, least_squares, brentq, minimize
 # N.B. we tested that mu_qp is not necessary therefore I will momentarily move the routines at the end of the file
 # adding a _ at the end. they will be removed in the future
 
-
-
-
-
 # -------------------------
 # Build H
 # -------------------------
@@ -477,89 +473,153 @@ def solve_F_dF_minimize(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target
 
 
 
+# In the following penalty from moving away from previous solution
 
-#TESTING WITH ADDED NON-LINEAR CONSTRAINTS - NOT WORKING
+# ---------- Movement-penalized residuals / jacobians for Lambda+R -----------
+def residual_LR_movement(x, beta, Lambda_c, D, F22_target, RTF12_target, x0, alpha=1e-5):
+    """Original residuals + movement-penalty residuals sqrt(2*alpha)*(x-x0)."""
+    r = residual_LR(x, beta, Lambda_c, D, F22_target, RTF12_target)
+    # movement residuals
+    if alpha <= 0.0:
+        return r
+    factor = np.sqrt(2.0 * alpha)
+    r_move = factor * (x - x0)
+    return np.concatenate([r, r_move])
 
+def jacobian_LR_movement(x, beta, Lambda_c, D, F22_target, RTF12_target, x0, alpha=1e-5):
+    """Stack original Jacobian with movement-penalty rows: factor * I."""
+    J = jacobian_LR(x, beta, Lambda_c, D, F22_target, RTF12_target)  # shape (m, N)
+    if alpha <= 0.0:
+        return J
+    N = x.size
+    factor = np.sqrt(2.0 * alpha)
+    # create extra rows: factor * identity (N rows x N cols)
+    Jpen = factor * np.eye(N, dtype=float)
+    # stack (original m x N) with (N x N) => (m+N, N)
+    return np.vstack([J, Jpen])
 
-# # objective and gradient from residuals
-# def objective(x, *args):
-#     r = residual_LR(x, *args)
-#     return 0.5 * np.dot(r, r)
+def solve_F_dF_LR_with_movement(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target,
+                                alpha=1e-5, use_analytic_jac=True, max_nfev=200):
+    """
+    Least-squares solve with quadratic movement penalty around starting x0.
+    alpha: penalty strength for sum_j (x_j-x0_j)^2 in objective.
+    If use_analytic_jac True, provides jacobian via jacobian_LR_movement to least_squares.
+    """
+    x0 = pack_params(Lambda0, R0)
+    if use_analytic_jac:
+        sol = least_squares(
+            residual_LR_movement,
+            x0,
+            jac=jacobian_LR_movement,
+            args=(beta, Lambda_c, D, F22_target, RTF12_target, x0, alpha),
+            method="trf",
+            x_scale="jac",
+            max_nfev=max_nfev,
+            ftol=1e-9,
+            xtol=1e-9,
+            gtol=1e-9,
+            verbose=2
+        )
+    else:
+        sol = least_squares(
+            residual_LR_movement,
+            x0,
+            jac='2-point',
+            args=(beta, Lambda_c, D, F22_target, RTF12_target, x0, alpha),
+            method="trf",
+            x_scale="jac",
+            max_nfev=max_nfev,
+            ftol=1e-9,
+            xtol=1e-9,
+            gtol=1e-9,
+            verbose=2
+        )
+    Lambda_sol, R_sol = unpack_params(sol.x, Lambda0.shape[0], R0.shape[1])
+    return sol, Lambda_sol, R_sol
 
-# def objective_grad(x, *args):
-#     J = jacobian_LR(x, *args)   # shape (m, nparams)
-#     r = residual_LR(x, *args)   # shape (m,)
-#     return J.T.dot(r)           # grad of 0.5||r||^2 is J^T r
-
-# # constraint: c(x) = 1 - sigma_max(R(x)) >= 0
-# def cons_fun(x, n, p):
-#     # c(x) >= 0
-#     # sigma_max(R) <= 1  <=>  1 - sigma_max(R) >= 0
-#     Lambda, R = unpack_params(x, n, p)
-#     smax = np.linalg.svd(R, compute_uv=False, full_matrices=False)[0]
-#     return 1.0 - smax
-
-
-# def cons_jac(x, n, p):
-#     # Gradient of c(x) wrt the REAL parameter vector x
-
-#     iu = np.triu_indices(n)
-#     iu_strict = np.triu_indices(n, k=1)
-#     n_re = len(iu[0])
-#     n_im = len(iu_strict[0])
-#     offset = n_re + n_im  # where R_re starts
-
-#     Lambda, R = unpack_params(x, n, p)
-
-#     U, S, Vh = np.linalg.svd(R, full_matrices=False)
-#     u = U[:, 0]                 # (n,)
-#     v = Vh.conj().T[:, 0]       # (p,)
-
-#     # coefficient appearing in Re(u^H dR v) is conj(u_i) * v_j
-#     coeff = np.outer(u.conj(), v)   # (n,p)
-
-#     # c = 1 - smax => dc = - d smax
-#     # ds = Re( sum coeff_ij * dR_ij )
-#     # For R = Rre + i Rim:
-#     # d/dRre: Re(coeff)
-#     # d/dRim: -Im(coeff)
-#     dc_dRre = -coeff.real
-#     dc_dRim = +coeff.imag   # because dc = -ds and ds/dRim = -Im(coeff)
-
-#     jac = np.zeros_like(x, dtype=float)
-#     jac[offset : offset + n*p] = dc_dRre.reshape(-1)
-#     jac[offset + n*p : offset + 2*n*p] = dc_dRim.reshape(-1)
-#     return jac
-
-
-
-# def solve_F_dF_minimize_2(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target):
-#     smax0 = np.linalg.svd(R0, compute_uv=False, full_matrices=False)[0]
-#     if smax0 > 1.0:
-#         R0 = R0 / smax0
-#     x0 = pack_params(Lambda0, R0)
-
-#     res = residual_LR(x0, beta, Lambda_c, D, F22_target, RTF12_target)
-
-#     n,p = R0.shape
-#     # Create constraints dict for minimize (ineq expects fun >= 0)
-#     cons = {'type': 'ineq', 'fun': lambda x, n=n, p=p: cons_fun(x, n, p),
-#             'jac': lambda x, n=n, p=p: cons_jac(x, n, p)}
-#     sol = minimize(objective, x0, args=(beta, Lambda_c, D, F22_target, RTF12_target),
-#                    jac=objective_grad, constraints=[cons],
-#                    method='trust-constr',
-#                    options={'verbose': 2, 'maxiter': 500})
-
-#     print('sols.fun=',sol.fun)
-#     print('sols.message=',sol.message)
-#     Lambda_sol, R_sol = unpack_params(sol.x, Lambda0.shape[0], R0.shape[1])
-#     return sol, Lambda_sol, R_sol 
+def update_self_energy_thermal_penalty(Lambda0, R0, Lambda_c, D, F22_target, RTF12_target,
+                             beta=200, alpha=1e-5, method="dF"):
+    """
+    Replacement of new_self_energy that includes movement penalty alpha * ||x-x0||^2.
+    method is passed to choose between analytic/numeric jacobian inside the solver.
+    """
+    sol, Lambda_sol, R_sol = solve_F_dF_LR_with_movement(
+        beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target,
+        alpha=alpha, use_analytic_jac=(method=="dF")
+    )
+    return Lambda_sol, R_sol
 
 
+# ---------- Movement-penalized residuals / jacobians for Lambda_c + D -----------
+def residual_LcD_movement(x, beta, Lambda, R, F11_target, F12D_target, x0, alpha=1e-5):
+    r = residual_LcD(x, beta, Lambda, R, F11_target, F12D_target)
+    if alpha <= 0.0:
+        return r
+    factor = np.sqrt(2.0 * alpha)
+    r_move = factor * (x - x0)
+    return np.concatenate([r, r_move])
 
-# def new_self_energy_2(Lambda0,R0, Lambda_c,D, F22_target,RTF12_target, beta=200, method="dF"):
-#     res, new_Lambda, new_R = solve_F_dF_minimize_2(beta, Lambda_c,D,Lambda0,R0,F22_target,RTF12_target)
-#     return new_Lambda, new_R
+def jacobian_LcD_movement(x, beta, Lambda, R, F11_target, F12D_target, x0, alpha=1e-5):
+    J = jacobian_LcD(x, beta, Lambda, R, F11_target, F12D_target)  # (m, N)
+    if alpha <= 0.0:
+        return J
+    N = x.size
+    factor = np.sqrt(2.0 * alpha)
+    Jpen = factor * np.eye(N, dtype=float)
+    return np.vstack([J, Jpen])
+
+def solve_F_dF_LcD_with_movement(beta, Lambda, R, Lambda_c0, D0, F11_target, F12D_target,
+                                 alpha=1e-5, use_analytic_jac=True, max_nfev=200):
+    x0 = pack_params(Lambda_c0, D0)
+    if use_analytic_jac:
+        sol = least_squares(
+            residual_LcD_movement,
+            x0,
+            jac=jacobian_LcD_movement,
+            args=(beta, Lambda, R, F11_target, F12D_target, x0, alpha),
+            method="trf",
+            x_scale="jac",
+            max_nfev=max_nfev,
+            ftol=1e-9,
+            xtol=1e-9,
+            gtol=1e-9,
+            verbose=2
+        )
+    else:
+        sol = least_squares(
+            residual_LcD_movement,
+            x0,
+            jac='2-point',
+            args=(beta, Lambda, R, F11_target, F12D_target, x0, alpha),
+            method="trf",
+            x_scale="jac",
+            max_nfev=max_nfev,
+            ftol=1e-9,
+            xtol=1e-9,
+            gtol=1e-9,
+            verbose=2
+        )
+    Lambda_c_sol, D_sol = unpack_params(sol.x, D0.shape[0], D0.shape[1])
+    return sol, Lambda_c_sol, D_sol
+
+def update_hybridization_thermal_penalty(Lambda_c0, D0, Lambda, R, F11_target, F12D_target,
+                               beta=200, alpha=1e-5, method="dF"):
+    '''
+    Function to update the hybridization function parameters D and Lambda_c
+    '''
+    sol, Lambda_c_sol, D_sol = solve_F_dF_LcD_with_movement(
+        beta, Lambda, R, Lambda_c0, D0, F11_target, F12D_target,
+        alpha=alpha, use_analytic_jac=(method=="dF")
+    )
+    return Lambda_c_sol, D_sol
+
+
+
+
+
+
+
+
 
 
 
@@ -680,7 +740,6 @@ def new_self_energy_penalty(Lambda0, R0, Lambda_c, D, F22_target, RTF12_target,
         beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target, w=w
     )
     return new_Lambda, new_R
-
 
 
 
@@ -1189,3 +1248,5 @@ def solve_F_dF_minimize_(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_targe
     print('sols.message=',sol.message)
     Lambda_sol, R_sol = unpack_params_(sol.x, Lambda0.shape[0], R0.shape[1])
     return sol, Lambda_sol, R_sol 
+
+
