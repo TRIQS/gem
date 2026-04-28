@@ -93,13 +93,17 @@ class Gdmft(object):
         self.etot = self.ekin + self.epot - mu*self.nfill
 
 # THIS FOR TEMP
-    def run(self, mu=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., n_target=None, silence=True, spin_pen=0.0, sz_pen=0.0, idx=0, num_eig=2, ed_verbose=0, fit_method='dF'):
+    def run(self, mu=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., n_target=None, n_tolerance=1e-3,
+            silence=True, spin_pen=0.0, sz_pen=0.0, idx=0, num_eig=2, ed_verbose=0, n_fit_method='qp'):
 
         print("mu = ", mu)
         self.Lattice.T = 1./beta
         self.Fragment.T = 1./beta
         self.diff = 1e20
+        self.mu = mu
         for it in range(itmax):
+
+            print(' Doing it:',it,'/',itmax)
 
             self.Lattice.solve_qp([self.Fragment])
 
@@ -124,11 +128,18 @@ class Gdmft(object):
                     print(self.Fragment.Lambda_c[:,:])
 
             # ED solvers
-            self.Fragment.solve_impurity(mu,num_eig=1,spin_pen=self.spin_pen)
+            self.Fragment.solve_impurity(self.mu,num_eig=1,spin_pen=self.spin_pen)
 
             #Update R and Update Lambda
             self.nfill = np.trace(self.Fragment.denMat[:self.nimp,:self.nimp])
-            print(" --> n_filling:",self.nfill)
+            print(" --> n_filling:",self.nfill,' - target:',n_target)
+            if( np.abs(self.nfill - n_target)>n_tolerance):
+                print('Fitting')
+                mu_new = self.Lattice.fit_mu( n_target, [self.Fragment], mode=n_fit_method, mu_old=self.mu, ntol=n_tolerance )
+                if(not mu_new is None): 
+                    self.mu = mu_new
+                    self.Fragment.solve_impurity(self.mu,num_eig=1,spin_pen=self.spin_pen)
+
             Lambda_old = self.Fragment.Lambda.copy()
             R_old = self.Fragment.R.copy()
 
@@ -147,6 +158,7 @@ class Gdmft(object):
             print('Rdag@R:', R_new.T.conj() @ R_new )
             print('diff_R:',diff_R)
             print('diff_L:',diff_Lambda)
+            print('mu:',self.mu)
             #time.sleep(1)
             self.diff = max(diff_R,diff_Lambda)
             self.Lambda = Lambda_new

@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.linalg import block_diag
+from scipy.optimize import brentq, bisect
 from .fragment import Fragment
 from .utility.utilities import calc_nf, calc_Fermi
 
@@ -62,16 +63,14 @@ class Lattice():
 
         return self.Delta_p_tot, self.ERD_tot
 
-    def fit_mu(self, n_target, Fragments_list, mu0=0.0, mode='qp'):
-        #Check that mu0 is float and mode is str
-        # and n_target is float and comprehended between
-        match mode.lower():
-            case( 'qp' | 'quasiparticle' ):
-                self.fit_mu_quasiparticle( n_target, Fragments_list, mu0=0.0 )
-            case( 'imp' | 'impurity' | 'frag' | 'fragment' ):
-                self.fit_mu_fragment( n_target, Fragments_list, mu0=0.0 )
+    def fit_mu(self, n_target, Fragments_list, mu_old=0.0, mode='qp', ntol=1e-4):
+        m = mode.lower()
+        if m in ('qp', 'quasiparticle'):
+            return self.fit_mu_quasiparticle( n_target, Fragments_list, mu_old=mu_old )
+        elif m in ('imp', 'impurity', 'frag', 'fragment'):
+            return self.fit_mu_fragment( n_target, Fragments_list, mu_old=mu_old, ntol=ntol )
 
-    def fit_mu_quasiparticle(self, n_target, Fragments_list, mu0=0.0):
+    def fit_mu_quasiparticle(self, n_target, Fragments_list, mu_old=0.0):
         if not isinstance(Fragments_list, list) or not all(isinstance(F, Fragment) for F in Fragments_list):
             raise TypeError(f"Fragments_list must be a list of Fragment objects")
 
@@ -87,37 +86,61 @@ class Lattice():
         #Check if can be jitted
         def qp_density( mu, T, Lqp, Rqp, ek_qp, wk_qp):
             dens=0.0
+            Lmu = Lqp - mu* Rqp @ np.eye(Rqp.shape[1]) @Rqp.T.conj()
             for ek,wk in zip(ek_qp, wk_qp):
-                Hk_qp = Rqp @ ( ek -mu )@ Rqp.T.conj() + Lqp
-                ekvals = np.linalg.eigvals(Hk_qp)
+                Hk_qp = Rqp @ ek @ Rqp.T.conj() + Lmu
+                ekvals = np.linalg.eigvalsh(Hk_qp)
                 dens += np.sum(calc_Fermi(ekvals/T))*wk
-            return dens
+            return dens/np.sum(wk_qp)
+        print('start_qp_dens:',qp_density( 0.0, self.T, self.Ltot, self.Rtot, self.eks, self.wks))
 
         nqp_target = 0.5*(nbath_tot-nimp_tot) + n_target
         try:
-            #DO: try root_finder which mu=mu_target such that qp_density(mu ...)==nqp_target starting from a guess mu=mu0
+            def residual(mu):
+                return qp_density(mu, self.T, self.Ltot, self.Rtot, self.eks, self.wks) - nqp_target
 
+            a, b = -10.0, 10.0
+            for _ in range(200):
+                if residual(a) * residual(b) < 0:
+                    break
+                a -= 10.0
+                b += 10.0
+            dmu_target =  bisect(f=residual, a=a, b=b, xtol=1e-5)
+            mu_target  = mu_old + dmu_target
             for F in Fragments_list:
-                F.Lambda += F.R @ mu_target*np.eye(F.nimp) @ F.R.T.conj()
+                F.Lambda -= F.R @ ( dmu_target * np.eye(F.nimp)) @ F.R.T.conj()
         except:
             mu_target=None
-
 
         return mu_target
 
 
 
-    def fit_mu_fragment(self, n_target, Fragments_list, nsteps=5, dmu0=1e-2, ntol=1e-4, mu0=0.0, spin_pen=0.0):
+    def fit_mu_fragment(self, n_target, Fragments_list, nsteps=10, dmu0=1e-2, ntol=1e-4, mu_old=0.0, spin_pen=0.0):
         if not isinstance(Fragments_list, list) or not all(isinstance(F, Fragment) for F in Fragments_list):
             raise TypeError(f"Fragments_list must be a list of Fragment objects")
 
-        nfill_new = sum(F.nfill for F in Fragments_list)
-        dmu=dmu0*np.sign(nfill_old-n_target)
-        mu_old=mu0
-        mu_new=mu_old+dmu
-        # solve_impurity(self, mu, num_eig=1, spin_pen=0.0) for all fragments and update nfill_new saving nfill_old
-        # then produce a linear interpolation to find the mu that would realize nfill_new=n_target and keep until convergence
-        # is reached ( ntol < abs(nfill_new-n_target) ) or the maximum number od steps (nsteps) is reached 
+        nfill_old = sum(F.nfill for F in Fragments_list)
+        dmu = dmu0 * np.sign(nfill_old - n_target)
+        mu_o = mu_old
+        mu_n = mu_o + dmu
 
-        return mu_new
+        for _ in range(nsteps):
+            for F in Fragments_list:
+                F.solve_impurity(mu_n, num_eig=1, spin_pen=spin_pen)
+            nfill_new = sum(F.nfill for F in Fragments_list)
+
+            if abs(nfill_new - n_target) < ntol:
+                break
+
+            dnfill = nfill_new - nfill_old
+            if abs(dnfill) > 1e-14:
+                mu_interp = mu_o + (mu_n - mu_o) * (n_target - nfill_old) / dnfill
+            else:
+                mu_interp = mu_n + dmu
+
+            mu_o, nfill_old = mu_n, nfill_new
+            mu_n = mu_interp
+
+        return mu_n
 
