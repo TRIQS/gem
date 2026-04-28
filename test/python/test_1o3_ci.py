@@ -2,9 +2,7 @@
 
 import unittest
 
-from triqs_ghostGA import LatticeSolver
 from triqs_ghostGA.gdmft import *
-from triqs_ghostGA.utility.utilities import U_matrix_kanamori
 from triqs_ghostGA.utility.e_list import EList_SemiCircular
 import numpy as np
 from triqs_ghostGA.solvers.ci import CI
@@ -16,7 +14,10 @@ class test_hemb_ci_1o3(unittest.TestCase):
     def test_gdmft_ci(self):
 
         # 1 orbital with 2 spins, 3 bath per orbital, total 8
-        nimp, nbath, ntot = 2, 6, 8
+        B = 3
+        nimp = 2
+        nbath = nimp*B
+        ntot = nimp+nbath
 
         # construct ek with semicircular DOS
         e_list = EList_SemiCircular(nmesh=5000).e_list
@@ -47,9 +48,8 @@ class test_hemb_ci_1o3(unittest.TestCase):
         # test CI solver
         edsolver = CI(ntot, use_Ntot=True,
                       use_Sz=True, dtype=np.complex128)
-        grisb = Gdmft(ntot, nimp, nbath, eks, eloc, Utensor, R=R0,
-                      Lambda=Lambda0, edsolver=edsolver)
-        grisb.run(itmax=30, mix=1, tol=1e-5, beta=500,
+        grisb = Gdmft(ntot, nimp, nbath, eks, eloc, Utensor, edsolver=edsolver)
+        grisb.run(itmax=30, mix=0.2, tol=1e-5, beta=500,
                   silence=True)
 
         name = "1o3_ci"
@@ -65,7 +65,7 @@ class test_hemb_ci_1o3(unittest.TestCase):
             idx = ref_denM_eval.argsort()[::-1]
             ref_denM_eval = ref_denM_eval[idx]
 
-            test_denM_eval, test_denM_evec = np.linalg.eig(grisb.denMat)
+            test_denM_eval, test_denM_evec = np.linalg.eig(grisb.Fragment.denMat)
             idx = test_denM_eval.argsort()[::-1]
             test_denM_eval = test_denM_eval[idx]
 
