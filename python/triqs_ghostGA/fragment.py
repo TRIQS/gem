@@ -10,12 +10,12 @@ class Fragment():
 # nimp and nbath or nimp and B?
 # Think of passing dict instead of all those parameters?
 # N.B. penalties and sectors are decided at solver level, thermal?
-    def __init__(self, \
-                 nimp: int, nbath: int, T: float, \
-                 eloc: np.ndarray, Utensor: np.ndarray, \
-                 solver, \
-                 Lambda=None,R=None,Lambda_c=None,D=None, \
-                 Thermal=False, spin_sym=False, verbose=0 \
+    def __init__(self,
+                 nimp: int, nbath: int, T: float,
+                 eloc: np.ndarray, Utensor: np.ndarray,
+                 solver,
+                 Lambda=None,R=None,Lambda_c=None,D=None,
+                 Thermal=False, spin_sym=False, verbose=0
                   ):
 
         #Checks?
