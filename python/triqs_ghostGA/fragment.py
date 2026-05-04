@@ -153,7 +153,7 @@ class Fragment():
 
         return self.R, self.Lambda
 
-    def update_hybridization(self, move_pen=1e-6):
+    def update_hybridization(self, mix=0.1, move_pen=1e-6):
         '''
         This function update the hybridization parameters Lambda_c and D
         '''
@@ -169,8 +169,8 @@ class Fragment():
             D_new=np.kron( D_new[::2,::2], np.eye(2) )
             Lc_new=np.kron( Lc_new[::2,::2], np.eye(2) )
 
-        self.D = D_new.copy()
-        self.Lambda_c = Lc_new.copy()
+        self.D = (1-mix)*D_new.copy() + mix*self.D
+        self.Lambda_c = (1-mix)*Lc_new.copy() + mix*self.Lambda_c
 
         return self.D, self.Lambda_c
 
