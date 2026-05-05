@@ -15,7 +15,7 @@ class Fragment():
                  eloc: np.ndarray, Utensor: np.ndarray,
                  solver,
                  Lambda=None,R=None,Lambda_c=None,D=None,
-                 Thermal=False, spin_sym=False, verbose=0
+                 Thermal=False, verbose=0
                   ):
 
         #Checks?
@@ -72,11 +72,9 @@ class Fragment():
                 raise ValueError(f"D must be ({nbath},{nimp}), got {self.D.shape}")
 
         self.thermal = Thermal
-        self.spin_sym = spin_sym
         self.verb = verbose
 
         #Create Hermitian list here and store
-        #only spinful but is spin_sym one may think of smaller one
         #maybe with a variable nspin being 1 or 2 so that [::nspin] always stride properly
         self.H_list,self.tH_list=Hermitian_list(nbath)
 
@@ -122,10 +120,12 @@ class Fragment():
             self.solver.solve_Hemb(num_eig=num_eig, verbose=self.verb )
 
         self.denMat = self.solver.calc_density_matrix()
+        fdagf = self.denMat[self.nimp:,self.nimp:]
+        self.Delta_aim = np.eye(self.nbath) - fdagf
         self.nfill  = np.trace( self.denMat[:self.nimp,:self.nimp] )
         self.E2loc  = self.solver.compute_E2loc()
 
-    def update_self_energy(self, mix=0.0, move_pen=1e-6):
+    def update_self_energy(self, move_pen=1e-6):
         '''
         This function update the self-energy parameters Lambda and R
         '''
@@ -140,17 +140,11 @@ class Fragment():
         else:
             R_new = np.transpose( cdagf.dot( funcMat(self.Delta_aim, denR)) )
             L_new = calc_Lambda( R_new, self.Lambda_c, self.Delta_aim, self.D, self.H_list )
-
-        if(self.spin_sym):
-            R_new=np.kron( R_new[::2,::2], np.eye(2) )
-            L_new=np.kron( L_new[::2,::2], np.eye(2) )
-
-        self.R = (1-mix)*R_new.copy() + mix*self.R
-        self.Lambda = (1-mix)*L_new.copy() + mix*self.Lambda
-
+        self.R = R_new.copy()
+        self.Lambda = L_new.copy()
         return self.R, self.Lambda
 
-    def update_hybridization(self, mix=0.0, move_pen=1e-6):
+    def update_hybridization(self, move_pen=1e-6):
         '''
         This function update the hybridization parameters Lambda_c and D
         '''
@@ -160,15 +154,9 @@ class Fragment():
                                                                  beta=1/self.T, alpha=move_pen, method="dF")
         else:
             D_new = np.dot(funcMat(self.Delta_qp, denR),np.transpose(self.ERD))
-            Lc_new = calc_Lambda_c(self.R, self.Lambda, self.Delta_qp, self.D, self.H_list)
-
-        if(self.spin_sym):
-            D_new=np.kron( D_new[::2,::2], np.eye(2) )
-            Lc_new=np.kron( Lc_new[::2,::2], np.eye(2) )
-
-        self.D = (1-mix)*D_new.copy() + mix*self.D
-        self.Lambda_c = (1-mix)*Lc_new.copy() + mix*self.Lambda_c
-
+            Lc_new = calc_Lambda_c(self.R, self.Lambda, self.Delta_qp, D_new, self.H_list)
+        self.D = D_new.copy()
+        self.Lambda_c = Lc_new.copy()
         return self.D, self.Lambda_c
 
     def compute_Z(self, mu=0.0, z0=0.0, h=1e-8):
@@ -185,3 +173,29 @@ class Fragment():
         dSigma = (Sigma(z0 + h) - Sigma(z0 - h)) / (2*h)
 
         return np.linalg.inv(I_nu - dSigma)
+    
+    ###### ROUTINES TO IMPOSE SYMMETRY #####
+    def impose_spin_SU2_symmetry(self):
+        self.R = 0.5*np.kron( self.R[::2,::2] + self.R[1::2,1::2], np.eye(2) )
+        self.Lambda = 0.5*np.kron( self.Lambda[::2,::2] + self.Lambda[1::2,1::2], np.eye(2) )
+        self.Lambda_c = 0.5*np.kron( self.Lambda_c[::2,::2] + self.Lambda_c[1::2,1::2], np.eye(2) )
+        self.D = 0.5*np.kron( self.D[::2,::2] + self.D[1::2,1::2], np.eye(2) )
+
+    def impose_orbital_symmetry(self):
+        n_orb = self.nimp//2
+        R_new = np.zeros((self.nbath//n_orb, self.nimp//n_orb), dtype=np.complex128)
+        Lambda_new = np.zeros((self.nbath//n_orb, self.nbath//n_orb), dtype=np.complex128)
+        D_new = np.zeros((self.nbath//n_orb, self.nimp//n_orb), dtype=np.complex128)
+        Lambda_c_new = np.zeros((self.nbath//n_orb, self.nbath//n_orb), dtype=np.complex128)
+
+        for i in range(n_orb):
+            idx_i = slice(i*2, (i+1)*2)
+            idx_b = slice(i*(self.nbath//n_orb), (i+1)*(self.nbath//n_orb))
+            R_new += self.R[idx_b, idx_i]
+            Lambda_new += self.Lambda[idx_b, idx_b]
+            D_new += self.D[idx_b, idx_i]
+            Lambda_c_new += self.Lambda_c[idx_b, idx_b]
+        self.R = np.kron(np.eye(n_orb), R_new)/n_orb
+        self.Lambda = np.kron(np.eye(n_orb), Lambda_new)/n_orb
+        self.Lambda_c = np.kron(np.eye(n_orb), Lambda_c_new)/n_orb 
+        self.D = np.kron(np.eye(n_orb), D_new)/n_orb
