@@ -40,10 +40,6 @@ from h5 import HDFArchive
 import triqs.utility.mpi as mpi
 from triqs.operators import util, n, c, c_dag, Operator
 from solid_dmft.dmft_tools import solver
-try:
-    import forktps as ftps
-except ImportError:
-    pass
 
 
 def _extract_U_J_list(param_name, n_inequiv_shells, general_params):
@@ -198,15 +194,7 @@ def _construct_kanamori(sum_k, general_params, icrsh):
     else:
         U_prime = general_params['U_prime'][icrsh]
 
-    if general_params['solver_type'] == 'ftps':
-        # 1-band modell requires J and U' equals zero
-        if n_orb == 1:
-            up, j = 0.0, 0.0
-        else:
-            up = U_prime
-            j = general_params['J'][icrsh]
-        h_int = ftps.solver_core.HInt(u=general_params['U'][icrsh], j=j, up=up, dd=False)
-    elif sum_k.SO == 0:
+    if sum_k.SO == 0:
         # Constructs U matrix
         #Umat, Upmat = util.U_matrix_kanamori(n_orb=n_orb, U_int=general_params['U'][icrsh],
         #                                     J_hund=general_params['J'][icrsh],
@@ -516,10 +504,6 @@ def construct(sum_k, general_params, advanced_params):
                     and general_params['ratio_F4_F2'][icrsh] != 'none'):
                 raise ValueError('Ratio F4/F2 only implemented for d-shells '
                                  + 'but set in impurity {}'.format(icrsh))
-
-            if general_params['h_int_type'][icrsh] == 'density_density' and general_params['solver_type'] == 'ftps':
-                # TODO: implement
-                raise NotImplementedError('\nNote: Density-density not implemented for ftps.')
 
             Umat_full = _generate_four_index_u_matrix(sum_k, general_params, icrsh)
 

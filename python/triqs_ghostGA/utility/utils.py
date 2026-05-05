@@ -16,7 +16,6 @@
 # Authors: Olivier Gingras and Tsung-Han Lee
 
 import numpy as np
-import triqs.utility.mpi as mpi
 
 def logo():
     logo = """

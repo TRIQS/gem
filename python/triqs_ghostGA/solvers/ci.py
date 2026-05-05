@@ -10,7 +10,7 @@ from scipy.linalg import block_diag
 import numpy as np
 from numba import jit
 import h5py
-import triqs.utility.mpi as mpi
+
 from math import factorial
 from itertools import combinations
 
@@ -303,15 +303,15 @@ class CI(object):
             self.basis = single_and_double_determinants(norb,reference_determinant,use_Sz=use_Sz)
 
         self.hsize = len(self.basis) # hilbert space size
-        mpi.report('size of basis= {:d}'.format( len(self.basis) ))#, 'data type of basis=', self.basis.dtype)
+        print('size of basis= {:d}'.format( len(self.basis) ))#, 'data type of basis=', self.basis.dtype)
         #print 'basis='
         #for bs in self.basis:
         #  print bs, self.strb.format(bs)
 
         if not is_ci_initialized:
             # build operators
-            mpi.report('build denmat_op')
-            mpi.report('build S2_op')
+            print('build denmat_op')
+            print('build S2_op')
             self.build_denmat_op() # density matrix operators. TODO: enforcing hopping structure to speed up the process.
             #self.build_docc_op() # double occupancy
             self.build_S2_op()# build total S2
@@ -383,17 +383,17 @@ class CI(object):
         '''
         build the Hamiltonian and return Hamiltonian
         '''
-        mpi.report('build one-body')
+        print('build one-body')
         self.build_h1e(eloc, D, Lambdac, 0, verbose=verbose)
         self.build_one_body(self.h1e)
-        mpi.report('build two-body')
+        print('build two-body')
         if self.Htwo is None:
             self.build_two_body(V2E)
-        mpi.report('one-body + two-body')
+        print('one-body + two-body')
         self.M = {"up": self.h1e[::2, ::2], "dn": self.h1e[1::2, 1::2]}
         self.Ham = self.Hone + self.Htwo + self.spin_pen*self.S2
         self.Ham += self.sz_pen*self.Sz.dot(self.Sz) + self.sx_pen*self.Sx.dot(self.Sx) + self.sy_pen*self.Sy.dot(self.Sy)
-        mpi.report('done')
+        print('done')
         if debug:
             return self.Ham
 
@@ -517,7 +517,7 @@ class CI(object):
         '''
         diagonalize the Hamiltonian
         '''
-        mpi.report('diagonalizing num_eig= {:d}'.format(num_eig))
+        print('diagonalizing num_eig= {:d}'.format(num_eig))
         if(self.hsize < 4000):
             print("Doing FULL diagonalization")
             vals, vecs = eigh(self.Ham.toarray())
@@ -557,7 +557,7 @@ class CI(object):
                         self.bw_list.append(1.0)
                         self.Tstates += 1
                         it += 1
-        if mpi.is_master_node():
+        if True:
             print('# Energy\t\tS2\t\t\tSz\t\t\tSx\t\t\tSy\t\t\tSz2\t\t\tSx2\t\t\tSy2')
             if(verbose>1):
               for i in range(int(self.Tstates)):

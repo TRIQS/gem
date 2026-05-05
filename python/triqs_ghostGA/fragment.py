@@ -81,13 +81,13 @@ class Fragment():
         self.H_list,self.tH_list=Hermitian_list(nbath)
 
         if(self.verb>1):
-            print('initial R matirx =')
+            print('initial R matrix =')
             print(self.R)
-            print('initial Lambda matirx =')
+            print('initial Lambda matrix =')
             print(self.Lambda)
-            print('initial D matirx =')
+            print('initial D matrix =')
             print(self.D)
-            print('initial Lambda_c matirx =')
+            print('initial Lambda_c matrix =')
             print(self.Lambda_c)
         print("##### END OF FRAGMENT INITIALIZATION #####")
 
@@ -103,9 +103,6 @@ class Fragment():
 
         if self.solver.type == "CI":
             self.solver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor)
-
-        elif self.solver.type == "FTPS":
-            self.solver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor, spin_pen=spin_pen)
 
         elif self.solver.type == "ITensorMPSSolver":
             self.solver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor, spin_pen=spin_pen)
@@ -128,7 +125,7 @@ class Fragment():
         self.nfill  = np.trace( self.denMat[:self.nimp,:self.nimp] )
         self.E2loc  = self.solver.compute_E2loc()
 
-    def update_self_energy(self, mix=0.1, move_pen=1e-6):
+    def update_self_energy(self, mix=0.0, move_pen=1e-6):
         '''
         This function update the self-energy parameters Lambda and R
         '''
@@ -153,7 +150,7 @@ class Fragment():
 
         return self.R, self.Lambda
 
-    def update_hybridization(self, mix=0.1, move_pen=1e-6):
+    def update_hybridization(self, mix=0.0, move_pen=1e-6):
         '''
         This function update the hybridization parameters Lambda_c and D
         '''

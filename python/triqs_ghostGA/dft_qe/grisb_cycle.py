@@ -75,13 +75,9 @@ def grisb_cycle(general_params, solver_params, advanced_params, dft_params,
     # TODO: use_dft_blocks=True yields inconsistent number of blocks!
 
     # first we have to determine the mesh
-    if general_params['solver_type'] in ['ftps']:
-        sumk_mesh = MeshReFreq(window=general_params['w_range'],
-                               n_w=general_params['n_w'])
-    else:
-        sumk_mesh = MeshImFreq(beta=general_params['beta'],
-                               S='Fermion',
-                               n_iw=general_params['n_iw'])
+    sumk_mesh = MeshImFreq(beta=general_params['beta'],
+                           S='Fermion',
+                           n_iw=general_params['n_iw'])
 
 # TODO
     sum_k = SumkGRISB(hdf_file=general_params['jobname']+'/'+general_params['seedname']+'.h5',
@@ -152,11 +148,7 @@ def grisb_cycle(general_params, solver_params, advanced_params, dft_params,
             sum_k.chemical_potential = general_params['mu_initial_guess']
             mpi.report('\ninitial chemical potential set to {:.3f} eV\n'.format(sum_k.chemical_potential))
 
-    if general_params['solver_type'] in ['ftps']:
-        dft_mu = sum_k.calc_mu(precision=general_params['prec_mu'],
-                               broadening=general_params['eta'])
-    else:
-        dft_mu = sum_k.calc_mu(precision=general_params['prec_mu'], method=general_params['calc_mu_method'])
+    dft_mu = sum_k.calc_mu(precision=general_params['prec_mu'], method=general_params['calc_mu_method'])
 ##TODO
     mpi.report('dft_mu={:2.8f}'.format(dft_mu))
 
@@ -194,10 +186,9 @@ def grisb_cycle(general_params, solver_params, advanced_params, dft_params,
 
     # Previous rot_mat only not None if the rot_mat changed from load_sigma or previous run
     previous_rot_mat = None
-    solver_struct_ftps = None
     # determine block structure for GF and Hyb function
     if det_blocks and not general_params['load_sigma']:
-        sum_k, dm, solver_struct_ftps = _determine_block_structure(sum_k, general_params, advanced_params)
+        sum_k, dm, _ = _determine_block_structure(sum_k, general_params, advanced_params)
     # if load sigma we need to load everything from this h5 archive
     elif general_params['load_sigma']:
         #loading block_struc and rot_mat and deg_shells
@@ -206,9 +197,6 @@ def grisb_cycle(general_params, solver_params, advanced_params, dft_params,
                 sum_k.block_structure = old_calc['DMFT_input/block_structure']
                 sum_k.deg_shells = old_calc['DMFT_input/deg_shells']
                 previous_rot_mat = old_calc['DMFT_input/rot_mat']
-                if general_params['solver_type'] in ['ftps']:
-                    solver_struct_ftps = old_calc['DMFT_input/solver_struct_ftps']
-
             if not all(np.allclose(x, y) for x, y in zip(sum_k.rot_mat, previous_rot_mat)):
                 print('WARNING: rot_mat in current run is different from loaded_sigma run.')
             else:
@@ -217,7 +205,6 @@ def grisb_cycle(general_params, solver_params, advanced_params, dft_params,
         sum_k.block_structure = mpi.bcast(sum_k.block_structure)
         sum_k.deg_shells = mpi.bcast(sum_k.deg_shells)
         previous_rot_mat = mpi.bcast(previous_rot_mat)
-        solver_struct_ftps = mpi.bcast(solver_struct_ftps)
 
         # In a magnetic calculation, no shells are degenerate
         if general_params['magnetic'] and sum_k.SO == 0:
@@ -234,13 +221,9 @@ def grisb_cycle(general_params, solver_params, advanced_params, dft_params,
                 archive['DMFT_input']['rot_mat'] = sum_k.rot_mat
             else:
                 previous_rot_mat = None
-            if general_params['solver_type'] in ['ftps']:
-                solver_struct_ftps = archive['DMFT_input/solver_struct_ftps']
-
         sum_k.block_structure = mpi.bcast(sum_k.block_structure)
         sum_k.deg_shells = mpi.bcast(sum_k.deg_shells)
         previous_rot_mat = mpi.bcast(previous_rot_mat)
-        solver_struct_ftps = mpi.bcast(solver_struct_ftps)
         dm = None
 
     # Compatibility with h5 archives from the triqs2 version
@@ -264,11 +247,8 @@ def grisb_cycle(general_params, solver_params, advanced_params, dft_params,
     formatter.print_block_sym(sum_k, dm, general_params)
 
     # extract free lattice greens function
-    if general_params['solver_type'] in ['ftps']:
-        G_loc_all_dft = sum_k.extract_G_loc(broadening=general_params['eta'], with_Sigma=False, mu=dft_mu)
-    else:
 ##TODO
-        G_loc_all_dft = sum_k.extract_G_loc( mu=dft_mu)
+    G_loc_all_dft = sum_k.extract_G_loc( mu=dft_mu)
     density_mat_dft = [G_loc_all_dft[iineq].density() for iineq in range(sum_k.n_inequiv_shells)]
 
     for iineq in range(sum_k.n_inequiv_shells):
@@ -297,15 +277,13 @@ def grisb_cycle(general_params, solver_params, advanced_params, dft_params,
             archive['DMFT_input']['block_structure'] = sum_k.block_structure
             archive['DMFT_input']['deg_shells'] = sum_k.deg_shells
             archive['DMFT_input']['shell_multiplicity'] = shell_multiplicity
-            if general_params['solver_type'] in ['ftps']:
-                archive['DMFT_input']['solver_struct_ftps'] = solver_struct_ftps
 
     solvers = [None] * sum_k.n_inequiv_shells
     for icrsh in range(sum_k.n_inequiv_shells):
         # Construct the Solver instances
         solvers[icrsh] = SolverStructure(general_params, solver_params, advanced_params,
                                          sum_k, icrsh, h_int[icrsh],
-                                         iteration_offset, solver_struct_ftps)
+                                         iteration_offset)
 
     # store solver hash to archive
     if mpi.is_master_node():
@@ -571,10 +549,7 @@ def _grisb_step(sum_k, solvers, it, general_params,
 
     # Extracts G local
 # TODO
-    #if general_params['solver_type'] in ['ftps']:
-    #    G_loc_all = sum_k.extract_G_loc(broadening=general_params['eta'])
-    #else:
-    #    G_loc_all = sum_k.extract_G_loc()
+    #G_loc_all = sum_k.extract_G_loc()
 #!TODO
 
     # Copies Sigma and G0 before Solver run for mixing later

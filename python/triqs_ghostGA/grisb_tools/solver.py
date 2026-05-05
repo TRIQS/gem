@@ -28,7 +28,7 @@ class SolverStructure(SStructure):
         solve impurity problem
     '''
 
-    def __init__(self, general_params, solver_params, advanced_params, sum_k, icrsh, h_int, iteration_offset, solver_struct_ftps):
+    def __init__(self, general_params, solver_params, advanced_params, sum_k, icrsh, h_int, iteration_offset):
         r'''
         Initialisation of the solver instance with h_int for impurity "icrsh" based on soliDMFT parameters.
 
@@ -55,7 +55,6 @@ class SolverStructure(SStructure):
         self.icrsh = icrsh
         self.h_int = h_int
         self.iteration_offset = iteration_offset
-        self.solver_struct_ftps = solver_struct_ftps
         self.nimp = self.sum_k.eloc_orig[self.icrsh]['up'].shape[0]
         self.nbath = self.general_params['norb_baths'][self.icrsh]
         # initialize density matrix as zeros
