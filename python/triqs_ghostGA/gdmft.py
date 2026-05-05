@@ -46,7 +46,7 @@ class Gdmft(object):
     :type Hfull_list: list
 
     """
-    def __init__(self, ntot, nimp, nbath, eks, eloc, Utensor, wks=None, spin_sym=True, soc=False, R=None, Lambda=None, D=None, Lambda_c=None, edsolver=None, suff='',thermal=False, T=1e-2,verbose=0,spin_pen=0):
+    def __init__(self, ntot, nimp, nbath, eks, eloc, Utensor, wks=None, spin_sym=True, orb_sym=False, soc=False, R=None, Lambda=None, D=None, Lambda_c=None, edsolver=None, suff='',thermal=False, T=1e-2,verbose=0,spin_pen=0):
         print("##### INITIALIZATON OF THE GRISB OBJECT (DMFT-like algorithm)#####")
         self.ntot = ntot
         self.nimp = nimp
@@ -57,6 +57,7 @@ class Gdmft(object):
         self.Utensor = Utensor
         self.soc = soc
         self.spin_sym = spin_sym
+        self.orb_sym = orb_sym
         self.gs_wf = None
         self.suff = suff    # Suffixe for file writting when many cpu at same time
         self.thermal = thermal
@@ -71,7 +72,7 @@ class Gdmft(object):
         self.Fragment = Fragment(self.nimp, self.nbath, self.T,
                  self.eloc, self.Utensor, edsolver,
                  Lambda=Lambda,R=R,Lambda_c=Lambda_c,D=D,
-                 Thermal=thermal, spin_sym=self.spin_sym, verbose=self.verb
+                 Thermal=thermal, verbose=self.verb
                   )
         self.Lambda=self.Fragment.Lambda
         self.R     =self.Fragment.R
@@ -115,14 +116,14 @@ class Gdmft(object):
             if not silence:
                 if not self.soc:
                     print("Delta_p=")
-                    print(self.Fragment.Delta_aim[::2,::2])
+                    print(self.Fragment.Delta_qp[::2,::2])
                     print("D=")
                     print(self.Fragment.D[::2,::2])
                     print("Lambda_c=")
                     print(self.Fragment.Lambda_c[::2,::2])
                 else:
                     print("Delta_p=")
-                    print(self.Fragment.Delta_aim[:,:])
+                    print(self.Fragment.Delta_qp[:,:])
                     print("D=")
                     print(self.Fragment.D[:,:])
                     print("Lambda_c=")
@@ -133,6 +134,9 @@ class Gdmft(object):
 
             #Update R and Update Lambda
             self.nfill = np.trace(self.Fragment.denMat[:self.nimp,:self.nimp])
+            print('imp denmat:')
+            print(self.Fragment.denMat[:self.nimp,:self.nimp])
+
             print(" --> n_filling:",self.nfill,' - target:',n_target)
             if( (not n_target is None) and (np.abs(self.nfill - n_target)>n_tolerance) ):
                 print('Fitting')
@@ -144,12 +148,12 @@ class Gdmft(object):
             Lambda_old = self.Fragment.Lambda.copy()
             R_old = self.Fragment.R.copy()
 
-            R_new, Lambda_new = self.Fragment.update_self_energy(mix=mix)
+            R_new, Lambda_new = self.Fragment.update_self_energy()
 
             L_eval_new, UL_new = np.linalg.eigh(Lambda_new[::2,::2])
             L_eval_old, UL_old = np.linalg.eigh(Lambda_old[::2,::2])
 
-            diff_R = (np.abs(UL_old@R_old[::2,::2])-np.abs(UL_new@R_new[::2,::2]) ).max()
+            diff_R = np.abs(np.abs(UL_old@R_old[::2,::2])-np.abs(UL_new@R_new[::2,::2]) ).max()
 
             diff_Lambda = np.abs(L_eval_new-L_eval_old).max()
 
@@ -162,8 +166,24 @@ class Gdmft(object):
             print('mu:',self.mu)
             #time.sleep(1)
             self.diff = max(diff_R,diff_Lambda)
+            # MIXING
+            Lambda_new = (1-mix)*Lambda_new.copy() + mix*Lambda_old
+            R_new = (1-mix)*R_new.copy() + mix*R_old
+            
+            # Update mixed parameters
+            self.Fragment.Lambda = Lambda_new
+            self.Fragment.R = R_new
             self.Lambda = Lambda_new
             self.R = R_new
+
+            if(self.spin_sym):
+                self.Fragment.impose_spin_SU2_symmetry()
+                self.Lambda = self.Fragment.Lambda
+                self.R = self.Fragment.R
+            if(self.orb_sym):
+                self.Fragment.impose_orbital_symmetry()
+                self.Lambda = self.Fragment.Lambda
+                self.R = self.Fragment.R
 
             convg_n=True
             if not silence:
@@ -181,7 +201,7 @@ class Gdmft(object):
                 print(self.Fragment.denMat[::2,::2])
             print("iteration:",it,'diff=',self.diff)
 
-            if (self.diff < tol and it>1) or it == (itmax-1):
+            if (self.diff < tol and it>2) or it == (itmax-1):
                 print("--------------------- ghost-RISB converged with diff=%g ---------------------"%(self.diff))
                 print("density matrix=")
                 print(self.Fragment.denMat)
