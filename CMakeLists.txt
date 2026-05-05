@@ -31,23 +31,40 @@ if(POLICY CMP0144)
 endif()
 
 # ############
-# Load TRIQS and CPP2PY
-find_package(TRIQS 3.3 REQUIRED)
+# Find Python
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+set(Python_EXECUTABLE ${Python3_EXECUTABLE})
 
-# Get the git hash & print status
-triqs_get_git_hash_of_source_dir(PROJECT_GIT_HASH)
+# Get the git hash
+execute_process(
+  COMMAND git -C ${PROJECT_SOURCE_DIR} rev-parse --short HEAD
+  OUTPUT_VARIABLE PROJECT_GIT_HASH
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  ERROR_QUIET
+)
+if(NOT PROJECT_GIT_HASH)
+  set(PROJECT_GIT_HASH "unknown")
+endif()
 message(STATUS "${PROJECT_NAME} version : ${PROJECT_VERSION}")
 message(STATUS "${PROJECT_NAME} Git hash: ${PROJECT_GIT_HASH}")
 
-# Enforce Consistent Versioning
-if(NOT ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR} VERSION_EQUAL ${TRIQS_VERSION_MAJOR}.${TRIQS_VERSION_MINOR})
-  message(FATAL_ERROR "The ${PROJECT_NAME} version ${PROJECT_VERSION} is not compatible with TRIQS version ${TRIQS_VERSION}.")
-endif()
+# Compute Python install destination relative to prefix
+execute_process(
+  COMMAND ${Python3_EXECUTABLE} -c
+    "import sys, os, sysconfig; print(os.path.relpath(sysconfig.get_path('purelib'), sys.prefix))"
+  OUTPUT_VARIABLE PYTHON_LIB_DEST_ROOT
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
 
-# Default Install directory to TRIQS_ROOT if not given or invalid.
+# Default install directory to Python prefix if not given or invalid.
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT OR (NOT IS_ABSOLUTE ${CMAKE_INSTALL_PREFIX}))
-  message(STATUS "No install prefix given (or invalid). Defaulting to TRIQS_ROOT")
-  set(CMAKE_INSTALL_PREFIX ${TRIQS_ROOT} CACHE PATH "default install path" FORCE)
+  execute_process(
+    COMMAND ${Python3_EXECUTABLE} -c "import sys; print(sys.prefix)"
+    OUTPUT_VARIABLE _python_prefix
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+  message(STATUS "No install prefix given (or invalid). Defaulting to Python prefix: ${_python_prefix}")
+  set(CMAKE_INSTALL_PREFIX ${_python_prefix} CACHE PATH "default install path" FORCE)
   set(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT FALSE)
 endif()
 if(NOT IS_SUBPROJECT)
@@ -67,11 +84,6 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 if(NOT IS_SUBPROJECT)
   message(STATUS "-------- BUILD-TYPE: ${CMAKE_BUILD_TYPE} --------")
-endif()
-
-# Python Support
-if(NOT TRIQS_WITH_PYTHON_SUPPORT)
-  message(FATAL_ERROR "TRIQS was installed without Python support. Cannot build the Python Interface. Disable the build with -DPythonSupport=OFF")
 endif()
 
 # Documentation
@@ -118,8 +130,6 @@ function(check_option_python command_str name)
   endif()
 endfunction()
 
-# Forktps
-check_option_python("import forktps" "ForkTPS")
 check_option_python("import block2" "Block2")
 
 # #############
@@ -135,7 +145,7 @@ if(BUILD_DEBIAN_PACKAGE AND NOT IS_SUBPROJECT)
   set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
   set(CPACK_PACKAGE_CONTACT "https://github.com/TRIQS/${PROJECT_NAME}")
   execute_process(COMMAND dpkg --print-architecture OUTPUT_VARIABLE CMAKE_DEBIAN_PACKAGE_ARCHITECTURE OUTPUT_STRIP_TRAILING_WHITESPACE)
-  set(CPACK_DEBIAN_PACKAGE_DEPENDS "triqs (>= 3.3), python3, python3-numpy, h5py")
+  set(CPACK_DEBIAN_PACKAGE_DEPENDS "python3, python3-numpy, h5py")
   set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
   set(CPACK_DEBIAN_PACKAGE_GENERATE_SHLIBS ON)
   include(CPack)
