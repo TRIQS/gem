@@ -46,12 +46,13 @@ class Gdmft(object):
     :type Hfull_list: list
 
     """
-    def __init__(self, ntot, nimp, nbath, eks, eloc, Utensor, spin_sym=True, soc=False, R=None, Lambda=None, D=None, Lambda_c=None, edsolver=None, suff='',thermal=False, T=1e-2,verbose=0,spin_pen=0):
+    def __init__(self, ntot, nimp, nbath, eks, eloc, Utensor, wks=None, spin_sym=True, soc=False, R=None, Lambda=None, D=None, Lambda_c=None, edsolver=None, suff='',thermal=False, T=1e-2,verbose=0,spin_pen=0):
         print("##### INITIALIZATON OF THE GRISB OBJECT (DMFT-like algorithm)#####")
         self.ntot = ntot
         self.nimp = nimp
         self.nbath = nbath
         self.eks = eks
+        self.wks = wks
         self.eloc = eloc
         self.Utensor = Utensor
         self.soc = soc
@@ -77,7 +78,7 @@ class Gdmft(object):
         self.Lambda_c=self.Fragment.Lambda_c
         self.D       =self.Fragment.D
         
-        self.Lattice = Lattice(self.T, self.eks, verbose=self.verb)
+        self.Lattice = Lattice(self.T, self.eks, wk_list=self.wks, verbose=self.verb)
 
 
 
