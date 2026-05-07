@@ -5,6 +5,7 @@ import unittest
 from triqs_ghostGA.gdmft import *
 from triqs_ghostGA.utility.utilities import U_matrix_kanamori
 import numpy as np
+import h5py
 from triqs_ghostGA.solvers.simple_ed import SimpleED
 import os
 
@@ -69,13 +70,15 @@ class test_hemb_2o6_ci(unittest.TestCase):
         grisb.run(itmax=9, mix=0.0, tol=1e-5, beta=1000, silence=False)
 
         name = "2o6_ci"
-        with HDFArchive(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "r") as A:
+        with h5py.File(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "r") as A:
 
             print("Compare docc")
-            np.testing.assert_allclose(grisb.docc, A[name]["docc"], atol=1e-3)
+            docc_true = [A[name]["docc"][str(i)][0] + 1j*A[name]["docc"][str(i)][1] for i in range(len(grisb.docc))]
+            np.testing.assert_allclose(grisb.docc, docc_true, atol=1e-3)
 
             print("Compare denMat")
-            ref_denM_eval, ref_denM_evec = np.linalg.eig(A[name]["denMat"])
+            denmat_true = A[name]["denMat"][...,0] + 1j*A[name]["denMat"][...,1]
+            ref_denM_eval, ref_denM_evec = np.linalg.eig(denmat_true)
             idx = ref_denM_eval.argsort()[::-1]
             ref_denM_eval = ref_denM_eval[idx]
 
@@ -85,12 +88,10 @@ class test_hemb_2o6_ci(unittest.TestCase):
 
             np.testing.assert_allclose(test_denM_eval, ref_denM_eval, atol=1e-3)
 
-        # with HDFArchive(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "a") as A:
-        #     tmp_dir = {
-        #         'docc': grisb.docc,
-        #         'denMat': grisb.Fragment.denMat,
-        #     }
-        #     A[name] = tmp_dir
+        # with h5py.File(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "a") as A:
+        #     grp = A.require_group(name)
+        #     grp["docc"] = grisb.docc
+        #     grp["denMat"] = grisb.Fragment.denMat
 
 
 if __name__ == '__main__':

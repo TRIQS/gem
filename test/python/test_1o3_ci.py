@@ -4,7 +4,8 @@ import unittest
 
 from triqs_ghostGA.gdmft import *
 import numpy as np
-from triqs_ghostGA.solvers.ci import CI
+import h5py
+from triqs_ghostGA.solvers.simple_ed import SimpleED
 import os
 
 
@@ -47,7 +48,7 @@ class test_hemb_ci_1o3(unittest.TestCase):
         Utensor[1,1,0,0] = U
 
         # test CI solver
-        edsolver = CI(ntot, use_Ntot=True,
+        edsolver = SimpleED(ntot, use_Ntot=True,
                       use_Sz=True, dtype=np.complex128)
         grisb = Gdmft(ntot, nimp, nbath, eks, eloc, Utensor, wks=wks, edsolver=edsolver)
         grisb.run(itmax=30, mix=0.2, tol=1e-5, beta=500,
@@ -56,13 +57,16 @@ class test_hemb_ci_1o3(unittest.TestCase):
         name = "1o3_ci"
 
 
-        with HDFArchive(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "r") as A:
+        with h5py.File(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "r") as A:
 
             print("Compare docc")
-            np.testing.assert_allclose(grisb.docc, A[name]["docc"], atol=1e-3)
+            docc_true = A[name]["docc"]['0'][0] + 1j*A[name]["docc"]['0'][1]
+            np.testing.assert_allclose(grisb.docc, docc_true, atol=1e-3)
 
             print("Compare denMat")
-            ref_denM_eval, ref_denM_evec = np.linalg.eig(A[name]["denMat"])
+            print(A[name]["denMat"])
+            denmat_true = A[name]["denMat"][...,0] + 1j*A[name]["denMat"][...,1]
+            ref_denM_eval, ref_denM_evec = np.linalg.eig(denmat_true)
             idx = ref_denM_eval.argsort()[::-1]
             ref_denM_eval = ref_denM_eval[idx]
 
@@ -72,12 +76,10 @@ class test_hemb_ci_1o3(unittest.TestCase):
 
             np.testing.assert_allclose(test_denM_eval, ref_denM_eval, atol=1e-3)
 
-        # with HDFArchive(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "a") as A:
-        #     tmp_dir = {
-        #         'docc': grisb.docc,
-        #         'denMat': grisb.denMat,
-        #     }
-        #     A[name] = tmp_dir
+        # with h5py.File(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "a") as A:
+        #     grp = A.require_group(name)
+        #     grp["docc"] = grisb.docc
+        #     grp["denMat"] = grisb.denMat
 
 
 if __name__ == '__main__':
