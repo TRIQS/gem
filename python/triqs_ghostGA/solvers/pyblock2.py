@@ -48,7 +48,7 @@ class Pyblock2_N(object):
         #print(h1e_trans)
         return h1e_trans, u_trans
 
-    def solve_Hemb(self, num_eig=10, verbose=0, sweep_iter = [0,10,20], sweep_epsilon = [5e-3,1e-3,5e-4], maxM=1000):
+    def solve_Hemb(self, num_eig=10, verbose=0, sweep_iter = [0,10,20], sweep_epsilon = [5e-3,1e-3,5e-4], maxM=1000,beta=500.0):
         self.driver = DMRGDriver(scratch="./tmp", symm_type=SymmetryTypes.SGFCPX, stack_mem=50<<30)#, n_threads=6)
 
         self.driver.initialize_system(n_sites=self.ntot, n_elec=self.ntot//2)#, spin=0)

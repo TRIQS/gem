@@ -273,7 +273,7 @@ class SVDSolver2(object):
             for b in range(a, ntot):
                 self.DM_op[a, b] = get_group(self.DenMat_tilde_path, f"op_{a}_{b}")[:K,:K]
 
-    def solve_Hemb(self, num_eig=None, verbose=None):
+    def solve_Hemb(self, num_eig=None, verbose=None, beta=500.0):
 
         X = self.X
         nbath = self.nbath

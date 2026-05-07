@@ -130,7 +130,7 @@ class ITensorMPSSolver(object):
         self.M["dn"]=0.5*(self.M["dn"] + self.M["dn"].T.conjugate())
 
 
-    def solve_Hemb(self, num_eig=1, verbose=1):
+    def solve_Hemb(self, num_eig=1, verbose=1,tol=1e-8, beta=500.0):
         # Criteria for the bound dimension of the DMRG, just be converged
         # Set up and run ForkTPS using the useful_func.py
         outfile = "data%s.h5" % self.suff

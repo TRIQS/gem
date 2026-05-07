@@ -19,7 +19,7 @@ class Pyscf_ccsd(object):
         self.type= 'PySCFCCSD'
         # initialize pyscf solvers
 
-    def build_Hemb(self, D, H1E, LAMBDA, V2E, spin_pen=0.0):
+    def build_Hemb(self, D, H1E, LAMBDA, V2E, spin_pen=0.0,beta=500.0):
         tmat = numpy.zeros((self.ntot,self.ntot))
         tmat[:self.nimp,:self.nimp] = H1E
         tmat[:self.nimp,self.nimp:] = D.T

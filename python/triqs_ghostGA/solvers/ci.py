@@ -15,6 +15,7 @@ from math import factorial
 from itertools import combinations
 
 #SAMUELE'S QUESTION
+# Change of name
 # Global change of debug with verbose options for printing
 
 
@@ -254,8 +255,9 @@ class CI(object):
     '''
     Exact diagonalization class aim to solve general impurity Hamiltonian.
     '''
-    def __init__(self, norb, use_Ntot=False, use_Sz=False, CISD=False, thermal=False, dtype=np.float64, Nparticle=None,
-                 spin_pen=0, sz_pen=0, sx_pen=0, sy_pen=0):
+    def __init__(self, norb, use_Ntot=False, use_Sz=False,
+                 CISD=False, thermal=False, dtype=np.float64, Nparticle=None,
+                 ):
         '''
         Constructor.
         Input:
@@ -278,11 +280,6 @@ class CI(object):
         self.data_type = dtype # data type of the Hamiltonian
         self.Hone = None # initialize None for one-body part
         self.Htwo = None # initialize None for two-body part
-
-        self.spin_pen = spin_pen
-        self.sz_pen = sz_pen
-        self.sx_pen = sx_pen
-        self.sy_pen = sy_pen
 
         # create basis in the ground space half-filled and optionally Sz=0.
         if use_Ntot == True and use_Sz == False and CISD == False: # Ntot symmetry
@@ -379,7 +376,8 @@ class CI(object):
                 else:
                     self.Hone += H1E[i,j]*self.denmat_op[(i,j)]
 
-    def build_Hemb(self, D, eloc, Lambdac, V2E, debug=False, verbose=0):
+    def build_Hemb(self, D, eloc, Lambdac, V2E, debug=False, verbose=0,
+                   spin_pen=0, sz_pen=0, sx_pen=0, sy_pen=0):
         '''
         build the Hamiltonian and return Hamiltonian
         '''
@@ -391,8 +389,8 @@ class CI(object):
             self.build_two_body(V2E)
         print('one-body + two-body')
         self.M = {"up": self.h1e[::2, ::2], "dn": self.h1e[1::2, 1::2]}
-        self.Ham = self.Hone + self.Htwo + self.spin_pen*self.S2
-        self.Ham += self.sz_pen*self.Sz.dot(self.Sz) + self.sx_pen*self.Sx.dot(self.Sx) + self.sy_pen*self.Sy.dot(self.Sy)
+        self.Ham = self.Hone + self.Htwo + spin_pen*self.S2
+        self.Ham += sz_pen*self.Sz.dot(self.Sz) + sx_pen*self.Sx.dot(self.Sx) + sy_pen*self.Sy.dot(self.Sy)
         print('done')
         if debug:
             return self.Ham
