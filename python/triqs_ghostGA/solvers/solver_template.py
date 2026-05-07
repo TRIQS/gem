@@ -1,0 +1,74 @@
+#######################################################
+# Template for solvers to solve the embedding Hamiltonian in ghostGA.
+# Author: Samuele Giuli
+# Email:  samuele.giuli@gmail.com
+#######################################################
+
+
+class SolverTemplate(object):
+    '''
+    Your class aim to solve general impurity Hamiltonian.
+    '''
+    def __init__(self,
+                 norb,
+                 use_Ntot=False, use_Sz=False, # eventually flags to use symmetries
+                 thermal=False, # flag to indicate if the calculations is thermal or not
+                 ):
+        #things that re relevant for the solver
+        self.type = "SolverTemplate"
+    
+    def build_Hemb(self,
+                   D, # MANDATORY: the hybridization matrix
+                   eloc, # MANDATORY: the impurity one-body term
+                   Lambdac, # MANDATORY: the bath one-body term
+                   V2E, # MANDATORY: the two-body interaction in the impurity
+                   verbose=0 # MANDATORY: verbose level
+                   spin_pen=0, sz_pen=0, sx_pen=0, sy_pen=0 # eventually penalty terms to enforce symmetries
+                   ):
+        print("build_Hemb not implemented yet")
+
+    def solve_Hemb(self,
+                   num_eig=1, # MANDATORY: number of eigenvalues to compute
+                   verbose=1, # MANDATORY: verbose level
+                   tol=1e-8,  # MANDATORY: tolerance for convergence
+                   beta=500.0 # MANDATORY: inverse temperature
+                   ):
+        '''
+        diagonalize the Hamiltonian
+        '''
+        self.gs_ene = None # MANDATORY: ground state energy
+        self.Zpart = None # MANDATORY: partition function for thermal calculations divided by exp(gs_ene/T) so that is 1 at zero temperature
+        print("solve_Hemb not implemented yet")
+        #HERE YOU SHOULD SOLVE
+        
+
+    
+    def calc_density_matrix(self):
+        '''
+        Compute denstiy matrix.
+        Return:
+          denmat: numpy.array. Densty matrix, <c^\dagger_i c_j>, of the system (impurity+bath).
+        '''
+        print("calc_density_matrix not implemented yet")
+
+    
+    def compute_E1loc(self):
+        '''
+        Compute the local one-body energy E1loc = Tr[eloc * denmat_impurity]
+        Return:
+          E1loc: float. Local one-body energy.
+        '''
+        print("compute_E1loc not implemented yet")
+
+    
+    def compute_E2loc(self):
+        '''
+        Compute local energy including local one and two-body term from a given set od thermal states
+        Works also at zero Temperature
+        Input:
+        Return:
+          Eloc: float. Total local energy.
+        '''
+        print("compute_E2loc not implemented yet")
+
+    
