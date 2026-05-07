@@ -5,7 +5,7 @@ import unittest
 from triqs_ghostGA.gdmft import *
 from triqs_ghostGA.utility.utilities import U_matrix_kanamori
 import numpy as np
-from triqs_ghostGA.solvers.ci import CI
+from triqs_ghostGA.solvers.simple_ed import SimpleED
 import os
 
 
@@ -62,7 +62,7 @@ class test_hemb_2o6_ci(unittest.TestCase):
 
         Utensor = U_matrix_kanamori(nimp//2, U, J)
 
-        edsolver = CI(ntot, use_Ntot=True, use_Sz=True, dtype=np.complex128, spin_pen=0.0)
+        edsolver = SimpleED(ntot, use_Ntot=True, use_Sz=True, dtype=np.complex128)
         grisb = Gdmft(ntot, nimp, nbath, eks, eloc, Utensor, wks=wks,
                       R=R0, Lambda=L0, edsolver=edsolver, verbose=4,
                       spin_sym=True, orb_sym=False)
