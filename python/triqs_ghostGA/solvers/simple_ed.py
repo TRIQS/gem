@@ -476,14 +476,12 @@ def residues(norb,determinant):
         electrons from a given determinant with number of orbitals norb
     '''
     residue_list = []
-    nonzero = determinant.bit_count() # countSetBits(determinant)#bin(determinant).count('1')
+    nonzero = determinant.bit_count() 
     for i in range(norb):
         mask1 = (1 << i)
         for j in range(i):
             mask2 = (1 << j)
             mask = mask1 ^ mask2
-            #if bin(determinant & ~mask).count('1') == (nonzero - 2):
-            #if countSetBits(determinant & ~mask)  == (nonzero - 2):
             if (determinant & ~mask).bit_count()  == (nonzero - 2):
                 residue_list.append(determinant & ~mask)
     return residue_list
@@ -520,8 +518,8 @@ def single_and_double_determinants(norb, determinant, use_Sz=False):
             even_bits = bs & 0xAAAAAAAA
             # Get all odd bits of x
             odd_bits = bs & 0x55555555
-            nup = even_bits.bit_count() # countSetBits(even_bits)
-            ndn = odd_bits.bit_count() # countSetBits(odd_bits)
+            nup = even_bits.bit_count()
+            ndn = odd_bits.bit_count()
             #print(bs, strb.format(bs), nup,ndn)
             if nup-ndn==0:
                 result_sz.append(bs)
@@ -663,16 +661,6 @@ def build_rholoc_onfly(basis,gs_wf,rholoc,bipart_smap):
 
 
 # ********** REPLACEABLE **********
-#HERE ONE CAN USE DIRECTLY WITHIN PYTHON:
-# n.bit_count()
-@jit(nopython=True)#,cache=True)
-def countSetBits(n):
-    count = 0
-    while (n):
-        count += n & 1
-        n >>= 1
-    return count
-
 
 #HERE ONE CAN USE DIRECTLY np.searchsorted
 @jit(nopython=True)
@@ -706,8 +694,8 @@ def table_es_sc(nstate,spinz,dtype=np.int64):
         even_bits = bs & 0xAAAAAAAA
         # Get all odd bits of x
         odd_bits = bs & 0x55555555
-        nup = even_bits.bit_count() #countSetBits(even_bits)
-        ndn = odd_bits.bit_count() #countSetBits(odd_bits)
+        nup = even_bits.bit_count()
+        ndn = odd_bits.bit_count()
         print(nup,ndn)
         if nup-ndn==spinz:
             result.append(bs)
