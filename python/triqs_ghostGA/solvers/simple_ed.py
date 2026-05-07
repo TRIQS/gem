@@ -1,8 +1,9 @@
 #######################################################
-# Full Configuration Interaction Exact Diagonalization
-# Author: Tsung-Han Lee
+# Simple Exact Diagonalization solver
+# Author: Tsung-Han Lee, Samuele
 # Email:  henhans74716@gmail.com
 #######################################################
+import warnings
 from scipy.sparse import csc_matrix, lil_matrix
 from scipy.sparse.linalg import eigsh
 from scipy.linalg import eigh
@@ -15,7 +16,6 @@ from math import factorial
 from itertools import combinations
 
 #SAMUELE'S QUESTION
-# Change of name
 # Global change of debug with verbose options for printing
 
 
@@ -41,7 +41,10 @@ class SimpleED(object):
         self.norb = norb # number of orbitals
         self.use_Ntot = use_Ntot # use Ntot symmetry
         self.use_Sz = use_Sz # use Sz symmtery
-        self.thermal = thermal # use thermal ensemble Not implemented yet!
+        self.thermal = thermal # use thermal ensemble
+        if( self.thermal and ( self.use_Ntot or self.use_Sz ) ):
+            warnings.warn("Thermal calculations should be performed without symmetries, otherwise the partition function is not correctly computed.")
+
         self.CISD = CISD # cisd
         self.strb = '{0:0'+str(norb)+'b}' # string to convert integer to binary string
         self.strb_red = '{0:0'+str(norb//2)+'b}' # string to convert integer to binary string in reudced Hilbert space
@@ -69,19 +72,11 @@ class SimpleED(object):
 
         self.hsize = len(self.basis) # hilbert space size
         print('size of basis= {:d}'.format( len(self.basis) ))#, 'data type of basis=', self.basis.dtype)
-        #print 'basis='
-        #for bs in self.basis:
-        #  print bs, self.strb.format(bs)
 
         print('build denmat_op')
-        print('build S2_op')
         self.build_denmat_op()
+        print('build S2_op')
         self.build_S2_op()
-
-    #def __del__(self):
-    #    #global is_ci_initialized
-    #    #is_ci_initialized = False
-    #    print("Destructor called")
 
 
 #MANDATORY FUNCTIONS
@@ -481,14 +476,15 @@ def residues(norb,determinant):
         electrons from a given determinant with number of orbitals norb
     '''
     residue_list = []
-    nonzero = countSetBits(determinant)#bin(determinant).count('1')
+    nonzero = determinant.bit_count() # countSetBits(determinant)#bin(determinant).count('1')
     for i in range(norb):
         mask1 = (1 << i)
         for j in range(i):
             mask2 = (1 << j)
             mask = mask1 ^ mask2
             #if bin(determinant & ~mask).count('1') == (nonzero - 2):
-            if countSetBits(determinant & ~mask)  == (nonzero - 2):
+            #if countSetBits(determinant & ~mask)  == (nonzero - 2):
+            if (determinant & ~mask).bit_count()  == (nonzero - 2):
                 residue_list.append(determinant & ~mask)
     return residue_list
 
@@ -524,8 +520,8 @@ def single_and_double_determinants(norb, determinant, use_Sz=False):
             even_bits = bs & 0xAAAAAAAA
             # Get all odd bits of x
             odd_bits = bs & 0x55555555
-            nup = countSetBits(even_bits)
-            ndn = countSetBits(odd_bits)
+            nup = even_bits.bit_count() # countSetBits(even_bits)
+            ndn = odd_bits.bit_count() # countSetBits(odd_bits)
             #print(bs, strb.format(bs), nup,ndn)
             if nup-ndn==0:
                 result_sz.append(bs)
@@ -537,9 +533,6 @@ def single_and_double_determinants(norb, determinant, use_Sz=False):
     return result
 
 
-
-
-# CI solver
 
 
 @jit(nopython=True)
@@ -713,8 +706,8 @@ def table_es_sc(nstate,spinz,dtype=np.int64):
         even_bits = bs & 0xAAAAAAAA
         # Get all odd bits of x
         odd_bits = bs & 0x55555555
-        nup = countSetBits(even_bits)
-        ndn = countSetBits(odd_bits)
+        nup = even_bits.bit_count() #countSetBits(even_bits)
+        ndn = odd_bits.bit_count() #countSetBits(odd_bits)
         print(nup,ndn)
         if nup-ndn==spinz:
             result.append(bs)
