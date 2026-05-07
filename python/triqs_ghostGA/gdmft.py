@@ -8,6 +8,7 @@ import time
 
 from .fragment import Fragment
 from .lattice import Lattice
+from .utility.utilities import calc_nf, calc_Fermi
 
 class Gdmft(object):
     """This is a class representation of a ghost-RISB object (with DMFT-like algorithm).
@@ -46,7 +47,11 @@ class Gdmft(object):
     :type Hfull_list: list
 
     """
-    def __init__(self, ntot, nimp, nbath, eks, eloc, Utensor, wks=None, spin_sym=True, orb_sym=False, soc=False, R=None, Lambda=None, D=None, Lambda_c=None, edsolver=None, suff='',thermal=False, T=1e-2,verbose=0,spin_pen=0):
+    def __init__(self, ntot, nimp, nbath, eks, eloc, Utensor,
+                 wks=None, spin_sym=True, orb_sym=False,
+                 soc=False, R=None, Lambda=None, D=None, Lambda_c=None,
+                 edsolver=None, suff='',thermal=False, T=1e-2,
+                 verbose=0,spin_pen=0):
         print("##### INITIALIZATON OF THE GRISB OBJECT (DMFT-like algorithm)#####")
         self.ntot = ntot
         self.nimp = nimp
@@ -90,9 +95,9 @@ class Gdmft(object):
         #self.ekin = [np.sum(self.R.dot( self.eks[x] ).dot( self.R.conj().T )*self.rhok_list[x].T ) for x in range(len(self.rhok_list))]
         #self.ekin = sum(self.ekin)/float(len(self.rhok_list))
         self.ekin = sum([np.sum( ( np.dot(self.R, np.dot(x, self.R.conj().T )) ) * \
-                    calc_nf( np.dot(self.R, np.dot(x, self.R.conj().T) ) + self.Lambda , 1./beta).T ) for x in self.eks] )/float(len(self.eks))
-        self.epot = self.E2loc + np.trace(self.eloc.dot(self.denMat[:self.nimp,:self.nimp].T))
-        self.etot = self.ekin + self.epot - mu*self.nfill
+                    calc_nf( np.dot(self.R, np.dot(x, self.R.conj().T) ) + self.Lambda , 1./beta).T )*wk for x,wk in zip(self.Lattice.eks,self.Lattice.wks)] )
+        self.epot = self.Fragment.E2loc + np.trace(self.Fragment.eloc.dot(self.Fragment.denMat[:self.nimp,:self.nimp].T))
+        self.etot = self.ekin + self.epot - mu*self.Fragment.nfill
 
 # THIS FOR TEMP
     def run(self, mu=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., n_target=None, n_tolerance=1e-3,
@@ -213,3 +218,9 @@ class Gdmft(object):
                 print("convg_n",convg_n)
                 print('lambda eigvals',np.linalg.eigvalsh(self.Lambda))
                 break
+
+    def get_functional(self):
+        """ Compute the value of the finite temperature functional
+        """
+        Omega_tot = self.Lattice.compute_functional( [self.Fragment] )
+        return Omega_tot

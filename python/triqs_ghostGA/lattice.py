@@ -3,6 +3,7 @@ from scipy.linalg import block_diag
 from scipy.optimize import brentq, bisect
 from .fragment import Fragment
 from .utility.utilities import calc_nf, calc_Fermi
+from .utility.delta_fit import build_H
 
 
 class Lattice():
@@ -143,4 +144,59 @@ class Lattice():
             mu_n = mu_interp
 
         return mu_n
+    
+    def compute_ekin(self, Fragments_list):
+        """ Compute kinetic energy from the quasiparticle part
+        """
+        if not isinstance(Fragments_list, list) or not all(isinstance(F, Fragment) for F in Fragments_list):
+            raise TypeError(f"Fragments_list must be a list of Fragment objects")
 
+        nimp_tot = sum(F.nimp for F in Fragments_list)
+        nbath_tot = sum(F.nbath for F in Fragments_list)
+
+        if self.eks.shape[1] != nimp_tot or self.eks.shape[2] != nimp_tot:
+            raise ValueError(f"ek_list second and third dimensions must be {nimp_tot}, got {self.eks.shape}")
+
+        self.Rtot = block_diag(*[F.R for F in Fragments_list])
+        self.Ltot = block_diag(*[F.Lambda for F in Fragments_list])
+
+        ekin = 0.0
+        for ek,wk in zip(self.eks, self.wks):
+            Hk_qp = self.Rtot @ ek @ self.Rtot.T.conj() + self.Ltot
+            Dk = calc_nf(Hk_qp,self.T).T
+            ekin += wk*np.sum( ( np.dot(self.Rtot, np.dot(ek, self.Rtot.T.conj() ) ) ) * Dk.T )
+        return ekin
+
+    def compute_functional(self, Fragments_list ):
+        """ Compute the value of the finite temperature functional
+        """
+        if not isinstance(Fragments_list, list) or not all(isinstance(F, Fragment) for F in Fragments_list):
+            raise TypeError(f"Fragments_list must be a list of Fragment objects")
+
+        #Embedding part of the functional
+        Omega_imps = 0.0
+        for F in Fragments_list:
+            if F.solver is None:
+                raise ValueError("Fragment solver is not set")
+            if (F.T != self.T) and F.thermal :
+                raise ValueError(f"Fragment temperature {F.T} does not match lattice temperature {self.T} for thermal calculation")
+            if(F.thermal):
+                Omega_imps += -self.T*np.log( F.solver.Zpart/np.exp(F.solver.gs_ene/self.T) )
+            else:
+                Omega_imps += F.solver.gs_ene
+        #Quasiparticle part of the functional
+        Omega_qp = 0.0
+        for ek,wk in zip(self.eks, self.wks):
+            Hk_qp = self.Rtot @ ek @ self.Rtot.T.conj() + self.Ltot
+            ekvals = np.linalg.eigvalsh(Hk_qp)
+            Omega_qp += np.sum(np.log(1+np.exp(-ekvals/self.T) ) )*wk
+        Omega_qp *= -self.T
+        #Mixed part of the functional
+        Omega_mix = 0.0
+        for F in Fragments_list:
+            H_mix = build_H(F.Lambda, F.Lambda_c, F.D, F.R)
+            emix_vals=np.linalg.eigvals(H_mix)
+            Omega_mix += np.sum(np.log(1+np.exp(-emix_vals/self.T) ) )
+        Omega_mix *= self.T
+        Omega_tot = Omega_qp+Omega_imps+Omega_mix
+        return Omega_tot # , Omega_qp, Omega_imps, Omega_mix

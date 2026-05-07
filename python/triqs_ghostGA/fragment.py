@@ -99,18 +99,8 @@ class Fragment():
         h1e[self.nimp:,self.nimp:] = -self.Lambda_c
         h1e[self.nimp:,:self.nimp] = self.D.conj()
 
-        if self.solver.type == "CI":
-            self.solver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor)
-
-        elif self.solver.type == "ITensorMPSSolver":
+        if self.solver.type in ["CI", "ITensorMPSSolver", "PySCFCCSD", "Block2NSZ"]:
             self.solver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor, spin_pen=spin_pen)
-
-        elif self.solver.type == "PySCFCCSD":
-            self.solver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor, spin_pen=spin_pen)
-
-        elif self.solver.type == "Block2NSZ":
-            self.solver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor, spin_pen=spin_pen)
-
         else:
             raise ValueError("only Full ED, CI, and HCI are supported")
 
@@ -158,6 +148,17 @@ class Fragment():
         self.D = D_new.copy()
         self.Lambda_c = Lc_new.copy()
         return self.D, self.Lambda_c
+    
+    def compute_energy(self):
+        '''
+        Compute the energy contributionsof the fragment using the density matrix and the Hamiltonian parameters.
+        Return:
+          E: float. Energy of the fragment.
+        '''
+        self.E1loc = self.solver.compute_E1loc()
+        self.E2loc = self.solver.compute_E2loc()
+        E = self.E1loc + self.E2loc
+        return E
 
     def compute_Z(self, mu=0.0, z0=0.0, h=1e-8):
         m, nu = self.R.shape
