@@ -2,7 +2,6 @@ import scipy
 import h5py
 import numpy as np
 import numba
-from h5 import *
 import sys
 import time
 

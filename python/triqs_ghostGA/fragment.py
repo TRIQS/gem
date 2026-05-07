@@ -99,7 +99,7 @@ class Fragment():
         h1e[self.nimp:,self.nimp:] = -self.Lambda_c
         h1e[self.nimp:,:self.nimp] = self.D.conj()
 
-        if self.solver.type in ["CI", "ITensorMPSSolver", "PySCFCCSD", "Block2NSZ"]:
+        if self.solver.type in ["SimpleED", "ITensorMPSSolver", "PySCFCCSD", "Block2NSZ"]:
             self.solver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor, spin_pen=spin_pen)
         else:
             raise ValueError("only Full ED, CI, and HCI are supported")
