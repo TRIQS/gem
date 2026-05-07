@@ -571,7 +571,7 @@ def build_cid_cj_csc(i, j, basis, bit_max, norb, debug=False):
         # create particles on i
         bsl = bsltmp | tmp_bit2
         # binary search the index for the final state bsl
-        id_bsl = search_bsl(basis,bsl)
+        id_bsl = np.searchsorted(basis, bsl)
         if bsl != basis[id_bsl] or id_bsl>=len(basis): # The c_i^\dagger c_j may lead to a state that is not in the symmetry constrained states.
             continue
         else:
@@ -662,13 +662,6 @@ def build_rholoc_onfly(basis,gs_wf,rholoc,bipart_smap):
 
 # ********** REPLACEABLE **********
 
-#HERE ONE CAN USE DIRECTLY np.searchsorted
-@jit(nopython=True)
-def search_bsl(basis, bsl):
-  '''
-  Helper function to find element in sorted list
-  '''
-  return np.searchsorted(basis, bsl)
 
 
   
