@@ -12,7 +12,7 @@ Initial Setup
 To install this package, run the following commands in order:
 
 ```bash
-git clone https://github.com/TRIQS/hartree_fock.git
+git clone https://github.com/TRIQS/ghostGA.git
 
 mkdir ghostGA.build && cd ghostGA.build
 
