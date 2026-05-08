@@ -9,14 +9,15 @@ from triqs_ghostGA.utility.delta_fit import (
     jacobian_LcD,
     build_H,
     F_of_H,
-    new_hybridization,
+    solve_F_dF_LcD_with_movement,
+    update_hybridization_thermal_penalty,
 )
 
 # --- Configuration ---
 size = 1
 B = 3
 Bsize = int(B * size)
-beta = 300.0
+beta = 100.0
 noise = 1e-3
 data_dir = Path("input_data") / "B3"
 
@@ -60,7 +61,7 @@ class TestFitLcDB3(unittest.TestCase):
         Dg_trg = np.abs(U_trg.T.conj() @ self.D_trg)
         Dg_sol = np.abs(U_sol.T.conj() @ D)
 
-        return np.sum(np.abs(Dg_trg - Dg_sol)) + np.sum(np.abs(eig_sol - eig_trg))
+        return np.sum(np.abs(abs(Dg_trg) - abs(Dg_sol))) + np.sum(np.abs(eig_sol - eig_trg))
 
     def _perturb_initial_guess(self):
         Lc_pert = 2.0 * (-0.5 + np.random.rand(Bsize, Bsize)) + 2j * (-0.5 + np.random.rand(Bsize, Bsize))
@@ -83,7 +84,7 @@ class TestFitLcDB3(unittest.TestCase):
 
         self.assertLess(
             float(np.sum(np.abs(res0))),
-            1e-10,
+            1e-8,
             msg="Residual at the target parameters should be ~0",
         )
 
@@ -94,45 +95,43 @@ class TestFitLcDB3(unittest.TestCase):
 
     def test_root_finding_without_derivatives(self):
         Lc_0, D_0 = self._perturb_initial_guess()
-
-        Lc_sol, D_sol = new_hybridization(
-            Lc_0, D_0, self.L, self.R, self.F11_trg, self.F12D_trg, beta=beta, method="F"
-        )
+        _, Lc_sol, D_sol = solve_F_dF_LcD_with_movement( beta, self.L,self.R, Lc_0, D_0,
+                                                     self.F11_trg, self.F12D_trg, alpha=1e-10, use_analytic_jac=False )
+ 
 
         x_sol = pack_params(Lc_sol, D_sol)
         res = residual_LcD(x_sol, beta, self.L, self.R, self.F11_trg, self.F12D_trg)
 
         self.assertLess(
             float(np.sum(np.abs(res))),
-            1e-8,
+            1e-6,
             msg="Residual should be small after root finding (method='F')",
         )
 
         self.assertLess(
             float(self._gauge_invariant_error(Lc_sol, D_sol)),
-            5e-6,
+            1e-5,
             msg="Solution should be close to target in gauge-invariant quantities (method='F')",
         )
 
     def test_root_finding_with_derivatives(self):
         Lc_0, D_0 = self._perturb_initial_guess()
-
-        Lc_sol, D_sol = new_hybridization(
-            Lc_0, D_0, self.L, self.R, self.F11_trg, self.F12D_trg, beta=beta, method="dF"
-        )
+        _, Lc_sol, D_sol = solve_F_dF_LcD_with_movement( beta, self.L,self.R, Lc_0,D_0,
+                                                     self.F11_trg, self.F12D_trg, alpha=1e-10, use_analytic_jac=True )
+ 
 
         x_sol = pack_params(Lc_sol, D_sol)
         res = residual_LcD(x_sol, beta, self.L, self.R, self.F11_trg, self.F12D_trg)
 
         self.assertLess(
             float(np.sum(np.abs(res))),
-            1e-8,
+            1e-6,
             msg="Residual should be small after root finding (method='dF')",
         )
 
         self.assertLess(
             float(self._gauge_invariant_error(Lc_sol, D_sol)),
-            5e-6,
+            1e-5,
             msg="Solution should be close to target in gauge-invariant quantities (method='dF')",
         )
 

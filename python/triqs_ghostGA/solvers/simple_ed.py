@@ -1,8 +1,9 @@
 #######################################################
 # Simple Exact Diagonalization solver
-# Author: Tsung-Han Lee, Samuele
+# Author: Tsung-Han Lee
 # Email:  henhans74716@gmail.com
 #######################################################
+
 import warnings
 from scipy.sparse import csc_matrix, lil_matrix
 from scipy.sparse.linalg import eigsh
@@ -26,6 +27,7 @@ class SimpleED(object):
     '''
     def __init__(self, norb, use_Ntot=False, use_Sz=False,
                  thermal=False, dtype=np.float64, Nparticle=None,
+                 solver_params=None,
                  ):
         '''
         Constructor.
@@ -37,6 +39,7 @@ class SimpleED(object):
           dtype: dtype. data type of the Hamiltonian
         '''
         self.type = "SimpleED"
+        self.solver_params = solver_params if solver_params is not None else {}
         self.norb = norb # number of orbitals
         self.use_Ntot = use_Ntot # use Ntot symmetry
         self.use_Sz = use_Sz # use Sz symmtery
@@ -75,10 +78,14 @@ class SimpleED(object):
 
 #MANDATORY FUNCTIONS
     def build_Hemb(self, D, eloc, Lambdac, V2E, debug=False, verbose=0,
-                   spin_pen=0, sz_pen=0, sx_pen=0, sy_pen=0):
+                   spin_pen=None, sz_pen=None, sx_pen=None, sy_pen=None):
         '''
         build the Hamiltonian and return Hamiltonian
         '''
+        spin_pen = self.solver_params.get('spin_pen', 0) if spin_pen is None else spin_pen
+        sz_pen   = self.solver_params.get('sz_pen',   0) if sz_pen   is None else sz_pen
+        sx_pen   = self.solver_params.get('sx_pen',   0) if sx_pen   is None else sx_pen
+        sy_pen   = self.solver_params.get('sy_pen',   0) if sy_pen   is None else sy_pen
         print('build one-body')
         self.build_h1e(eloc, D, Lambdac, 0, verbose=verbose)
         self.build_one_body(self.h1e)
@@ -93,10 +100,12 @@ class SimpleED(object):
         if debug:
             return self.Ham
 
-    def solve_Hemb(self,num_eig=1,which='SA',tol=1e-8, verbose=0,beta=500.0):
+    def solve_Hemb(self, num_eig=1, which=None, tol=None, verbose=0, T=0.0):
         '''
         diagonalize the Hamiltonian
         '''
+        which = self.solver_params.get('which', 'SA') if which is None else which
+        tol   = self.solver_params.get('tol',   1e-8) if tol   is None else tol
         print('diagonalizing num_eig= {:d}'.format(num_eig))
         if(self.hsize < 4000):
             print("Doing FULL diagonalization")
@@ -116,8 +125,8 @@ class SimpleED(object):
         self.Zpart = 1 #partition function for thermal and degeneracies, will replace deg
         self.Tstates = 1 #number of thermal states
         self.bw_list = [1] #list of boltzmann weights
-        if(self.thermal):
-            if(beta is None): raise ValueError("Solving thermal=True without passing beta")
+        if(T>0.0):
+            beta=1/T
             print('Building thermal partition function')
             for eit in vals[1:]:
                 boltz_weight = np.exp(-beta*(eit-self.gs_ene))
