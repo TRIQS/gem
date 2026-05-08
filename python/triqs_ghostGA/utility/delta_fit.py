@@ -1,10 +1,13 @@
+#######################################################
+# Finite temperature density matrix fitting routines
+# for thermal ghost Gutzwiller
+# Author: Samuele Giuli
+# Email:  samuele.giuli@gmail.com
+#######################################################
+
 import numpy as np
 from scipy.optimize import root, least_squares, brentq, minimize
 
-
-
-# N.B. we tested that mu_qp is not necessary therefore I will momentarily move the routines at the end of the file
-# adding a _ at the end. they will be removed in the future
 
 # -------------------------
 # Build H
@@ -78,10 +81,10 @@ def dH_dR(dR, D):
     """
     n, p = D.shape
     Z_nn = np.zeros((n, n), dtype=complex)
-    
+
     term12 = dR @ D.T
-    term21 = term12.conj().T 
-    
+    term21 = term12.conj().T
+
     return np.block([
         [Z_nn,   term12],
         [term21, Z_nn  ]
@@ -100,16 +103,14 @@ def dH_dD(dD, R):
     """
     n, p = R.shape
     Z_nn = np.zeros((n, n), dtype=complex)
-    
+
     term12 = R @ dD.T
-    term21 = term12.conj().T 
-    
+    term21 = term12.conj().T
+
     return np.block([
         [Z_nn,   term12],
         [term21, Z_nn  ]
     ])
-
-
 
 
 # ============================================================
@@ -132,6 +133,7 @@ def pack_params(Lambda, R):
         R.real.reshape(-1),
         R.imag.reshape(-1)
     ])
+
 def unpack_params(x, n, p):
     iu = np.triu_indices(n)
     iu_strict = np.triu_indices(n, k=1)
@@ -156,7 +158,6 @@ def unpack_params(x, n, p):
     Lambda.imag[iu_strict[1],iu_strict[0]] = -Lam_im.real
     R = R_re + 1j * R_im
     return Lambda, R
-
 
 
 # ============================================================
@@ -232,7 +233,7 @@ def jacobian_LR(x, beta, Lambda_c, D, F22_target, RTF12_target):
     F12 = F[:n, n:]
 
     Jcols = []
-    
+
     # Indices for Hermitian reduction
     iu = np.triu_indices(n)
     iu_strict = np.triu_indices(n, k=1)
@@ -249,7 +250,7 @@ def jacobian_LR(x, beta, Lambda_c, D, F22_target, RTF12_target):
         dF22 = dF[n:, n:]
         dF12 = dF[:n, n:]
         dRTF12 = R.T@dF12 + dR.T@F12
-        
+
         # Must match the concatenation logic in residual()
         Jcols.append(np.concatenate([
             # F22 (Hermitian reduction)
@@ -276,7 +277,7 @@ def jacobian_LcD(x, beta, Lambda, R, F11_target, F12D_target):
     F12 = F[:n, n:]
 
     Jcols = []
-    
+
     # Indices for Hermitian reduction
     iu = np.triu_indices(n)
     iu_strict = np.triu_indices(n, k=1)
@@ -292,7 +293,7 @@ def jacobian_LcD(x, beta, Lambda, R, F11_target, F12D_target):
         dF11 = dF[:n, :n]
         dF12 = dF[:n, n:]
         dF12D = dF12@D + F12@dD
-        
+
         # Must match the concatenation logic in residual()
         Jcols.append(np.concatenate([
             # F22 (Hermitian reduction)
@@ -305,175 +306,6 @@ def jacobian_LcD(x, beta, Lambda, R, F11_target, F12D_target):
 
     return np.column_stack(Jcols)
 
-
-# ============================================================
-# Root solve for Lambda and R (aka Self Energy)
-# ============================================================
-# This one works without derivatives and with least square instead of root
-def solve_F_only_LR(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target):
-    '''
-    Solve the root finding problem for a given set of Lambda_c,D,beta,F22=<badg b> and RTF12=R.T@<fdag b>
-    using numerical derivatives
-    '''
-    x0 = pack_params(Lambda0, R0)
-    # We use least_squares because it supports 'trf' and '2-point' (numerical) jacobians
-    sol = least_squares(
-        residual_LR,
-        x0,
-        jac='2-point', # This tells Scipy to compute the gradient numerically
-        args=(beta, Lambda_c, D, F22_target, RTF12_target),
-        method="trf",
-        max_nfev=100,  # Limits total function calls to 200
-        xtol=1e-9,
-        ftol=1e-9,
-        verbose=2      # Useful to see if the cost function is actually decreasing
-    )
-    
-    Lambda_sol, R_sol = unpack_params(sol.x, Lambda0.shape[0], R0.shape[1])
-    return sol, Lambda_sol, R_sol
-
-
-# This one works
-def solve_F_dF_LR(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target):
-    '''
-    Solve the root finding problem for Lambda and R
-    given set of Lambda_c,D,beta,F22=<badg b> and RTF12=R.T@<fdag b>
-    using analytical derivatives.
-    Least_squares() proved to be faster than root()
-    '''
-    x0 = pack_params(Lambda0, R0)
-    if(True):
-        sol = least_squares(
-            residual_LR,
-            x0,
-            jac=jacobian_LR,
-            args=(beta, Lambda_c, D, F22_target, RTF12_target),
-            method="trf", # Change from 'hybr' to 'lm'
-            max_nfev=100,
-            ftol=1e-9,
-            xtol=1e-9,
-            verbose=2
-        )
-    elif(False):
-        sol = root(
-            residual_LR,
-            x0,
-            jac=jacobian_LR,
-            args=(beta, Lambda_c, D, F22_target, RTF12_target),
-            method="lm", # Change from 'hybr' to 'lm'
-            options={'ftol': 1e-9, 'xtol': 1e-9}
-        )
-    Lambda_sol, R_sol = unpack_params(sol.x, Lambda0.shape[0], R0.shape[1])
-    return sol, Lambda_sol, R_sol
-
-def new_self_energy(Lambda0,R0, Lambda_c,D, F22_target,RTF12_target, beta=200, method="dF"):
-    print("New self-energy fitting Lambda and R")
-    if(method=="dF"):
-        res, new_Lambda, new_R = solve_F_dF_LR(beta, Lambda_c,D,Lambda0,R0,F22_target,RTF12_target)
-    elif(method=="F"):
-        res, new_Lambda, new_R = solve_F_only_LR(beta, Lambda_c,D,Lambda0,R0,F22_target,RTF12_target)
-    else:
-        raise ValueError(f"Tried new_self_energy with method={method} - only \"F\" and \"dF\" methods are available")
-    return new_Lambda, new_R
-
-# ============================================================
-# Root solve for Lambda_c and D (aka Hybridization)
-# ============================================================
-# This one works without derivatives and with least square instead of root
-def solve_F_only_LcD(beta, Lambda, R, Lambda_c0, D0, F11_target, F12D_target):
-    x0 = pack_params(Lambda_c0, D0)
-    # We use least_squares because it supports 'trf' and '2-point' (numerical) jacobians
-    sol = least_squares(
-        residual_LcD,
-        x0,
-        jac='2-point', # This tells Scipy to compute the gradient numerically
-        args=(beta, Lambda, R, F11_target, F12D_target),
-        method="trf",
-        max_nfev=100,  # Limits total function calls to 200
-        xtol=1e-9,
-        ftol=1e-9,
-        verbose=2      # Useful to see if the cost function is actually decreasing
-    )
-    Lambda_c_sol, D_sol = unpack_params(sol.x, D0.shape[0], D0.shape[1])
-    return sol, Lambda_c_sol, D_sol
-
-
-# This one works
-def solve_F_dF_LcD(beta, Lambda, R, Lambda_c0, D0, F11_target, F12D_target):
-    '''
-    Solve the root finding problem for Lambda_c and D
-    given set of Lambda,R,beta,F11=<fadg f> and RTF12=<fdag b>@D
-    using analytical derivatives.
-    Least_squares() proved to be faster than root()
-    '''
-    x0 = pack_params(Lambda_c0, D0)
-    if(True):
-        sol = least_squares(
-            residual_LcD,
-            x0,
-            jac=jacobian_LcD,
-            args=(beta, Lambda, R, F11_target, F12D_target),
-            method="trf", # Change from 'hybr' to 'lm'
-            x_scale="jac", # should help
-            max_nfev=100,
-            ftol=1e-9,
-            xtol=1e-9,
-            verbose=2
-        )
-    elif(False):
-        sol = root(
-            residual_LcD,
-            x0,
-            jac=jacobian_LcD,
-            args=(beta, Lambda, R, F11_target, F12D_target),
-            method="lm", # Change from 'hybr' to 'lm'
-            options={'ftol': 1e-9, 'xtol': 1e-9}
-        )
-    Lambda_c_sol, D_sol = unpack_params(sol.x, D0.shape[0], D0.shape[1])
-    return sol, Lambda_c_sol, D_sol
-
-
-def new_hybridization( Lambda_c0,D0, Lambda,R, F11_target, F12D_target, beta=200, method="dF"):
-    print("New hybridization fitting Lambda_c and D")
-    if(method=="dF"):
-        res, new_Lambda_c, new_D = solve_F_dF_LcD(beta, Lambda,R,Lambda_c0,D0,F11_target,F12D_target)
-    elif(method=="F"):
-        res, new_Lambda_c, new_D = solve_F_only_LcD(beta, Lambda,R,Lambda_c0,D0,F11_target,F12D_target)
-    else:
-        raise ValueError(f"Tried new_hybridization with method={method} - only \"F\" and \"dF\" methods are available")
-    return new_Lambda_c, new_D
-   
-
-def residual_minimize(x, beta, Lambda_c, D, F22_target, RTF12_target):
-    r = residual_LR(x, beta, Lambda_c, D, F22_target, RTF12_target)
-    return 0.5 * np.dot(r, r)
-
-def jacobian_minimize(x, beta, Lambda_c, D, F22_target, RTF12_target):
-    r = residual_LR(x, beta, Lambda_c, D, F22_target, RTF12_target)
-    J = jacobian_LR(x, beta, Lambda_c, D, F22_target, RTF12_target)
-    return J.T @ r
-
-def solve_F_dF_minimize(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target):
-    x0 = pack_params(Lambda0, R0)
-    res = residual_LR(x0, beta, Lambda_c, D, F22_target, RTF12_target)
-    sol = minimize(
-        residual_minimize,
-        x0,
-        #jac=jacobian_minimize,
-        args=(beta, Lambda_c, D, F22_target, RTF12_target),
-        method="BFGS",
-        tol=1e-5,
-        options={'disp':False, 'eps': 1e-10, 'maxiter': len(x0)*10000}
-        )
-    print('sols.fun=',sol.fun)
-    print('sols.message=',sol.message)
-    Lambda_sol, R_sol = unpack_params(sol.x, Lambda0.shape[0], R0.shape[1])
-    return sol, Lambda_sol, R_sol 
-
-
-
-
-# In the following penalty from moving away from previous solution
 
 # ---------- Movement-penalized residuals / jacobians for Lambda+R -----------
 def residual_LR_movement(x, beta, Lambda_c, D, F22_target, RTF12_target, x0, alpha=1e-5):
@@ -614,17 +446,170 @@ def update_hybridization_thermal_penalty(Lambda_c0, D0, Lambda, R, F11_target, F
     return Lambda_c_sol, D_sol
 
 
+# ============================================================
+# Other routines — not needed for update_self_energy_thermal_penalty
+# or update_hybridization_thermal_penalty, but used in tests
+# ============================================================
+
+def solve_F_only_LR(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target):
+    '''
+    Solve the root finding problem for a given set of Lambda_c,D,beta,F22=<badg b> and RTF12=R.T@<fdag b>
+    using numerical derivatives
+    '''
+    x0 = pack_params(Lambda0, R0)
+    # We use least_squares because it supports 'trf' and '2-point' (numerical) jacobians
+    sol = least_squares(
+        residual_LR,
+        x0,
+        jac='2-point', # This tells Scipy to compute the gradient numerically
+        args=(beta, Lambda_c, D, F22_target, RTF12_target),
+        method="trf",
+        max_nfev=100,  # Limits total function calls to 200
+        xtol=1e-9,
+        ftol=1e-9,
+        verbose=2      # Useful to see if the cost function is actually decreasing
+    )
+
+    Lambda_sol, R_sol = unpack_params(sol.x, Lambda0.shape[0], R0.shape[1])
+    return sol, Lambda_sol, R_sol
 
 
+def solve_F_dF_LR(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target):
+    '''
+    Solve the root finding problem for Lambda and R
+    given set of Lambda_c,D,beta,F22=<badg b> and RTF12=R.T@<fdag b>
+    using analytical derivatives.
+    Least_squares() proved to be faster than root()
+    '''
+    x0 = pack_params(Lambda0, R0)
+    if(True):
+        sol = least_squares(
+            residual_LR,
+            x0,
+            jac=jacobian_LR,
+            args=(beta, Lambda_c, D, F22_target, RTF12_target),
+            method="trf", # Change from 'hybr' to 'lm'
+            max_nfev=100,
+            ftol=1e-9,
+            xtol=1e-9,
+            verbose=2
+        )
+    elif(False):
+        sol = root(
+            residual_LR,
+            x0,
+            jac=jacobian_LR,
+            args=(beta, Lambda_c, D, F22_target, RTF12_target),
+            method="lm", # Change from 'hybr' to 'lm'
+            options={'ftol': 1e-9, 'xtol': 1e-9}
+        )
+    Lambda_sol, R_sol = unpack_params(sol.x, Lambda0.shape[0], R0.shape[1])
+    return sol, Lambda_sol, R_sol
+
+def new_self_energy(Lambda0,R0, Lambda_c,D, F22_target,RTF12_target, beta=200, method="dF"):
+    print("New self-energy fitting Lambda and R")
+    if(method=="dF"):
+        res, new_Lambda, new_R = solve_F_dF_LR(beta, Lambda_c,D,Lambda0,R0,F22_target,RTF12_target)
+    elif(method=="F"):
+        res, new_Lambda, new_R = solve_F_only_LR(beta, Lambda_c,D,Lambda0,R0,F22_target,RTF12_target)
+    else:
+        raise ValueError(f"Tried new_self_energy with method={method} - only \"F\" and \"dF\" methods are available")
+    return new_Lambda, new_R
+
+def solve_F_only_LcD(beta, Lambda, R, Lambda_c0, D0, F11_target, F12D_target):
+    x0 = pack_params(Lambda_c0, D0)
+    # We use least_squares because it supports 'trf' and '2-point' (numerical) jacobians
+    sol = least_squares(
+        residual_LcD,
+        x0,
+        jac='2-point', # This tells Scipy to compute the gradient numerically
+        args=(beta, Lambda, R, F11_target, F12D_target),
+        method="trf",
+        max_nfev=100,  # Limits total function calls to 200
+        xtol=1e-9,
+        ftol=1e-9,
+        verbose=2      # Useful to see if the cost function is actually decreasing
+    )
+    Lambda_c_sol, D_sol = unpack_params(sol.x, D0.shape[0], D0.shape[1])
+    return sol, Lambda_c_sol, D_sol
 
 
+def solve_F_dF_LcD(beta, Lambda, R, Lambda_c0, D0, F11_target, F12D_target):
+    '''
+    Solve the root finding problem for Lambda_c and D
+    given set of Lambda,R,beta,F11=<fadg f> and RTF12=<fdag b>@D
+    using analytical derivatives.
+    Least_squares() proved to be faster than root()
+    '''
+    x0 = pack_params(Lambda_c0, D0)
+    if(True):
+        sol = least_squares(
+            residual_LcD,
+            x0,
+            jac=jacobian_LcD,
+            args=(beta, Lambda, R, F11_target, F12D_target),
+            method="trf", # Change from 'hybr' to 'lm'
+            x_scale="jac", # should help
+            max_nfev=100,
+            ftol=1e-9,
+            xtol=1e-9,
+            verbose=2
+        )
+    elif(False):
+        sol = root(
+            residual_LcD,
+            x0,
+            jac=jacobian_LcD,
+            args=(beta, Lambda, R, F11_target, F12D_target),
+            method="lm", # Change from 'hybr' to 'lm'
+            options={'ftol': 1e-9, 'xtol': 1e-9}
+        )
+    Lambda_c_sol, D_sol = unpack_params(sol.x, D0.shape[0], D0.shape[1])
+    return sol, Lambda_c_sol, D_sol
 
 
+def new_hybridization( Lambda_c0,D0, Lambda,R, F11_target, F12D_target, beta=200, method="dF"):
+    print("New hybridization fitting Lambda_c and D")
+    if(method=="dF"):
+        res, new_Lambda_c, new_D = solve_F_dF_LcD(beta, Lambda,R,Lambda_c0,D0,F11_target,F12D_target)
+    elif(method=="F"):
+        res, new_Lambda_c, new_D = solve_F_only_LcD(beta, Lambda,R,Lambda_c0,D0,F11_target,F12D_target)
+    else:
+        raise ValueError(f"Tried new_hybridization with method={method} - only \"F\" and \"dF\" methods are available")
+    return new_Lambda_c, new_D
 
 
+# ============================================================
+# UNUSED — never called outside this file
+# ============================================================
 
-#TESTING WITH PENALTY
-# --- helpers for spectral-norm constraint on R ---
+def residual_minimize(x, beta, Lambda_c, D, F22_target, RTF12_target):
+    r = residual_LR(x, beta, Lambda_c, D, F22_target, RTF12_target)
+    return 0.5 * np.dot(r, r)
+
+def jacobian_minimize(x, beta, Lambda_c, D, F22_target, RTF12_target):
+    r = residual_LR(x, beta, Lambda_c, D, F22_target, RTF12_target)
+    J = jacobian_LR(x, beta, Lambda_c, D, F22_target, RTF12_target)
+    return J.T @ r
+
+def solve_F_dF_minimize(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target):
+    x0 = pack_params(Lambda0, R0)
+    res = residual_LR(x0, beta, Lambda_c, D, F22_target, RTF12_target)
+    sol = minimize(
+        residual_minimize,
+        x0,
+        #jac=jacobian_minimize,
+        args=(beta, Lambda_c, D, F22_target, RTF12_target),
+        method="BFGS",
+        tol=1e-5,
+        options={'disp':False, 'eps': 1e-10, 'maxiter': len(x0)*10000}
+        )
+    print('sols.fun=',sol.fun)
+    print('sols.message=',sol.message)
+    Lambda_sol, R_sol = unpack_params(sol.x, Lambda0.shape[0], R0.shape[1])
+    return sol, Lambda_sol, R_sol
+
+
 def _smax_and_uv(R):
     """Return smax, u, v for the largest singular value of R."""
     U, S, Vh = np.linalg.svd(R, full_matrices=False)
@@ -657,7 +642,6 @@ def _penalty_residual_and_jac_blocks(R, w):
     return sw * viol, dr_dRre.reshape(-1), dr_dRim.reshape(-1)
 
 
-# --- penalty-augmented residual ---
 def residual_LR_penalty(x, beta, Lambda_c, D, F22_target, RTF12_target, w=1e6):
     """
     Original residuals + one scalar penalty residual to enforce ||R||_2 <= 1.
@@ -671,7 +655,6 @@ def residual_LR_penalty(x, beta, Lambda_c, D, F22_target, RTF12_target, w=1e6):
     return np.concatenate([r, np.array([r_pen])])
 
 
-# --- penalty-augmented jacobian ---
 def jacobian_LR_penalty(x, beta, Lambda_c, D, F22_target, RTF12_target, w=1e6):
     """
     Stack the original Jacobian with one extra row for the penalty residual.
@@ -702,7 +685,6 @@ def jacobian_LR_penalty(x, beta, Lambda_c, D, F22_target, RTF12_target, w=1e6):
     return np.vstack([J, Jpen])
 
 
-# --- drop-in solver using least_squares (recommended) ---
 def solve_F_dF_LR_with_penalty(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target,
                               w=1e6, max_nfev=200):
     """
@@ -740,4 +722,3 @@ def new_self_energy_penalty(Lambda0, R0, Lambda_c, D, F22_target, RTF12_target,
         beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target, w=w
     )
     return new_Lambda, new_R
-
