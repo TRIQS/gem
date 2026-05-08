@@ -5,7 +5,7 @@ import numpy as np
 
 from triqs_ghostGA.gdmft import *
 #from triqs_ghostGA.utility.e_list import EList_SemiCircular
-from triqs_ghostGA.solvers.ci import CI
+from triqs_ghostGA.solvers.simple_ed import SimpleED
 
 
 def _make_grisb():
@@ -33,7 +33,7 @@ def _make_grisb():
     Utensor[0, 0, 1, 1] = U
     Utensor[1, 1, 0, 0] = U
 
-    edsolver = CI(ntot, use_Ntot=True, use_Sz=True, dtype=np.complex128)
+    edsolver = SimpleED(ntot, use_Ntot=True, use_Sz=True, dtype=np.complex128)
     return Gdmft(ntot, nimp, nbath, eks, eloc, Utensor, wks=wks, edsolver=edsolver)
 
 

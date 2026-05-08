@@ -3,9 +3,8 @@
 import unittest
 
 from triqs_ghostGA.gdmft import *
-from triqs_ghostGA.utility.e_list import EList_SemiCircular
 import numpy as np
-from triqs_ghostGA.solvers.ci import CI
+from triqs_ghostGA.solvers.simple_ed import SimpleED
 import os
 import time
 
@@ -22,7 +21,9 @@ class test_hemb_ci_1o3(unittest.TestCase):
         ntot = nimp+nbath
 
         # construct ek with semicircular DOS
-        e_list = EList_SemiCircular(nmesh=5000).e_list
+        e_list = np.linspace(-1, 1, 5001)
+        wks = np.sqrt(1 - e_list**2)
+        wks /= np.sum(wks)
         eks = []
         for e in e_list:
             tmp = np.array([[1.0*e]],dtype=np.complex128)
@@ -44,10 +45,10 @@ class test_hemb_ci_1o3(unittest.TestCase):
             Utensor[1,1,0,0] = U
 
             # test CI solver
-            edsolver = CI(ntot, use_Ntot=True, spin_pen=0.1,
+            edsolver = SimpleED(ntot, use_Ntot=True, spin_pen=0.1,
                         use_Sz=True, dtype=np.complex128)
-            grisb = Gdmft(ntot, nimp, nbath, eks, eloc, Utensor, edsolver=edsolver, 
-                          Lambda=Lambda0, R=R0 , spin_pen=0.1)
+            grisb = Gdmft(ntot, nimp, nbath, eks, eloc, Utensor, wks=wks, edsolver=edsolver,
+                          Lambda=Lambda0, R=R0, spin_pen=0.1)
             grisb.run(itmax=100, mix=0.2, tol=1e-5, beta=500,
                     silence=True)
         

@@ -2,25 +2,24 @@
 
 import unittest
 
-from triqs_ghostGA import LatticeSolver
-from triqs_ghostGA.grisb import *
-from triqs_ghostGA.utility.utils_TH import U_matrix_kanamori
-from triqs_ghostGA.utility.e_list import EList_SemiCircular
-from h5 import *
+from triqs_ghostGA.gdmft import *
 import numpy as np
-from triqs_ghostGA.solvers.ci import CI
+import h5py
+from triqs_ghostGA.solvers.simple_ed import SimpleED
 import os
 
 
 class test_hemb_ci_1o3(unittest.TestCase):
 
-    def test_grisb_ci(self):
+    def test_gdmft_ci(self):
 
         # 1 orbital with 2 spins, 3 bath per orbital, total 8
         nimp, nbath, ntot = 2, 6, 8
 
         # construct ek with semicircular DOS
-        e_list = EList_SemiCircular(nmesh=5000).e_list
+        e_list = np.linspace(-1, 1, 5001)
+        wks = np.sqrt(1 - e_list**2)
+        wks /= np.sum(wks)
         eks = []
         for e in e_list:
             tmp = np.array([[1.0*e]],dtype=np.complex128)
@@ -46,36 +45,35 @@ class test_hemb_ci_1o3(unittest.TestCase):
         Utensor[1,1,0,0] = U
 
         # test CI solver
-        edsolver = CI(ntot, use_Ntot=True, use_Sz=False,
+        edsolver = SimpleED(ntot, use_Ntot=True, use_Sz=False,
                       dtype=np.complex128, spin_pen=0.05)
-        grisb = Grisb(ntot, nimp, nbath, eks, eloc, Utensor, R=R0,
+        grisb = Gdmft(ntot, nimp, nbath, eks, eloc, Utensor, wks=wks, R=R0,
                       Lambda=Lambda0, edsolver=edsolver)
-        grisb.run(itmax=30, mix=1, tol=1e-5, beta=500,
-                  silence=True, diis=True)
+        grisb.run(itmax=30, mix=1, tol=1e-5, beta=500, silence=True)
 
         name = "1o3_ci_diis"
-        with HDFArchive(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "r") as A:
+        with h5py.File(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "r") as A:
 
             print("Compare docc")
-            np.testing.assert_allclose(grisb.docc, A[name]["docc"], atol=1e-3)
+            docc_true = A[name]["docc"]['0'][0] + 1j*A[name]["docc"]['0'][1]
+            np.testing.assert_allclose(grisb.docc, docc_true, atol=1e-3)
 
             print("Compare denMat")
-            ref_denM_eval, ref_denM_evec = np.linalg.eig(A[name]["denMat"])
+            denmat_true = A[name]["denMat"][...,0] + 1j*A[name]["denMat"][...,1]
+            ref_denM_eval, ref_denM_evec = np.linalg.eig(denmat_true)
             idx = ref_denM_eval.argsort()[::-1]
             ref_denM_eval = ref_denM_eval[idx]
 
-            test_denM_eval, test_denM_evec = np.linalg.eig(grisb.denMat)
+            test_denM_eval, test_denM_evec = np.linalg.eig(grisb.Fragment.denMat)
             idx = test_denM_eval.argsort()[::-1]
             test_denM_eval = test_denM_eval[idx]
 
             np.testing.assert_allclose(test_denM_eval, ref_denM_eval, atol=1e-3)
 
-        # with HDFArchive("os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "a") as A:
-        #     tmp_dir = {
-        #         'docc': grisb.docc,
-        #         'denMat': grisb.denMat,
-        #     }
-        #     A[name] = tmp_dir
+        # with h5py.File(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "a") as A:
+        #     grp = A.require_group(name)
+        #     grp["docc"] = grisb.docc
+        #     grp["denMat"] = grisb.Fragment.denMat
 
 
 if __name__ == '__main__':

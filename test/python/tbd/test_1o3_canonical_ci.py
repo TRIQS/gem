@@ -9,15 +9,20 @@ from triqs_ghostGA.solvers.simple_ed import SimpleED
 import os
 
 
-class test_hemb_ci_1o3(unittest.TestCase):
+class test_hemb_1o3_ci(unittest.TestCase):
 
     def test_gdmft_ci(self):
 
         # 1 orbital with 2 spins, 3 bath per orbital, total 8
-        B = 3
-        nimp = 2
-        nbath = nimp*B
-        ntot = nimp+nbath
+        nimp, nbath, ntot = 2, 6, 8
+
+        U = 1.2
+        nfix = 0.8
+        nnom = 1.0
+        eloc = np.zeros((nimp, nimp))
+        tmp_e = -U/2
+        eloc[0,0] = tmp_e
+        eloc[1,1] = tmp_e
 
         # construct ek with semicircular DOS
         e_list = np.linspace(-1, 1, 5001)
@@ -25,38 +30,31 @@ class test_hemb_ci_1o3(unittest.TestCase):
         wks /= np.sum(wks)
         eks = []
         for e in e_list:
-            tmp = np.array([[1.0*e]],dtype=np.complex128)
+            tmp = np.array([[1.0*e]], dtype=np.complex128)
             tmp = np.kron(tmp,np.eye(2))
             eks.append(tmp)
         eks = np.array(eks)
 
+        np.random.seed(1234)
         # random initial value for hybridization
         R0 = np.random.rand(nbath//2, nimp//2)
         R0 = np.kron(R0, np.eye(2))
 
         Lambda0 = np.zeros((nbath//2, nbath//2))
-        Lambda0 = np.diag([0.6, 0, -0.6])
+        Lambda0[0, 0] = 0.1
+        Lambda0[1, 1] = 0.0
+        Lambda0[2, 2] = -0.1
         Lambda0 = np.kron(Lambda0, np.eye(2))
 
-        U = 2.4
-        eloc = np.zeros((nimp, nimp))
-        eloc[0,0] = -U/2.
-        eloc[1,1] = -U/2.
-
         Utensor = np.zeros((nimp, nimp, nimp, nimp))
-        Utensor[0,0,1,1] = U
-        Utensor[1,1,0,0] = U
+        Utensor[1, 1, 0, 0] = U
+        Utensor[0, 0, 1, 1] = U
 
-        # test CI solver
-        edsolver = SimpleED(ntot, use_Ntot=True,
-                      use_Sz=True, dtype=np.complex128)
-        grisb = Gdmft(ntot, nimp, nbath, eks, eloc, Utensor, wks=wks, edsolver=edsolver)
-        grisb.run(itmax=30, mix=0.2, tol=1e-5, beta=500,
-                  silence=True)
+        edsolver = SimpleED(ntot, use_Ntot=True, use_Sz=True, dtype=np.complex128, spin_pen=0.0)
+        grisb = Gdmft(ntot, nimp, nbath, eks, eloc, Utensor, wks=wks, R=R0, Lambda=Lambda0, edsolver=edsolver)
+        grisb.run(mu=-0.2, n_target=nfix, itmax=100, mix=1, tol=1e-5, beta=500, silence=True)
 
-        name = "1o3_ci"
-
-
+        name = "1o3_canonical_ci"
         with h5py.File(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "r") as A:
 
             print("Compare docc")
@@ -64,7 +62,6 @@ class test_hemb_ci_1o3(unittest.TestCase):
             np.testing.assert_allclose(grisb.docc, docc_true, atol=1e-3)
 
             print("Compare denMat")
-            print(A[name]["denMat"])
             denmat_true = A[name]["denMat"][...,0] + 1j*A[name]["denMat"][...,1]
             ref_denM_eval, ref_denM_evec = np.linalg.eig(denmat_true)
             idx = ref_denM_eval.argsort()[::-1]
@@ -76,10 +73,14 @@ class test_hemb_ci_1o3(unittest.TestCase):
 
             np.testing.assert_allclose(test_denM_eval, ref_denM_eval, atol=1e-3)
 
+            print("Compare mu")
+            np.testing.assert_allclose(grisb.mu, A[name]["mu"][()], atol=1e-2)
+
         # with h5py.File(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "a") as A:
         #     grp = A.require_group(name)
         #     grp["docc"] = grisb.docc
-        #     grp["denMat"] = grisb.denMat
+        #     grp["denMat"] = grisb.Fragment.denMat
+        #     grp["mu"] = grisb.mu
 
 
 if __name__ == '__main__':

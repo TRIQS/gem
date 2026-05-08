@@ -10,9 +10,9 @@ from triqs_ghostGA.solvers.simple_ed import SimpleED
 import os
 
 
-class test_hemb_2o6_ci(unittest.TestCase):
+class test_hemb_2o6_simple_ed(unittest.TestCase):
 
-    def test_gdmft_ci(self):
+    def test_gdmft_simple_ed(self):
 
         # 2 orbital with 2 spins, 3 bath per orbital, total 16
         B=3

@@ -3,7 +3,7 @@ import unittest
 
 from triqs_ghostGA.gdmft import *
 import numpy as np
-from triqs_ghostGA.solvers.ci import CI
+from triqs_ghostGA.solvers.simple_ed import SimpleED
 import os
 import h5py
 
@@ -46,11 +46,11 @@ class test_temperature(unittest.TestCase):
         Utensor[0, 0, 1, 1] = U
         Utensor[1, 1, 0, 0] = U
 
-        edsolver = CI(ntot, use_Ntot=False,
+        edsolver = SimpleED(ntot, use_Ntot=False,
                       use_Sz=False, dtype=np.complex128, thermal=True)
 
         grisb = Gdmft(ntot, nimp, nbath, eks, eloc, Utensor,
-                      wks=wks, R=R0, Lambda=Lambda0, edsolver=edsolver, thermal=True)
+                      wks=wks, R=R0, Lambda=Lambda0, edsolver=edsolver)
 
         T_results = []
         docc_results = []
