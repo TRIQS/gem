@@ -1,3 +1,10 @@
+# Solver based on ITensorMPS, a finite MPS and MPO methods
+# based on the Julia version of ITensor ( https://github.com/ITensor/ITensorWebsite.git )
+# 
+#
+# When using this solver please cite the following articles:
+# - M. Fishman et al, SciPost Phys. Codebases 4 (2022)
+
 import numpy as np
 import os
 import sys
@@ -47,51 +54,7 @@ class ITensorMPSSolver(object):
         self.recouple = recouple
         self.gs_ene = 0
 
-    def add_to_schedule(self,nsweeps=1,maxdim=1024, cutoff=1e-14,noise=0.0,outputlevel=1):
-        thesweep=    {
-            "nsweeps":nsweeps,
-            "maxdim":maxdim,
-            "cutoff":cutoff,
-            "noise":noise,
-            "outputlevel":outputlevel
-            }
-        self.schedule.append(
-        [tuple(thesweep.keys()),tuple(thesweep.values())])
-        return thesweep
-    def make_schedule(self, input=False):
-        assert input==False
-        if type(input)==bool and input==False:
-            self.add_to_schedule(nsweeps=15,maxdim=32,cutoff=1e-10,noise=1e-5)
-            self.add_to_schedule(nsweeps=15,maxdim=64,cutoff=1e-10,noise=1e-6)
-            self.add_to_schedule(nsweeps=15,maxdim=128,cutoff=1e-12,noise=1e-6)
-            self.add_to_schedule(nsweeps=10,maxdim=256,cutoff=1e-12,noise=1e-6)
-            self.add_to_schedule(nsweeps=10,maxdim=512,cutoff=1e-12,noise=1e-7)
-            self.add_to_schedule(nsweeps=10,maxdim=1024,cutoff=1e-14,noise=1e-8)
-            self.add_to_schedule(nsweeps=10,maxdim=2048,cutoff=1e-14,noise=1e-9)
-            self.add_to_schedule(nsweeps=5,maxdim=4096,cutoff=1e-14,noise=1e-10)
-            self.add_to_schedule(nsweeps=3,maxdim=8192,cutoff=1e-14,noise=1e-12)
-            self.add_to_schedule(nsweeps=2,maxdim=8192,cutoff=1e-14,noise=0.0)
-            #setup standard schedule
-        else:
-            #not implemented yet
-            assert False
-        return
-
-    def set_kwargs(self,kwargs={"use_Sz":True,"use_Ntot":True,"spin_pen":0.0}):
-        self.kwargs=[[tuple(kwargs.keys()),tuple(kwargs.values())]]
-        return
-
-    def modify_kwargs(self, key,value):
-        #make dict out of key, value pairs
-        d=dict(zip(self.kwargs[0][0],self.kwargs[0][1]))
-        d[key]=value
-        self.set_kwargs(d)
-        return
-
-    def set_tolerances(self,tol_names=("E","rho"),tol_vals=(1e-5,5e-3)):
-        self.tolerances=[[tol_names,tol_vals]]
-        return
-
+#MANDATORY FUNCTIONS
     def build_Hemb(self, D, eloc, LAMBDA, V2E): # , spin_pen=0.0):
         # Local Hamiltonian
         #thedtype=np.complex_
@@ -129,7 +92,6 @@ class ITensorMPSSolver(object):
         self.M["up"]=0.5*(self.M["up"] + self.M["up"].T.conjugate())
         self.M["dn"]=0.5*(self.M["dn"] + self.M["dn"].T.conjugate())
 
-
     def solve_Hemb(self, num_eig=1, verbose=1,tol=1e-8, beta=500.0):
         # Criteria for the bound dimension of the DMRG, just be converged
         # Set up and run ForkTPS using the useful_func.py
@@ -153,7 +115,6 @@ class ITensorMPSSolver(object):
             self.singleP_up = 0.5*(self.singleP_up + self.singleP_dn)   #constrains to paramagnet
             self.singleP_dn = self.singleP_up.copy() #constrains to paramagnet
 
-
     def calc_density_matrix(self):
         if self.rotateBath:
             self.singleP = rotateDensityMatrix(self.singleP_up,self.singleP_dn, self.v)
@@ -170,14 +131,57 @@ class ITensorMPSSolver(object):
             self.dm = self.singleP
         return self.dm
 
-    def calc_double_occ(self,idx):
-        print('warning: double occupancy not implement!')
-        return 0.25
-
     def compute_E2loc(self):
         #eone = 2*numpy.einsum('ij,ij',self.h1,self.dm[::2,::2])
         #etwo = self.e0 - eone
         return self.EHint
+
+#AUXILIARY FUNCTIONS
+    def add_to_schedule(self,nsweeps=1,maxdim=1024, cutoff=1e-14,noise=0.0,outputlevel=1):
+        thesweep=    {
+            "nsweeps":nsweeps,
+            "maxdim":maxdim,
+            "cutoff":cutoff,
+            "noise":noise,
+            "outputlevel":outputlevel
+            }
+        self.schedule.append(
+        [tuple(thesweep.keys()),tuple(thesweep.values())])
+        return thesweep
+
+    def make_schedule(self, input=False):
+        assert input==False
+        if type(input)==bool and input==False:
+            self.add_to_schedule(nsweeps=15,maxdim=32,cutoff=1e-10,noise=1e-5)
+            self.add_to_schedule(nsweeps=15,maxdim=64,cutoff=1e-10,noise=1e-6)
+            self.add_to_schedule(nsweeps=15,maxdim=128,cutoff=1e-12,noise=1e-6)
+            self.add_to_schedule(nsweeps=10,maxdim=256,cutoff=1e-12,noise=1e-6)
+            self.add_to_schedule(nsweeps=10,maxdim=512,cutoff=1e-12,noise=1e-7)
+            self.add_to_schedule(nsweeps=10,maxdim=1024,cutoff=1e-14,noise=1e-8)
+            self.add_to_schedule(nsweeps=10,maxdim=2048,cutoff=1e-14,noise=1e-9)
+            self.add_to_schedule(nsweeps=5,maxdim=4096,cutoff=1e-14,noise=1e-10)
+            self.add_to_schedule(nsweeps=3,maxdim=8192,cutoff=1e-14,noise=1e-12)
+            self.add_to_schedule(nsweeps=2,maxdim=8192,cutoff=1e-14,noise=0.0)
+            #setup standard schedule
+        else:
+            #not implemented yet
+            assert False
+        return
+
+    def set_kwargs(self,kwargs={"use_Sz":True,"use_Ntot":True,"spin_pen":0.0}):
+        self.kwargs=[[tuple(kwargs.keys()),tuple(kwargs.values())]]
+        return
+
+    def modify_kwargs(self, key,value):
+        #make dict out of key, value pairs
+        d=dict(zip(self.kwargs[0][0],self.kwargs[0][1]))
+        d[key]=value
+        self.set_kwargs(d)
+        return
+
+    def set_tolerances(self,tol_names=("E","rho"),tol_vals=(1e-5,5e-3)):
+        self.tolerances=[[tol_names,tol_vals]]
+        return
 
     def h5write_gs(self,filename,group_path,name):
         #check that group at group_path exists
@@ -201,6 +205,7 @@ class ITensorMPSSolver(object):
         else:
             return jl.GGMPSSolver.ITensors.inner(bra,ket)
 
+
 def write_mps_to_file(state,filename,group_path,name):
     #check that group at group_path exists
     with h5py.File(filename,"a") as f:
@@ -211,5 +216,3 @@ def write_mps_to_file(state,filename,group_path,name):
 
 def read_mps_from_file(filename,group_path,name):
     return jl.GGMPSSolver.read_mps_from_file(filename,group_path,name)
-
-
