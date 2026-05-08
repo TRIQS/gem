@@ -25,7 +25,7 @@ class SimpleED(object):
     Simple exact diagonalization class aim to solve general impurity Hamiltonian.
     '''
     def __init__(self, norb, use_Ntot=False, use_Sz=False,
-                 CISD=False, thermal=False, dtype=np.float64, Nparticle=None,
+                 thermal=False, dtype=np.float64, Nparticle=None,
                  ):
         '''
         Constructor.
@@ -33,7 +33,6 @@ class SimpleED(object):
           norb: int. number of orbitals including spin
           use_Ntot: bool. If using particle number symmetry
           use_Sz: bool. If using Sz symmetry
-          CISD: bool. If using CISD basis
           thermal: bool. If performing thermal calculation.
           dtype: dtype. data type of the Hamiltonian
         '''
@@ -45,7 +44,6 @@ class SimpleED(object):
         if( self.thermal and ( self.use_Ntot or self.use_Sz ) ):
             warnings.warn("Thermal calculations should be performed without symmetries, otherwise the partition function is not correctly computed.")
 
-        self.CISD = CISD # cisd
         self.strb = '{0:0'+str(norb)+'b}' # string to convert integer to binary string
         self.strb_red = '{0:0'+str(norb//2)+'b}' # string to convert integer to binary string in reudced Hilbert space
         self.data_type = dtype # data type of the Hamiltonian
@@ -53,22 +51,18 @@ class SimpleED(object):
         self.Htwo = None # initialize None for two-body part
 
         # create basis in the ground space half-filled and optionally Sz=0.
-        if use_Ntot == True and use_Sz == False and CISD == False: # Ntot symmetry
+        if use_Ntot == True and use_Sz == False: # Ntot symmetry
             if Nparticle == None:
                 self.basis = table_ep(norb,norb//2)
             else:
                 self.basis = table_ep(norb,Nparticle)
-        if use_Ntot == True and use_Sz == True and CISD == False: # Ntot and Sz symmetry
+        if use_Ntot == True and use_Sz == True: # Ntot and Sz symmetry
             if Nparticle == None:
                 self.basis = table_es(norb,norb//2,0)
             else:
                 self.basis = table_es(norb,Nparticle,0)
         if use_Ntot == False and use_Sz == False: # no symmetry
             self.basis = np.arange(2**(norb))
-        if CISD == True: # cisd basis
-            reference_determinant = int(2**(norb//2) - 1) # reference determinant, lowest nEle orbitals filled
-            #self.basis = np.array([reverseBits(norb,reference_determinant)])
-            self.basis = single_and_double_determinants(norb,reference_determinant,use_Sz=use_Sz)
 
         self.hsize = len(self.basis) # hilbert space size
         print('size of basis= {:d}'.format( len(self.basis) ))#, 'data type of basis=', self.basis.dtype)
@@ -506,32 +500,6 @@ def add_particles(norb,residue_list):
     #return [format(det,'#0'+str(n_orbitals+2)+'b') for det in list(set(determinants))]
     return list(set(determinants))
 
-@jit(nopython=True)#,cache=True)
-def single_and_double_determinants(norb, determinant, use_Sz=False):
-    #print("building cisd basis")
-    #strb = '{0:0'+str(norb)+'b}'
-    result = np.array([i for i in add_particles(norb, residues(norb, determinant))])
-    if use_Sz ==True:
-        result_sz = []
-        for bs in result:
-            # Get all even bits of x
-            even_bits = bs & 0xAAAAAAAA
-            # Get all odd bits of x
-            odd_bits = bs & 0x55555555
-            nup = even_bits.bit_count()
-            ndn = odd_bits.bit_count()
-            #print(bs, strb.format(bs), nup,ndn)
-            if nup-ndn==0:
-                result_sz.append(bs)
-                #print(bs, strb.format(bs), nup,ndn)
-        result = np.array(result_sz)
-    #print("sorting cisd basis")
-    #result.sort()
-    #print("finished cisd basis")
-    return result
-
-
-
 
 @jit(nopython=True)
 def find_count(i,j,bsr,norb,bsltmp):
@@ -656,71 +624,3 @@ def build_rholoc_onfly(basis,gs_wf,rholoc,bipart_smap):
             if bipart_smap[i,2] == bipart_smap[j,2] and abs(gs_wf[i]*gs_wf[j]) > 1e-12:
                 rholoc[bipart_smap[i,1],bipart_smap[j,1]] += gs_wf[i]*gs_wf[j]
     return rholoc
-
-
-
-  
-# ********** POSSIBLE JUNK ***********
-
-#NEVER USED
-def reverseBits(norb,n):
-  strb = '{0:0'+str(norb)+'b}'
-  rb = strb.format(n)[::-1]
-  return int(rb,2)
-
-#NEVER USED - NO SC
-def table_es_sc(nstate,spinz,dtype=np.int64):
-    '''
-    This function generates the table of binary representations of a particle-non-conserved and spin-conserved basis.
-    '''
-    strb = '{0:0'+str(nstate)+'b}'
-    tmp = np.arange(0,2**nstate)
-    result = []
-    for bs in tmp:
-        print(bs, strb.format(bs) )
-        # Get all even bits of x
-        even_bits = bs & 0xAAAAAAAA
-        # Get all odd bits of x
-        odd_bits = bs & 0x55555555
-        nup = even_bits.bit_count()
-        ndn = odd_bits.bit_count()
-        print(nup,ndn)
-        if nup-ndn==spinz:
-            result.append(bs)
-    result = np.array(result)
-    result.sort()
-    return result
-
-# NEVER USED
-def build_no_trial_states(norb, nimp, nelc):
-    """ Natural orbital convention as (nimp|empty|inter|filled) for example
-        1-orbital impurity
-        (01|00000|01|11111)
-        (10|00000|10|11111)
-
-        3-orbital impurity
-        (010101|000000|010101|111111)
-        (101010|000000|101010|111111)
-    """
-    print("building cisd basis")
-    strb = '{0:0'+str(norb)+'b}'
-    result = []
-    for i in range(2):#spin-block
-        tmp = 0
-        for j in range(nimp//2):# impurity orbital block
-            tmp += 1 <<(2*j+i)
-        #print('tmp=',strb.format(tmp))
-        tmp = tmp << (norb - nimp)
-        #print('tmp1=',strb.format(tmp))
-        tmp2 = 0
-        for j in range(nimp//2):# intermediate obirtal block
-            tmp2 += 1 <<(2*j+(1-i))
-        tmp2 = tmp2 << (nelc - nimp)
-        #print('tmp2=',strb.format(tmp2))
-        tmp = tmp | tmp2
-        for j in range(nelc-nimp):
-            tmp = tmp | (1<<j)
-        #print(strb.format(tmp))
-        result.append(tmp)
-    result = np.array(result)
-    return result
