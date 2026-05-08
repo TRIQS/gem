@@ -11,11 +11,11 @@ class Fragment():
 # Think of passing dict instead of all those parameters?
 # N.B. penalties and sectors are decided at solver level, thermal?
     def __init__(self,
-                 nimp: int, nbath: int, T: float,
+                 nimp: int, nbath: int,
                  eloc: np.ndarray, Utensor: np.ndarray,
                  solver,
                  Lambda=None,R=None,Lambda_c=None,D=None,
-                 Thermal=False, verbose=0
+                 verbose=0
                   ):
 
         #Checks?
@@ -32,7 +32,6 @@ class Fragment():
         self.nbath = nbath
         self.ntot = nimp + nbath
         self.Bgh = nbath//nimp
-        self.T = float(T)
 
         assert eloc.shape == (nimp, nimp), f"eloc must be ({nimp},{nimp}), got {eloc.shape}"
         assert Utensor.shape == (nimp,)*4, f"Utensor must be ({nimp},{nimp},{nimp},{nimp}), got {Utensor.shape}"
@@ -71,7 +70,6 @@ class Fragment():
             if self.D.shape != (nbath, nimp):
                 raise ValueError(f"D must be ({nbath},{nimp}), got {self.D.shape}")
 
-        self.thermal = Thermal
         self.verb = verbose
 
         #Create Hermitian list here and store
@@ -89,7 +87,7 @@ class Fragment():
             print(self.Lambda_c)
         print("##### END OF FRAGMENT INITIALIZATION #####")
 
-    def solve_impurity(self, mu, num_eig=1, spin_pen=0.0):
+    def solve_impurity(self, mu, T=0.0, num_eig=1, spin_pen=0.0):
         """
         Solve embedding problem using the solver from Fragment
         """
@@ -99,15 +97,16 @@ class Fragment():
         h1e[self.nimp:,self.nimp:] = -self.Lambda_c
         h1e[self.nimp:,:self.nimp] = self.D.conj()
 
-        if self.solver.type in ["SimpleED", "ITensorMPSSolver", "PySCFCCSD", "Block2NSZ"]:
-            self.solver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor, spin_pen=spin_pen)
+        if(self.verb>0):
+            print(f"Solving embedding problem with solver  {self.solver.type}")
+            print(" Temperature T =", T)
+        
+        self.solver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor, spin_pen=spin_pen)
+        
+        if(T>=0.0):
+            self.solver.solve_Hemb(num_eig=num_eig, verbose=self.verb , T=T)
         else:
-            raise ValueError("only Full ED, CI, and HCI are supported")
-
-        if(self.solver.thermal):
-            self.solver.solve_Hemb(num_eig=num_eig, verbose=self.verb , beta=1/self.T)
-        else:
-            self.solver.solve_Hemb(num_eig=num_eig, verbose=self.verb )
+            raise ValueError("Temperature T must be non-negative")
 
         self.denMat = self.solver.calc_density_matrix()
         fdagf = self.denMat[self.nimp:,self.nimp:]
@@ -115,7 +114,7 @@ class Fragment():
         self.nfill  = np.trace( self.denMat[:self.nimp,:self.nimp] )
         self.E2loc  = self.solver.compute_E2loc()
 
-    def update_self_energy(self, move_pen=1e-6):
+    def update_self_energy(self, T=0.0, move_pen=1e-6):
         '''
         This function update the self-energy parameters Lambda and R
         '''
@@ -123,28 +122,32 @@ class Fragment():
         fdagf = self.denMat[self.nimp:,self.nimp:]
         self.Delta_aim = np.eye(self.nbath) - fdagf
 
-        if(self.thermal):
+        if T > 0.0:
             L_new, R_new = update_self_energy_thermal_penalty(self.Lambda, self.R, self.Lambda_c, self.D,
                                                               fdagf, cdagf,
-                                                              beta=1/self.T, alpha=move_pen, method="dF")
-        else:
+                                                              beta=1/T, alpha=move_pen, method="dF")
+        elif T == 0.0:
             R_new = np.transpose( cdagf.dot( funcMat(self.Delta_aim, denR)) )
             L_new = calc_Lambda( R_new, self.Lambda_c, self.Delta_aim, self.D, self.H_list )
+        else:
+            raise ValueError("Temperature T must be non-negative")
         self.R = R_new.copy()
         self.Lambda = L_new.copy()
         return self.R, self.Lambda
 
-    def update_hybridization(self, move_pen=1e-6):
+    def update_hybridization(self, T=0.0, move_pen=1e-6):
         '''
         This function update the hybridization parameters Lambda_c and D
         '''
-        if(self.thermal):
+        if T > 0.0:
             Lc_new, D_new = update_hybridization_thermal_penalty(self.Lambda_c, self.D, self.Lambda, self.R,
                                                                  self.Delta_qp, self.ERD.T,
-                                                                 beta=1/self.T, alpha=move_pen, method="dF")
-        else:
+                                                                 beta=1/T, alpha=move_pen, method="dF")
+        elif T == 0.0:
             D_new = np.dot(funcMat(self.Delta_qp, denR),np.transpose(self.ERD))
             Lc_new = calc_Lambda_c(self.R, self.Lambda, self.Delta_qp, D_new, self.H_list)
+        else:
+            raise ValueError("Temperature T must be non-negative")
         self.D = D_new.copy()
         self.Lambda_c = Lc_new.copy()
         return self.D, self.Lambda_c
