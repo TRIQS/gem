@@ -10,11 +10,10 @@ class Lattice():
     '''
     Class for the lattice part to solve the quasiparticle problem
     '''
-    def __init__(self, T: float,
+    def __init__(self,
                  ek_list: np.ndarray, wk_list: np.ndarray = None,
                  verbose=0
                   ):
-        if not isinstance(T, float): raise TypeError(f"T must be int, got {type(T)}")
         if not isinstance(verbose, int): raise TypeError(f"verbose must be int, got {type(verbose)}")
         if not isinstance(ek_list, np.ndarray): raise TypeError(f"ek_list must be ndarray, got {type(ek_list)}")
         if(wk_list is None):
@@ -28,12 +27,11 @@ class Lattice():
 
         self.eks  = ek_list.copy()
         self.wks  = wk_list.copy()
-        self.T    = T
         self.verb = verbose
 
         print("##### END OF LATTICE INITIALIZATION #####")
 
-    def solve_qp(self, Fragments_list):
+    def solve_qp(self, Fragments_list, T=0.0):
         if not isinstance(Fragments_list, list) or not all(isinstance(F, Fragment) for F in Fragments_list):
             raise TypeError(f"Fragments_list must be a list of Fragment objects")
 
@@ -42,7 +40,8 @@ class Lattice():
 
         if self.eks.shape[1] != nimp_tot or self.eks.shape[2] != nimp_tot:
             raise ValueError(f"ek_list second and third dimensions must be {nimp_tot}, got {self.eks.shape}")
-
+        if(T<0.0): raise ValueError("Temperature T must be non-negative")
+        Tuse=np.max(1e-3,T)
         self.Rtot = block_diag(*[F.R for F in Fragments_list])
         self.Ltot = block_diag(*[F.Lambda for F in Fragments_list])
 
@@ -50,7 +49,7 @@ class Lattice():
         self.ERD_tot   = np.zeros( (nimp_tot ,nbath_tot), dtype=complex )
         for ek,wk in zip(self.eks, self.wks):
             Hk_qp = self.Rtot @ ek @ self.Rtot.T.conj() + self.Ltot
-            Dk = calc_nf(Hk_qp,self.T).T
+            Dk = calc_nf(Hk_qp,Tuse).T
             self.Delta_p_tot += wk*Dk
             self.ERD_tot   += wk*(ek @ self.Rtot.T.conj() @ Dk)
 
@@ -64,17 +63,19 @@ class Lattice():
 
         return self.Delta_p_tot, self.ERD_tot
 
-    def fit_mu(self, n_target, Fragments_list, mu_old=0.0, mode='qp', ntol=1e-4):
+    def fit_mu(self, n_target, Fragments_list, T=1e-2, mu_old=0.0, mode='qp', ntol=1e-4):
         m = mode.lower()
+        if(T<0.0): raise ValueError("Temperature T must be non-negative")
         if m in ('qp', 'quasiparticle'):
-            return self.fit_mu_quasiparticle( n_target, Fragments_list, mu_old=mu_old )
+            return self.fit_mu_quasiparticle( n_target, Fragments_list, T=T, mu_old=mu_old )
         elif m in ('imp', 'impurity', 'frag', 'fragment'):
-            return self.fit_mu_fragment( n_target, Fragments_list, mu_old=mu_old, ntol=ntol )
+            return self.fit_mu_fragment( n_target, Fragments_list, T=T, mu_old=mu_old, ntol=ntol )
 
-    def fit_mu_quasiparticle(self, n_target, Fragments_list, mu_old=0.0):
+    def fit_mu_quasiparticle(self, n_target, Fragments_list, T=1e-2, mu_old=0.0):
         if not isinstance(Fragments_list, list) or not all(isinstance(F, Fragment) for F in Fragments_list):
             raise TypeError(f"Fragments_list must be a list of Fragment objects")
-
+        if T < 0.0: raise ValueError("Temperature T must be non-negative")
+        Tuse=np.max(1e-3,T)
         nimp_tot = sum(F.nimp for F in Fragments_list)
         nbath_tot = sum(F.nbath for F in Fragments_list)
 
@@ -93,12 +94,12 @@ class Lattice():
                 ekvals = np.linalg.eigvalsh(Hk_qp)
                 dens += np.sum(calc_Fermi(ekvals/T))*wk
             return dens/np.sum(wk_qp)
-        print('start_qp_dens:',qp_density( 0.0, self.T, self.Ltot, self.Rtot, self.eks, self.wks))
+        print('start_qp_dens:',qp_density( 0.0, Tuse, self.Ltot, self.Rtot, self.eks, self.wks))
 
         nqp_target = 0.5*(nbath_tot-nimp_tot) + n_target
         try:
             def residual(mu):
-                return qp_density(mu, self.T, self.Ltot, self.Rtot, self.eks, self.wks) - nqp_target
+                return qp_density(mu, Tuse, self.Ltot, self.Rtot, self.eks, self.wks) - nqp_target
 
             a, b = -10.0, 10.0
             for _ in range(200):
@@ -117,18 +118,18 @@ class Lattice():
 
 
 
-    def fit_mu_fragment(self, n_target, Fragments_list, nsteps=10, dmu0=1e-2, ntol=1e-4, mu_old=0.0, spin_pen=0.0):
+    def fit_mu_fragment(self, n_target, Fragments_list, T=1e-2, nsteps=10, dmu0=1e-2, ntol=1e-4, mu_old=0.0, spin_pen=0.0):
         if not isinstance(Fragments_list, list) or not all(isinstance(F, Fragment) for F in Fragments_list):
             raise TypeError(f"Fragments_list must be a list of Fragment objects")
-
+        if T < 0.0: raise ValueError("Temperature T must be non-negative")
+        Tuse=np.max(1e-3,T)
         nfill_old = sum(F.nfill for F in Fragments_list)
         dmu = dmu0 * np.sign(nfill_old - n_target)
         mu_o = mu_old
         mu_n = mu_o + dmu
-
         for _ in range(nsteps):
             for F in Fragments_list:
-                F.solve_impurity(mu_n, num_eig=1, spin_pen=spin_pen)
+                F.solve_impurity(mu_n, num_eig=1, T=Tuse, spin_pen=spin_pen)
             nfill_new = sum(F.nfill for F in Fragments_list)
 
             if abs(nfill_new - n_target) < ntol:
@@ -145,12 +146,12 @@ class Lattice():
 
         return mu_n
     
-    def compute_ekin(self, Fragments_list):
+    def compute_ekin(self, Fragments_list, T):
         """ Compute kinetic energy from the quasiparticle part
         """
         if not isinstance(Fragments_list, list) or not all(isinstance(F, Fragment) for F in Fragments_list):
             raise TypeError(f"Fragments_list must be a list of Fragment objects")
-
+        if(T<0.0): raise ValueError("Temperature T must be non-negative")
         nimp_tot = sum(F.nimp for F in Fragments_list)
         nbath_tot = sum(F.nbath for F in Fragments_list)
 
@@ -161,13 +162,14 @@ class Lattice():
         self.Ltot = block_diag(*[F.Lambda for F in Fragments_list])
 
         ekin = 0.0
+        Tuse=np.max(1e-3,T)
         for ek,wk in zip(self.eks, self.wks):
             Hk_qp = self.Rtot @ ek @ self.Rtot.T.conj() + self.Ltot
-            Dk = calc_nf(Hk_qp,self.T).T
+            Dk = calc_nf(Hk_qp,Tuse).T
             ekin += wk*np.sum( ( np.dot(self.Rtot, np.dot(ek, self.Rtot.T.conj() ) ) ) * Dk.T )
         return ekin
 
-    def compute_functional(self, Fragments_list ):
+    def compute_functional(self, Fragments_list , T=1e-2):
         """ Compute the value of the finite temperature functional
         """
         if not isinstance(Fragments_list, list) or not all(isinstance(F, Fragment) for F in Fragments_list):
@@ -175,28 +177,29 @@ class Lattice():
 
         #Embedding part of the functional
         Omega_imps = 0.0
+        Omega_qp = 0.0
+        Omega_mix = 0.0
+        if(T<0.0): raise ValueError("Temperature T must be non-negative")
+        # If T=0.0, use a small T to compute the functional
+        Tuse=np.max(1e-3,T)     
         for F in Fragments_list:
             if F.solver is None:
                 raise ValueError("Fragment solver is not set")
-            if (F.T != self.T) and F.thermal :
-                raise ValueError(f"Fragment temperature {F.T} does not match lattice temperature {self.T} for thermal calculation")
-            if(F.thermal):
-                Omega_imps += -self.T*np.log( F.solver.Zpart/np.exp(F.solver.gs_ene/self.T) )
             else:
-                Omega_imps += F.solver.gs_ene
+                Omega_imps += -Tuse*np.log( F.solver.Zpart/np.exp(F.solver.gs_ene/Tuse) )
+            # if T is small (only Gs and non degenerate) then  Omega_imps = F.solver.gs_ene
         #Quasiparticle part of the functional
-        Omega_qp = 0.0
         for ek,wk in zip(self.eks, self.wks):
             Hk_qp = self.Rtot @ ek @ self.Rtot.T.conj() + self.Ltot
             ekvals = np.linalg.eigvalsh(Hk_qp)
-            Omega_qp += np.sum(np.log(1+np.exp(-ekvals/self.T) ) )*wk
-        Omega_qp *= -self.T
+            Omega_qp += np.sum(np.log(1+np.exp(-ekvals/Tuse) ) )*wk
+        Omega_qp *= -Tuse
         #Mixed part of the functional
-        Omega_mix = 0.0
         for F in Fragments_list:
             H_mix = build_H(F.Lambda, F.Lambda_c, F.D, F.R)
             emix_vals=np.linalg.eigvals(H_mix)
-            Omega_mix += np.sum(np.log(1+np.exp(-emix_vals/self.T) ) )
-        Omega_mix *= self.T
+            Omega_mix += np.sum(np.log(1+np.exp(-emix_vals/Tuse) ) )
+        Omega_mix *= Tuse
+
         Omega_tot = Omega_qp+Omega_imps+Omega_mix
         return Omega_tot # , Omega_qp, Omega_imps, Omega_mix
