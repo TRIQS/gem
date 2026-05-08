@@ -49,7 +49,7 @@ class Gdmft(object):
     def __init__(self, ntot, nimp, nbath, eks, eloc, Utensor,
                  wks=None, spin_sym=True, orb_sym=False,
                  soc=False, R=None, Lambda=None, D=None, Lambda_c=None,
-                 edsolver=None, suff='',thermal=False, T=1e-2,
+                 edsolver=None, suff='', T=1e-2,
                  verbose=0,spin_pen=0):
         print("##### INITIALIZATON OF THE GRISB OBJECT (DMFT-like algorithm)#####")
         self.ntot = ntot
@@ -64,7 +64,6 @@ class Gdmft(object):
         self.orb_sym = orb_sym
         self.gs_wf = None
         self.suff = suff    # Suffixe for file writting when many cpu at same time
-        self.thermal = thermal
         self.T = T
         self.verb = verbose
         self.spin_pen = spin_pen
@@ -73,17 +72,17 @@ class Gdmft(object):
         if edsolver is None:
             raise ValueError("Not edsolver was passed to the GRISB.")
 
-        self.Fragment = Fragment(self.nimp, self.nbath, self.T,
+        self.Fragment = Fragment(self.nimp, self.nbath,
                  self.eloc, self.Utensor, edsolver,
                  Lambda=Lambda,R=R,Lambda_c=Lambda_c,D=D,
-                 Thermal=thermal, verbose=self.verb
+                 verbose=self.verb
                   )
         self.Lambda=self.Fragment.Lambda
         self.R     =self.Fragment.R
         self.Lambda_c=self.Fragment.Lambda_c
         self.D       =self.Fragment.D
-        
-        self.Lattice = Lattice(self.T, self.eks, wk_list=self.wks, verbose=self.verb)
+
+        self.Lattice = Lattice(self.eks, wk_list=self.wks, verbose=self.verb)
 
 
 
@@ -103,17 +102,17 @@ class Gdmft(object):
             silence=True, spin_pen=0.0, sz_pen=0.0, idx=0, num_eig=2, ed_verbose=0, n_fit_method='qp'):
 
         print("mu = ", mu)
-        self.Lattice.T = 1./beta
-        self.Fragment.T = 1./beta
+        T = 1./beta
+        self.T = T
         self.diff = 1e20
         self.mu = mu
         for it in range(itmax):
 
             print(' Doing it:',it,'/',itmax)
 
-            self.Lattice.solve_qp([self.Fragment])
+            self.Lattice.solve_qp([self.Fragment], T=T)
 
-            self.D, self.Lambda_c = self.Fragment.update_hybridization()
+            self.D, self.Lambda_c = self.Fragment.update_hybridization(T=T)
 
 
             
@@ -134,7 +133,7 @@ class Gdmft(object):
                     print(self.Fragment.Lambda_c[:,:])
 
             # ED solvers
-            self.Fragment.solve_impurity(self.mu,num_eig=1,spin_pen=self.spin_pen)
+            self.Fragment.solve_impurity(self.mu, T=T, num_eig=1, spin_pen=self.spin_pen)
 
             #Update R and Update Lambda
             self.nfill = np.trace(self.Fragment.denMat[:self.nimp,:self.nimp])
@@ -144,15 +143,15 @@ class Gdmft(object):
             print(" --> n_filling:",self.nfill,' - target:',n_target)
             if( (not n_target is None) and (np.abs(self.nfill - n_target)>n_tolerance) ):
                 print('Fitting')
-                mu_new = self.Lattice.fit_mu( n_target, [self.Fragment], mode=n_fit_method, mu_old=self.mu, ntol=n_tolerance )
-                if(not mu_new is None): 
+                mu_new = self.Lattice.fit_mu( n_target, [self.Fragment], T=T, mode=n_fit_method, mu_old=self.mu, ntol=n_tolerance )
+                if(not mu_new is None):
                     self.mu = mu_new
-                    self.Fragment.solve_impurity(self.mu,num_eig=1,spin_pen=self.spin_pen)
+                    self.Fragment.solve_impurity(self.mu, T=T, num_eig=1, spin_pen=self.spin_pen)
 
             Lambda_old = self.Fragment.Lambda.copy()
             R_old = self.Fragment.R.copy()
 
-            R_new, Lambda_new = self.Fragment.update_self_energy()
+            R_new, Lambda_new = self.Fragment.update_self_energy(T=T)
 
             L_eval_new, UL_new = np.linalg.eigh(Lambda_new[::2,::2])
             L_eval_old, UL_old = np.linalg.eigh(Lambda_old[::2,::2])
@@ -221,5 +220,5 @@ class Gdmft(object):
     def get_functional(self):
         """ Compute the value of the finite temperature functional
         """
-        Omega_tot = self.Lattice.compute_functional( [self.Fragment] )
+        Omega_tot = self.Lattice.compute_functional( [self.Fragment], T=self.T )
         return Omega_tot
