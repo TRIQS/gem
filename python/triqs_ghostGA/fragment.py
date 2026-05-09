@@ -5,7 +5,12 @@ from .utility.delta_fit import update_self_energy_thermal_penalty, update_hybrid
 
 class Fragment():
     '''
-    Class for the embedded correlated space
+    Class for the embedded correlated space.
+
+    It contains the matrices parameterizing the self-energy ( R and Lambda )
+    and the hybridization ( D and Lambda_c ), as well as the local Hamiltonian parameters.
+
+    It takes care of solving the correlated embedding problem and updating the self-energy and hybridization parameters.
     '''
 # nimp and nbath or nimp and B?
 # Think of passing dict instead of all those parameters?
@@ -17,6 +22,21 @@ class Fragment():
                  Lambda=None,R=None,Lambda_c=None,D=None,
                  verbose=0
                   ):
+        """  
+        Initialize the Fragment class with the given parameters.
+
+        :param nimp: int. Number of impurity spin-orbital levels.
+        :param nbath: int. Number of bath spin-orbital levels.
+        :param eloc: ndarray. Local one-body electronic Hamiltonian.
+        :param Utensor: ndarray. Tensor of local electron-electron interactions.
+        :param solver: object. Solver for the impurity problem.    
+        :param Lambda: ndarray, optional. Self-energy parameters Lambda.
+        :param R: ndarray, optional. Self-energy parameters R.
+        :param Lambda_c: ndarray, optional. Hybridization parameters Lambda_c.
+        :param D: ndarray, optional. Hybridization parameters D.
+        :param verbose: int, optional. Level of verbosity.
+
+        """
 
         #Checks?
         if not isinstance(nimp, int): raise TypeError(f"nimp must be int, got {type(nimp)}")
@@ -90,6 +110,11 @@ class Fragment():
     def solve_impurity(self, mu, T=0.0, num_eig=1, spin_pen=0.0):
         """
         Solve embedding problem using the solver from Fragment
+
+        :param mu: float. Chemical potential.
+        :param T: float. Temperature.
+        :param num_eig: int. Number of eigenvalues to compute.
+        :param spin_pen: float. Penalty for spin singlet symmetry breaking.
         """
         h1e = np.zeros((self.ntot,self.ntot), dtype=np.complex128)
         h1e[:self.nimp,:self.nimp] = self.eloc - mu*np.eye(self.nimp)
@@ -117,6 +142,13 @@ class Fragment():
     def update_self_energy(self, T=0.0, move_pen=1e-6):
         '''
         This function update the self-energy parameters Lambda and R
+
+        :param T: float. Temperature.
+        :param move_pen: float. Penalty for moving the self-energy parameters.
+
+        Return:
+            R: ndarray. Updated self-energy parameter R.
+            Lambda: ndarray. Updated self-energy parameter Lambda.
         '''
         cdagf = self.denMat[:self.nimp,self.nimp:]
         fdagf = self.denMat[self.nimp:,self.nimp:]
@@ -138,6 +170,13 @@ class Fragment():
     def update_hybridization(self, T=0.0, move_pen=1e-6):
         '''
         This function update the hybridization parameters Lambda_c and D
+
+        :param T: float. Temperature.
+        :param move_pen: float. Penalty for moving the hybridization parameters.
+
+        Return:
+            D: ndarray. Updated hybridization parameter D.
+            Lambda_c: ndarray. Updated hybridization parameter Lambda_c.
         '''
         if T > 0.0:
             Lc_new, D_new = update_hybridization_thermal_penalty(self.Lambda_c, self.D, self.Lambda, self.R,
@@ -154,7 +193,8 @@ class Fragment():
     
     def compute_energy(self):
         '''
-        Compute the energy contributionsof the fragment using the density matrix and the Hamiltonian parameters.
+        Compute the energy contributions of the fragment using the density matrix and the Hamiltonian parameters.
+
         Return:
           E: float. Energy of the fragment.
         '''
@@ -164,6 +204,16 @@ class Fragment():
         return E
 
     def compute_Z(self, mu=0.0, z0=0.0, h=1e-8):
+        """
+        Compute the quasiparticle weight Z from the self-energy parameters in the local case.
+
+        :param mu: float. Chemical potential.
+        :param z0: float. Frequency at which to compute Z.
+        :param h: float. Step size for finite difference.
+
+        Return:
+            Z: float. Quasiparticle weight.
+        """
         m, nu = self.R.shape
         I_m = np.eye(m, dtype=complex)
         I_nu = np.eye(nu, dtype=complex)
@@ -180,12 +230,18 @@ class Fragment():
     
     ###### ROUTINES TO IMPOSE SYMMETRY #####
     def impose_spin_SU2_symmetry(self):
+        """
+        Impose spin SU(2) symmetry on the self-energy and hybridization parameters by averaging over spin components.
+        """
         self.R = 0.5*np.kron( self.R[::2,::2] + self.R[1::2,1::2], np.eye(2) )
         self.Lambda = 0.5*np.kron( self.Lambda[::2,::2] + self.Lambda[1::2,1::2], np.eye(2) )
         self.Lambda_c = 0.5*np.kron( self.Lambda_c[::2,::2] + self.Lambda_c[1::2,1::2], np.eye(2) )
         self.D = 0.5*np.kron( self.D[::2,::2] + self.D[1::2,1::2], np.eye(2) )
 
     def impose_orbital_symmetry(self):
+        """
+        Impose orbital symmetry on the self-energy and hybridization parameters by averaging over orbital components.
+        """
         n_orb = self.nimp//2
         R_new = np.zeros((self.nbath//n_orb, self.nimp//n_orb), dtype=np.complex128)
         Lambda_new = np.zeros((self.nbath//n_orb, self.nbath//n_orb), dtype=np.complex128)
