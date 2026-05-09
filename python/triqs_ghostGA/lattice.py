@@ -4,6 +4,7 @@ from scipy.optimize import brentq, bisect
 from .fragment import Fragment
 from .utility.utilities import calc_nf, calc_Fermi
 from .utility.delta_fit import build_H
+from numba import jit
 
 
 class Lattice():
@@ -41,7 +42,7 @@ class Lattice():
         if self.eks.shape[1] != nimp_tot or self.eks.shape[2] != nimp_tot:
             raise ValueError(f"ek_list second and third dimensions must be {nimp_tot}, got {self.eks.shape}")
         if(T<0.0): raise ValueError("Temperature T must be non-negative")
-        Tuse=np.max(1e-3,T)
+        Tuse=np.maximum(1e-3,T)
         self.Rtot = block_diag(*[F.R for F in Fragments_list])
         self.Ltot = block_diag(*[F.Lambda for F in Fragments_list])
 
@@ -62,6 +63,36 @@ class Lattice():
             bath_stride += F.nbath
 
         return self.Delta_p_tot, self.ERD_tot
+    
+    def compute_Gloc(self, w_list, Fragments_list, eps=1e-2):
+        if not isinstance(Fragments_list, list) or not all(isinstance(F, Fragment) for F in Fragments_list):
+            raise TypeError(f"Fragments_list must be a list of Fragment objects")
+
+        nimp_tot = sum(F.nimp for F in Fragments_list)
+        nbath_tot = sum(F.nbath for F in Fragments_list)
+
+        if self.eks.shape[1] != nimp_tot or self.eks.shape[2] != nimp_tot:
+            raise ValueError(f"ek_list second and third dimensions must be {nimp_tot}, got {self.eks.shape}")
+
+        self.Rtot = block_diag(*[F.R for F in Fragments_list])
+        self.Ltot = block_diag(*[F.Lambda for F in Fragments_list])
+
+
+        @jit(nopython=True)
+        def compute_Gloc_at_w( w, Rtot, Ltot, eks, wks, eps):
+            # Implementation for computing Gloc at a specific frequency w
+            Gloc_w = np.zeros( (eks.shape[1], eks.shape[1]), dtype=np.complex128 )
+            for ek,wk in zip(eks, wks):
+                Hk_qp = Rtot @ ek @ Rtot.T.conj() + Ltot
+                Gk_qp = Rtot.T.conj() @ np.linalg.inv( (w+1j*eps)*np.eye(Hk_qp.shape[0]) - Hk_qp ) @ Rtot
+                Gloc_w += wk*Gk_qp
+            return Gloc_w
+
+        Gloc = np.zeros( (len(w_list),nimp_tot,nimp_tot), dtype=np.complex128 )
+        for i,w in enumerate(w_list):
+            Gloc[i,:,:] = compute_Gloc_at_w(w, self.Rtot, self.Ltot, self.eks, self.wks, eps)
+        return Gloc
+    
 
     def fit_mu(self, n_target, Fragments_list, T=1e-2, mu_old=0.0, mode='qp', ntol=1e-4):
         m = mode.lower()
@@ -75,7 +106,7 @@ class Lattice():
         if not isinstance(Fragments_list, list) or not all(isinstance(F, Fragment) for F in Fragments_list):
             raise TypeError(f"Fragments_list must be a list of Fragment objects")
         if T < 0.0: raise ValueError("Temperature T must be non-negative")
-        Tuse=np.max(1e-3,T)
+        Tuse=np.maximum(1e-3,T)
         nimp_tot = sum(F.nimp for F in Fragments_list)
         nbath_tot = sum(F.nbath for F in Fragments_list)
 
@@ -122,7 +153,7 @@ class Lattice():
         if not isinstance(Fragments_list, list) or not all(isinstance(F, Fragment) for F in Fragments_list):
             raise TypeError(f"Fragments_list must be a list of Fragment objects")
         if T < 0.0: raise ValueError("Temperature T must be non-negative")
-        Tuse=np.max(1e-3,T)
+        Tuse=np.maximum(1e-3,T)
         nfill_old = sum(F.nfill for F in Fragments_list)
         dmu = dmu0 * np.sign(nfill_old - n_target)
         mu_o = mu_old
@@ -162,7 +193,7 @@ class Lattice():
         self.Ltot = block_diag(*[F.Lambda for F in Fragments_list])
 
         ekin = 0.0
-        Tuse=np.max(1e-3,T)
+        Tuse=np.maximum(1e-3,T)
         for ek,wk in zip(self.eks, self.wks):
             Hk_qp = self.Rtot @ ek @ self.Rtot.T.conj() + self.Ltot
             Dk = calc_nf(Hk_qp,Tuse).T
@@ -181,7 +212,7 @@ class Lattice():
         Omega_mix = 0.0
         if(T<0.0): raise ValueError("Temperature T must be non-negative")
         # If T=0.0, use a small T to compute the functional
-        Tuse=np.max(1e-3,T)     
+        Tuse=np.maximum(1e-3,T)     
         for F in Fragments_list:
             if F.solver is None:
                 raise ValueError("Fragment solver is not set")
