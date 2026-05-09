@@ -15,7 +15,8 @@ import numpy
 
 class SolverEDIpack(object):
 
-    def __init__(self, nimp, nbath, use_Ntot=False, use_Sz=False, use_SU2=False, thermal=False):
+    def __init__(self, nimp, nbath, use_Ntot=False, use_Sz=False, use_SU2=False, thermal=False, solver_params=None):
+        self.solver_params = solver_params if solver_params is not None else {}
         # Solver parameters, using BATH_MODE=hybrid
         self.ediNspin = 1 if use_SU2 else 2
         self.ediNorb  = nimp//2
@@ -37,3 +38,21 @@ class SolverEDIpack(object):
         
         #INTERACTION?
         #BETA?
+
+#MANDATORY FUNCTIONS
+    def build_Hemb(self, D, H1E, Lambda, V2E):
+        raise NotImplementedError
+
+    def solve_Hemb(self, num_eig=None, verbose=None, beta=500.0):
+        raise NotImplementedError
+
+    def calc_density_matrix(self):
+        raise NotImplementedError
+
+    def compute_E1loc(self):
+        raise NotImplementedError
+
+    def compute_E2loc(self):
+        raise NotImplementedError
+
+#AUXILIARY FUNCTIONS

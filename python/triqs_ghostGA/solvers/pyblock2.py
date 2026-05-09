@@ -8,18 +8,20 @@ import numpy
 class Pyblock2_N(object):
     """ Wrapper for pyblock2 solvers with N symmetry
     """
-    def __init__(self, ntot, nimp, nbath, maxM, spin_pen=0):
+    def __init__(self, ntot, nimp, nbath, maxM, spin_pen=0, solver_params=None):
         """Constructor method
         """
         self.ntot = ntot
         self.nimp = nimp
         self.nbath = nbath
-        self.maxM = maxM
-        print('maxM=',maxM)
+        self.solver_params = solver_params if solver_params is not None else {}
+        self.maxM = self.solver_params.get('maxM', maxM)
+        print('maxM=', self.maxM)
         self.type= 'Block2N'
         self.spin_pen = 0
         # initialize pyscf solvers
 
+# MANDATORY FUNCTIONS
     def build_Hemb(self, D, H1E, LAMBDA, V2E):
         tmat = numpy.zeros((self.ntot,self.ntot),dtype=numpy.complex128)
         tmat[:self.nimp,:self.nimp] = H1E
@@ -31,24 +33,9 @@ class Pyblock2_N(object):
         self.Utensor_full = numpy.zeros((self.ntot,self.ntot,self.ntot,self.ntot),dtype=numpy.complex128)
         self.Utensor_full[:self.nimp,:self.nimp,:self.nimp,:self.nimp] = V2E
 
-    @staticmethod
-    def gauge_transform(h1e, ntot, nimp):
-        from scipy.linalg import eig, eigh
-        h1e_trans = numpy.zeros((ntot,ntot), dtype=numpy.complex128)
-        u_trans = numpy.eye(ntot, dtype=numpy.complex128)
-        h1e_trans[:nimp,:nimp] = h1e[:nimp,:nimp]
-        # enforce spin symmtery
-        #evals, tmp = eigh(h1e[nimp::2,nimp::2])
-        #u_trans[nimp:,nimp:] = numpy.kron(tmp,numpy.eye(2))
-        # no spin symmtery
-        evals, tmp = eigh(h1e[nimp:,nimp:])
-        u_trans[nimp:,nimp:] = tmp
-        h1e_trans = u_trans.conj().T.dot(h1e).dot(u_trans)
-        #print('h1e_trans=')
-        #print(h1e_trans)
-        return h1e_trans, u_trans
 
-    def solve_Hemb(self, num_eig=10, verbose=0, sweep_iter = [0,10,20], sweep_epsilon = [5e-3,1e-3,5e-4], maxM=1000,beta=500.0):
+    def solve_Hemb(self, num_eig=10, verbose=0, sweep_iter = [0,10,20], sweep_epsilon = [5e-3,1e-3,5e-4], maxM=1000,T=0.0):
+        
         self.driver = DMRGDriver(scratch="./tmp", symm_type=SymmetryTypes.SGFCPX, stack_mem=50<<30)#, n_threads=6)
 
         self.driver.initialize_system(n_sites=self.ntot, n_elec=self.ntot//2)#, spin=0)
@@ -105,11 +92,13 @@ class Pyblock2_N(object):
 
         self.ket = self.driver.get_random_mps(tag="KET", bond_dim=250, nroots=1)
 
-        bond_dims = [200,300,400,500]+[500,500,800,800,800]#[maxM] * 8
-        noises = [1e-5]*4 + [1e-6]*4 + [0]
-        thrds = [1e-10]*9
+        bond_dims = self.solver_params.get('bond_dims', [200, 300, 400, 500] + [500, 500, 800, 800, 800])
+        noises    = self.solver_params.get('noises',    [1e-5]*4 + [1e-6]*4 + [0])
+        thrds     = self.solver_params.get('thrds',     [1e-10]*9)
+        n_sweeps  = self.solver_params.get('n_sweeps',  20)
+        dmrg_tol  = self.solver_params.get('dmrg_tol', 1e-8)
 
-        self.e0 = self.driver.dmrg(mpo, self.ket, n_sweeps=20, bond_dims=bond_dims, noises=noises, thrds=thrds, tol=1e-8,  cutoff=0, iprint=1)
+        self.e0 = self.driver.dmrg(mpo, self.ket, n_sweeps=n_sweeps, bond_dims=bond_dims, noises=noises, thrds=thrds, tol=dmrg_tol, cutoff=0, iprint=1)
 
     def calc_density_matrix(self):
         dm = self.driver.get_1pdm(self.ket)
@@ -125,27 +114,12 @@ class Pyblock2_N(object):
         self.dm = dm
         return dm
 
-    def calc_double_occ(self,idx):
-        ''' not implemented (return arbitrary value 0.25) '''
-        return 0.25
-
     def compute_E2loc(self):
         eone = numpy.einsum('ij,ij',self.h1,self.dm)
         etwo = self.e0 - eone
         return etwo
 
-class Pyblock2_N_SZ(Pyblock2_N):
-    def __init__(self, ntot, nimp, nbath, maxM, spin_pen=0):
-        """Constructor method
-        """
-        self.ntot = ntot
-        self.nimp = nimp
-        self.nbath = nbath
-        self.maxM = maxM
-        print('maxM=',maxM)
-        self.type= 'Block2NSZ'
-        # initialize pyscf solvers
-
+#AUXILIARY FUNCTIONS
     @staticmethod
     def gauge_transform(h1e, ntot, nimp):
         from scipy.linalg import eig, eigh
@@ -153,16 +127,36 @@ class Pyblock2_N_SZ(Pyblock2_N):
         u_trans = numpy.eye(ntot, dtype=numpy.complex128)
         h1e_trans[:nimp,:nimp] = h1e[:nimp,:nimp]
         # enforce spin symmtery
-        evals, tmp = eigh(h1e[nimp::2,nimp::2])
-        u_trans[nimp:,nimp:] = numpy.kron(tmp,numpy.eye(2))
+        #evals, tmp = eigh(h1e[nimp::2,nimp::2])
+        #u_trans[nimp:,nimp:] = numpy.kron(tmp,numpy.eye(2))
         # no spin symmtery
-        #evals, tmp = eigh(h1e[nimp:,nimp:])
-        #u_trans[nimp:,nimp:] = tmp
+        evals, tmp = eigh(h1e[nimp:,nimp:])
+        u_trans[nimp:,nimp:] = tmp
         h1e_trans = u_trans.conj().T.dot(h1e).dot(u_trans)
         #print('h1e_trans=')
         #print(h1e_trans)
         return h1e_trans, u_trans
 
+    def calc_double_occ(self,idx):
+        ''' not implemented (return arbitrary value 0.25) '''
+        return 0.25
+
+
+
+class Pyblock2_N_SZ(Pyblock2_N):
+    def __init__(self, ntot, nimp, nbath, maxM, spin_pen=0, solver_params=None):
+        """Constructor method
+        """
+        self.ntot = ntot
+        self.nimp = nimp
+        self.nbath = nbath
+        self.solver_params = solver_params if solver_params is not None else {}
+        self.maxM = self.solver_params.get('maxM', maxM)
+        print('maxM=', self.maxM)
+        self.type= 'Block2NSZ'
+        # initialize pyscf solvers
+
+#MANDATORY FUNCTIONS
     def solve_Hemb(self, num_eig=10, verbose=0, sweep_iter = [0,10,20], sweep_epsilon = [5e-3,1e-3,5e-4], maxM=1000):
         self.driver = DMRGDriver(scratch="./tmp", symm_type=SymmetryTypes.SZ | SymmetryTypes.CPX, stack_mem=50<<30)#, n_threads=6)
 
@@ -207,16 +201,13 @@ class Pyblock2_N_SZ(Pyblock2_N):
 
         self.ket = self.driver.get_random_mps(tag="KET", bond_dim=250, nroots=1)
 
-        bond_dims = [200,300,400,500]+[500,500,self.maxM,self.maxM,self.maxM]#[maxM] * 8
-        # bond_dims = list(np.arange(200, self.maxM, 100)) + [self.maxM,self.maxM,self.maxM]#[maxM] * 8
-        noises = [1e-5]*4 + [1e-6]*4 + [0]
-        # noises = ([1e-5 for x in np.arange(200, self.maxM/2, 100)] +
-        #           [1e-6 for x in np.arange(self.maxM/2, self.maxM)] +
-        #           [1e-7, 1e-8, 0])
-        thrds = [1e-10]*9
-        # thrds = [1e-10 for x in bond_dims]
+        bond_dims = self.solver_params.get('bond_dims', [200, 300, 400, 500] + [500, 500, self.maxM, self.maxM, self.maxM])
+        noises    = self.solver_params.get('noises',    [1e-5]*4 + [1e-6]*4 + [0])
+        thrds     = self.solver_params.get('thrds',     [1e-10]*9)
+        n_sweeps  = self.solver_params.get('n_sweeps',  25)
+        dmrg_tol  = self.solver_params.get('dmrg_tol', 1e-10)
 
-        self.e0 = self.driver.dmrg(mpo, self.ket, n_sweeps=25, bond_dims=bond_dims, noises=noises, thrds=thrds, tol=1e-10,  cutoff=0, iprint=1)
+        self.e0 = self.driver.dmrg(mpo, self.ket, n_sweeps=n_sweeps, bond_dims=bond_dims, noises=noises, thrds=thrds, tol=dmrg_tol, cutoff=0, iprint=1)
 
     def calc_density_matrix(self):
         dm = self.driver.get_1pdm(self.ket)
@@ -224,6 +215,24 @@ class Pyblock2_N_SZ(Pyblock2_N):
         dm = self.u_trans.conj().dot( numpy.kron( (dm[0] + dm[1])*0.5, numpy.eye(2)) ).dot(self.u_trans.T)
         self.dm = dm
         return dm
+
+#AUXILIARY FUNCTIONS
+    @staticmethod
+    def gauge_transform(h1e, ntot, nimp):
+        from scipy.linalg import eig, eigh
+        h1e_trans = numpy.zeros((ntot,ntot), dtype=numpy.complex128)
+        u_trans = numpy.eye(ntot, dtype=numpy.complex128)
+        h1e_trans[:nimp,:nimp] = h1e[:nimp,:nimp]
+        # enforce spin symmtery
+        evals, tmp = eigh(h1e[nimp::2,nimp::2])
+        u_trans[nimp:,nimp:] = numpy.kron(tmp,numpy.eye(2))
+        # no spin symmtery
+        #evals, tmp = eigh(h1e[nimp:,nimp:])
+        #u_trans[nimp:,nimp:] = tmp
+        h1e_trans = u_trans.conj().T.dot(h1e).dot(u_trans)
+        #print('h1e_trans=')
+        #print(h1e_trans)
+        return h1e_trans, u_trans
 
 
 

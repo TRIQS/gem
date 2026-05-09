@@ -141,10 +141,11 @@ def construct_DMtilde(approx_GS: np.ndarray,
 
 class SVDSolver2(object):
     ''' SVD solver class'''
-    def __init__(self, ntot, nimp, nbath, suff="", K=None):
+    def __init__(self, ntot, nimp, nbath, suff="", K=None, solver_params=None):
         """Constructor method
         """
         self.type = "SVDSolver"
+        self.solver_params = solver_params if solver_params is not None else {}
         self.ntot = ntot
         self.nimp = nimp
         self.nbath = nbath
@@ -164,6 +165,7 @@ class SVDSolver2(object):
         self.shift = 0
         self.U = 1
 
+#MANDATORY FUNCTIONS
     def build_Hemb(self, D, H1E, Lambda, V2E):
 
         ntot, nimp, nbath = self.ntot, self.nimp, self.nbath
@@ -258,22 +260,7 @@ class SVDSolver2(object):
         print()
 
 
-    def load_stuff(self, path):
-        nbath = self.nbath
-        ntot = self.ntot
-        K = self.K
-
-        # Define paths relative to the root directory
-        self.Htilde_one_path = os.path.join(path, f"data/Htilde_one_B{nbath//2}.h5")
-        self.Htilde_int_path = os.path.join(path, f"data/Htilde_int_B{nbath//2}.h5")
-        self.DenMat_tilde_path = os.path.join(path, f"data/DM_project_B{nbath//2}.h5")
-
-        self.DM_op = np.zeros((ntot, ntot, K, K), dtype = np.complex128)
-        for a in range(ntot):
-            for b in range(a, ntot):
-                self.DM_op[a, b] = get_group(self.DenMat_tilde_path, f"op_{a}_{b}")[:K,:K]
-
-    def solve_Hemb(self, num_eig=None, verbose=None, beta=500.0):
+    def solve_Hemb(self, num_eig=None, verbose=None, T=0.0):
 
         X = self.X
         nbath = self.nbath
@@ -297,6 +284,22 @@ class SVDSolver2(object):
     def compute_E2loc(self):
         print('warning: E2loc not implemented')
         return 0
+
+#AUXILIARY FUNCTIONS
+    def load_stuff(self, path):
+        nbath = self.nbath
+        ntot = self.ntot
+        K = self.K
+
+        # Define paths relative to the root directory
+        self.Htilde_one_path = os.path.join(path, f"data/Htilde_one_B{nbath//2}.h5")
+        self.Htilde_int_path = os.path.join(path, f"data/Htilde_int_B{nbath//2}.h5")
+        self.DenMat_tilde_path = os.path.join(path, f"data/DM_project_B{nbath//2}.h5")
+
+        self.DM_op = np.zeros((ntot, ntot, K, K), dtype = np.complex128)
+        for a in range(ntot):
+            for b in range(a, ntot):
+                self.DM_op[a, b] = get_group(self.DenMat_tilde_path, f"op_{a}_{b}")[:K,:K]
 
     def calc_double_occ(self,idx):
         H_int = get_group(self.Htilde_int_path, "Htilde_int_1")[:self.K, :self.K]

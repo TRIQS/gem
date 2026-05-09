@@ -34,18 +34,19 @@ from triqs_ghostGA.solvers.utility.utils_mps import setup_MPS, rotateBath, rotat
 
 class ITensorMPSSolver(object):
     ''' FTPS solver class'''
-    def __init__(self, ntot, nimp, nbath, params={"use_Sz":True,"use_Ntot":True,"spin_pen":0.0}, suff="", rotateBath=True, recouple=True):
+    def __init__(self, ntot, nimp, nbath, params={"use_Sz":True,"use_Ntot":True,"spin_pen":0.0}, suff="", rotateBath=True, recouple=True, solver_params=None):
         """Constructor method
         """
         self.type = "ITensorMPSSolver"
+        self.solver_params = solver_params if solver_params is not None else {}
         self.ntot = ntot
         self.nimp = nimp
         self.nbath = nbath
-        self.set_kwargs(params)
+        self.set_kwargs(self.solver_params.get('kwargs', params))
         self.schedule = []
         self.make_schedule()    #initialize with default
         self.tolerances = []
-        self.set_tolerances()   #initialize with default
+        self.set_tolerances()
         self.scalartype = np.float_ # if not set elsewhere
         self.scalartype = np.complex_ # if not set elsewhere
         self.paramagnetic = True
@@ -92,11 +93,12 @@ class ITensorMPSSolver(object):
         self.M["up"]=0.5*(self.M["up"] + self.M["up"].T.conjugate())
         self.M["dn"]=0.5*(self.M["dn"] + self.M["dn"].T.conjugate())
 
-    def solve_Hemb(self, num_eig=1, verbose=1,tol=1e-8, beta=500.0):
+    def solve_Hemb(self, num_eig=1, verbose=1,tol=1e-8, T=0.0 ):
         # Criteria for the bound dimension of the DMRG, just be converged
         # Set up and run ForkTPS using the useful_func.py
         outfile = "data%s.h5" % self.suff
         self.converged = False
+        beta=1/T
 
         print(self.M)
         ### Run MPS with julia call ###

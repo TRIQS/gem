@@ -13,9 +13,11 @@ class SolverTemplate(object):
                  norb,
                  use_Ntot=False, use_Sz=False, # eventually flags to use symmetries
                  thermal=False, # flag to indicate if the calculations is thermal or not
+                 solver_params=None, # dict of solver-specific parameters; keys depend on the solver
                  ):
         #things that re relevant for the solver
         self.type = "SolverTemplate"
+        self.solver_params = solver_params if solver_params is not None else {}
     
     def build_Hemb(self,
                    D, # MANDATORY: the hybridization matrix
@@ -31,10 +33,12 @@ class SolverTemplate(object):
                    num_eig=1, # MANDATORY: number of eigenvalues to compute
                    verbose=1, # MANDATORY: verbose level
                    tol=1e-8,  # MANDATORY: tolerance for convergence
-                   beta=500.0 # MANDATORY: inverse temperature
+                   T=0.0 # MANDATORY: inverse temperature
                    ):
         '''
-        diagonalize the Hamiltonian
+        diagonalize the Hamiltonian.
+        Solver-specific parameters are read from self.solver_params with sensible defaults,
+        e.g.: my_param = self.solver_params.get('my_param', default_value)
         '''
         self.gs_ene = None # MANDATORY: ground state energy
         self.Zpart = None # MANDATORY: partition function for thermal calculations divided by exp(gs_ene/T) so that is 1 at zero temperature

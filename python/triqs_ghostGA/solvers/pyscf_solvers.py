@@ -9,16 +9,18 @@ import os
 class Pyscf_ccsd(object):
     """ Wrapper for pyscf ccsd solvers
     """
-    def __init__(self, ntot, nimp, nbath):
+    def __init__(self, ntot, nimp, nbath, solver_params=None):
         """Constructor method
         """
         self.ntot = ntot
         self.nimp = nimp
         self.nbath = nbath
+        self.solver_params = solver_params if solver_params is not None else {}
         self.hsize = 2**ntot
         self.type= 'PySCFCCSD'
         # initialize pyscf solvers
 
+#MANDATORY FUNCTIONS
     def build_Hemb(self, D, H1E, LAMBDA, V2E, spin_pen=0.0,beta=500.0):
         tmat = numpy.zeros((self.ntot,self.ntot))
         tmat[:self.nimp,:self.nimp] = H1E
@@ -29,8 +31,8 @@ class Pyscf_ccsd(object):
         self.h2 = numpy.zeros((self.ntot//2,self.ntot//2,self.ntot//2,self.ntot//2))
         self.h2[:self.nimp//2,:self.nimp//2,:self.nimp//2,:self.nimp//2] = V2E[::2,::2,1::2,1::2] # spin symmetric
 
-    def solve_Hemb(self, num_eig=10, verbose=0, restrict=True):
-        self.restrict = restrict # restrict CCSD? True: for spin symmetry
+    def solve_Hemb(self, num_eig=10, verbose=0, restrict=None, T=0.0):
+        self.restrict = self.solver_params.get('restrict', True) if restrict is None else restrict
         if restrict:
             mol = gto.M()
             mol.nelectron = self.ntot//2
@@ -105,9 +107,6 @@ class Pyscf_ccsd(object):
         if self.restrict:
             dmup = self.mycc.make_rdm1()/2.
             dmup = numpy.einsum('ai,bj,ij->ab',self.C, self.C, dmup)
-            #print('dmup=')
-            #print(dmup)
-            #assert(numpy.allclose(dmup,dmdn))
             dm = numpy.kron(dmup,numpy.eye(2))
             self.dm = dm
             return dm
@@ -115,10 +114,6 @@ class Pyscf_ccsd(object):
             dmup, dmdn = self.mycc.make_rdm1()
             dmup = numpy.einsum('ai,bj,ij->ab',self.Cup, self.Cup, dmup)
             dmdn = numpy.einsum('ai,bj,ij->ab',self.Cdn, self.Cdn, dmdn)
-            #print('dmup=')
-            #print(dmup)
-            #print('dmdn=')
-            #print(dmdn)
             dm = (dmup + dmdn)/2. # average over spin to recover spin symmetry. Don't use it with magnetism
             dm = numpy.kron(dm,numpy.eye(2))
             self.dm = dm
@@ -131,7 +126,6 @@ class Pyscf_ccsd(object):
         Return:
           Eloc: float. Total local energy.
         '''
-        #return self.gs_wf.conj().T.dot((self.Htwo).dot(self.gs_wf))
         return numpy.trace(self.h1[:nimp,:nimp].dot(self.dm[:nimp,:nimp].T))
 
     def compute_E2loc(self):
@@ -139,38 +133,28 @@ class Pyscf_ccsd(object):
         etwo = self.e0 - eone
         return etwo
 
+#AUXILIARY FUNCTIONS
     def calc_double_occ(self,idx):
         print('double occupancy not implemented')
         return 0.25
 
+
 class Pyscf_dmrg(Pyscf_ccsd):
     """ Wrapper to pyscf dmrg
     """
-    def __init__(self, ntot, nimp, nbath, maxM):
+    def __init__(self, ntot, nimp, nbath, maxM, solver_params=None):
         """Constructor method
         """
         self.ntot = ntot
         self.nimp = nimp
         self.nbath = nbath
+        self.solver_params = solver_params if solver_params is not None else {}
         self.hsize = 2**ntot
-        self.maxM = maxM
-        print('maxM=',maxM)
+        self.maxM = self.solver_params.get('maxM', maxM)
+        print('maxM=', self.maxM)
         # initialize pyscf solvers
 
-    @staticmethod
-    def gauge_transform(h1e, ntot, nimp):
-        from scipy.linalg import eig, eigh
-        h1e_trans = numpy.zeros((ntot,ntot), dtype=numpy.float64)
-        u_trans = numpy.eye(ntot, dtype=numpy.float64)
-        h1e_trans[:nimp,:nimp] = h1e[:nimp,:nimp]
-        # enforce spin symmtery
-        evals, tmp = eigh(h1e[nimp:,nimp:])
-        u_trans[nimp:,nimp:] = tmp
-        h1e_trans = u_trans.conj().T.dot(h1e).dot(u_trans)
-        print('h1e_trans=')
-        print(h1e_trans)
-        return h1e_trans, u_trans
-
+#MANDATORY FUNCTIONS
     def solve_Hemb(self, num_eig=10, verbose=0, sweep_iter = [0,10,20], sweep_epsilon = [5e-3,1e-3,5e-4], maxM=500):
         mol = gto.M()
         mol.nelectron = self.ntot//2
@@ -191,45 +175,40 @@ class Pyscf_dmrg(Pyscf_ccsd):
         mf = mf.run()
         self.C = mf.mo_coeff
 
-        #dmrgscf.settings.BLOCKEXE = os.popen("which block2main").read().strip()
-        #dmrgscf.settings.MPIPREFIX = ''
-        #dmrgscf.settings.BLOCKEXE = os.popen("which block2main").read().strip()
-        #dmrgscf.settings.MPIPREFIX = 'mpirun -n 4 --bind-to none'
-
         self.nmo = mf.mo_coeff.shape[1]
         self.nelec = mol.nelec # this part report error when nelectron is odd
-        self.cisolver = dmrgscf.DMRGSCF(mf, self.nmo, self.nelec, maxM=self.maxM, tol=1e-8)#shci.SHCISCF(mf, ntot//2, ntot//2)
-        #self.cisolver.fcisolver.runtimeDir = lib.param.TMPDIR
-        #self.cisolver.fcisolver.scratchDirectory = lib.param.TMPDIR
+        self.cisolver = dmrgscf.DMRGSCF(mf, self.nmo, self.nelec, maxM=self.maxM, tol=1e-8)
         self.cisolver.fcisolver.threads = int(os.environ.get("OMP_NUM_THREADS", 4))
         print('using threads:',self.cisolver.fcisolver.threads)
         self.cisolver.fcisolver.memory = 50 #int(mol.max_memory / 1000) # mem in GB
-        #self.cisolver.canonicalization = True
-        #self.cisolver.natorb = True
         self.e0 = self.cisolver.kernel()[0]
 
     def calc_density_matrix(self):
         dm1 = self.cisolver.fcisolver.make_rdm1(0, self.nmo, self.nelec)/2.
         dmup = numpy.einsum('ai,bj,ij->ab', self.C, self.C, dm1)
-        #print('dmup=')
-        #print(dmup)
-        #print('dmdn=')
-        #print(dmdn)
-        #assert(numpy.allclose(dmup,dmdn))
-        #dmup = self.u_trans.conj().dot( dmup ).dot(self.u_trans.T)
         dm = numpy.kron(dmup,numpy.eye(2))
         self.dm = dm
         return dm
-
-    def calc_double_occ(self,idx):
-        #tmp = fci.addons.des_a(self.fcivec, self.ntot//2, (self.ntot//4  ,self.ntot//4  ), idx//2)
-        #tmp = fci.addons.cre_a(tmp        , self.ntot//2, (self.ntot//4-1,self.ntot//4  ), idx//2)
-        #tmp = fci.addons.des_b(tmp        , self.ntot//2, (self.ntot//4  ,self.ntot//4  ), idx//2)
-        #tmp = fci.addons.cre_b(tmp        , self.ntot//2, (self.ntot//4  ,self.ntot//4-1), idx//2)
-        #return numpy.dot(tmp.flatten(), self.fcivec.flatten())
-        return 0.25
 
     def compute_E2loc(self):
         eone = 2*numpy.einsum('ij,ij',self.h1,self.dm[::2,::2])
         etwo = self.e0 - eone
         return etwo
+
+#AUXILIARY FUNCTIONS
+    @staticmethod
+    def gauge_transform(h1e, ntot, nimp):
+        from scipy.linalg import eig, eigh
+        h1e_trans = numpy.zeros((ntot,ntot), dtype=numpy.float64)
+        u_trans = numpy.eye(ntot, dtype=numpy.float64)
+        h1e_trans[:nimp,:nimp] = h1e[:nimp,:nimp]
+        # enforce spin symmtery
+        evals, tmp = eigh(h1e[nimp:,nimp:])
+        u_trans[nimp:,nimp:] = tmp
+        h1e_trans = u_trans.conj().T.dot(h1e).dot(u_trans)
+        print('h1e_trans=')
+        print(h1e_trans)
+        return h1e_trans, u_trans
+
+    def calc_double_occ(self,idx):
+        return 0.25

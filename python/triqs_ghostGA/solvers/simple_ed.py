@@ -147,20 +147,22 @@ class SimpleED(object):
                         self.Tstates += 1
                         it += 1
         if True:
-            print('# Energy\t\tS2\t\t\tSz\t\t\tSx\t\t\tSy\t\t\tSz2\t\t\tSx2\t\t\tSy2')
             if(verbose>1):
-              for i in range(int(self.Tstates)):
-                S2 = vecs[:,i].conj().T.dot(self.S2.dot(vecs[:,i]))
-                Sz = vecs[:,i].conj().T.dot(self.Sz.dot(vecs[:,i]))
-                Sz2 = vecs[:,i].conj().T.dot(self.Sz.dot(self.Sz).dot(vecs[:,i]))
-                Sx = vecs[:,i].conj().T.dot(self.Sx.dot(vecs[:,i]))
-                Sx2 = vecs[:,i].conj().T.dot(self.Sx.dot(self.Sx).dot(vecs[:,i]))
-                Sy = vecs[:,i].conj().T.dot(self.Sy.dot(vecs[:,i]))
-                Sy2 = vecs[:,i].conj().T.dot(self.Sy.dot(self.Sy).dot(vecs[:,i]))
-                print("%.12e  \t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej" %
-                      (vals[i], S2.real, S2.imag, Sz.real, Sz.imag, Sx.real, Sx.imag, Sy.real, Sy.imag, Sz2.real, Sz2.imag, Sx2.real, Sx2.imag, Sy2.real, Sy2.imag))
-                print('deg=',self.deg,' - Boltzmann weight=',self.bw_list[i])
-                print('')
+                print('# Energy\t\tS2\t\t\tSz\t\t\tSx\t\t\tSy\t\t\tSz2\t\t\tSx2\t\t\tSy2')
+
+                for i in range(int(self.Tstates)):
+                    S2 = vecs[:,i].conj().T.dot(self.S2.dot(vecs[:,i]))
+                    Sz = vecs[:,i].conj().T.dot(self.Sz.dot(vecs[:,i]))
+                    Sz2 = vecs[:,i].conj().T.dot(self.Sz.dot(self.Sz).dot(vecs[:,i]))
+                    Sx = vecs[:,i].conj().T.dot(self.Sx.dot(vecs[:,i]))
+                    Sx2 = vecs[:,i].conj().T.dot(self.Sx.dot(self.Sx).dot(vecs[:,i]))
+                    Sy = vecs[:,i].conj().T.dot(self.Sy.dot(vecs[:,i]))
+                    Sy2 = vecs[:,i].conj().T.dot(self.Sy.dot(self.Sy).dot(vecs[:,i]))
+                    print("%.12e  \t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej\t%.1e+%.1ej" %
+                        (vals[i], S2.real, S2.imag, Sz.real, Sz.imag, Sx.real, Sx.imag, Sy.real, Sy.imag, Sz2.real, Sz2.imag, Sx2.real, Sx2.imag, Sy2.real, Sy2.imag))
+                    print('Boltzmann weight=',self.bw_list[i])
+                    print('')
+                print('degeneracy=', self.deg, 'Zpart=', self.Zpart, 'Tstates=', self.Tstates)
         #CHECK THAN LENGTHS ARE CORRECTS FOR BW_LIST VALS AND SO ON
         self.evals=self.evals[:self.Tstates]
         self.evecs=self.evecs[:,:self.Tstates]
