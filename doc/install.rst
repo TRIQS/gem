@@ -2,75 +2,99 @@
 
 .. _install:
 
-Install triqs_ghostGA
-*********************
+Installation
+************
 
-Compiling triqs_ghostGA from source
-===================================
+Dependencies
+============
 
-.. note:: To guarantee reproducibility in scientific calculations we strongly recommend the use of a stable `release <https://github.com/TRIQS/triqs/releases>`_ of both TRIQS and its applications.
+Core
+----
 
-Prerequisites
--------------
+The following packages are required for the core functionality of the software:
 
-#. The :ref:`TRIQS <triqslibs:welcome>` library, see :ref:`TRIQS installation instruction <triqslibs:installation>`.
-   In the following, we assume that TRIQS is installed in the directory ``path_to_triqs``.
++----------+----------------------------------------------+
+| Package  | Purpose                                      |
++==========+==============================================+
+| numpy    | Array computing                              |
++----------+----------------------------------------------+
+| scipy    | Sparse matrices, linear algebra, optimization|
++----------+----------------------------------------------+
+| numba    | JIT compilation for ED basis construction    |
++----------+----------------------------------------------+
+| h5py     | HDF5 file I/O                                |
++----------+----------------------------------------------+
 
-Installation steps
-------------------
+Solvers
+-------
 
-#. Download the source code of the latest stable version by cloning the ``TRIQS/triqs_ghostGA`` repository from GitHub::
+Install only the packages corresponding to the solvers you intend to use:
 
-     $ git clone https://github.com/TRIQS/triqs_ghostGA triqs_ghostGA.src
++-------------+---------------------------------------------------------------+
+| Solver      | Extra packages required                                       |
++=============+===============================================================+
+| SimpleED    | *(none)*                                                      |
++-------------+---------------------------------------------------------------+
+| PySCF       | `pyscf <https://pyscf.org>`_                                  |
++-------------+---------------------------------------------------------------+
+| PyBlock2    | `pyblock2 <https://block2.readthedocs.io>`_, block2           |
++-------------+---------------------------------------------------------------+
+| EDIpack     | `edipack2triqs <https://github.com/edipack/edipack2triqs>`_,  |
+|             | mpi4py                                                        |
++-------------+---------------------------------------------------------------+
+| MPS/ITensor | `juliacall <https://juliapy.github.io/PythonCall.jl>`_,       |
+|             | Julia ≥ 1.9, ITensors.jl — see ``README_JULIA.txt``           |
++-------------+---------------------------------------------------------------+
 
-#. Create and move to a new directory where you will compile the code::
+Testing
+-------
 
-     $ mkdir triqs_ghostGA.build && cd triqs_ghostGA.build
++--------+-----------------------------+
+| Package| Purpose                     |
++========+=============================+
+| pytest | Test runner (``make test``) |
++--------+-----------------------------+
 
-#. Ensure that your shell contains the TRIQS environment variables by sourcing the ``triqsvars.sh`` file from your TRIQS installation::
+Installation Steps
+==================
 
-     $ source path_to_triqs/share/triqs/triqsvars.sh
+#. Clone the repository::
 
-#. In the build directory call cmake, including any additional custom CMake options, see below::
+     git clone https://github.com/TRIQS/ghostGA.git
 
-     $ cmake ../triqs_ghostGA.src
+#. Create a build directory and run CMake::
 
-#. Compile the code, run the tests and install the application::
+     mkdir ghostGA.build && cd ghostGA.build
+     cmake ../ghostGA
 
-     $ make test
-     $ make install
+#. Build and install::
 
-Version compatibility
----------------------
+     make
+     make test
+     make install
 
-Keep in mind that the version of ``triqs_ghostGA`` must be compatible with your TRIQS library version,
-see :ref:`TRIQS website <triqslibs:versions>`.
-In particular the Major and Minor Version numbers have to be the same.
-To use a particular version, go into the directory with the sources, and look at all available versions::
+Custom CMake Options
+====================
 
-     $ cd triqs_ghostGA.src && git tag
+The build can be configured with CMake options::
 
-Checkout the version of the code that you want::
+    cmake ../ghostGA -DOPTION1=value1 -DOPTION2=value2 ...
 
-     $ git checkout 2.1.0
++--------------------------------------------------------------+-----------------------------------------------+
+| Option                                                       | Syntax                                        |
++==============================================================+===============================================+
+| Specify a custom installation prefix                         | ``-DCMAKE_INSTALL_PREFIX=<path>``             |
++--------------------------------------------------------------+-----------------------------------------------+
+| Build in debug mode                                          | ``-DCMAKE_BUILD_TYPE=Debug``                  |
++--------------------------------------------------------------+-----------------------------------------------+
+| Disable tests (not recommended)                              | ``-DBuild_Tests=OFF``                         |
++--------------------------------------------------------------+-----------------------------------------------+
+| Build the documentation                                      | ``-DBuild_Documentation=ON``                  |
++--------------------------------------------------------------+-----------------------------------------------+
 
-and follow steps 2 to 4 above to compile the code.
+MPS / ITensor Solver (Julia)
+============================
 
-Custom CMake options
---------------------
-
-The compilation of ``triqs_ghostGA`` can be configured using CMake-options::
-
-    cmake ../triqs_ghostGA.src -DOPTION1=value1 -DOPTION2=value2 ...
-
-+-----------------------------------------------------------------+-----------------------------------------------+
-| Options                                                         | Syntax                                        |
-+=================================================================+===============================================+
-| Specify an installation path other than path_to_triqs           | -DCMAKE_INSTALL_PREFIX=path_to_triqs_ghostGA  |
-+-----------------------------------------------------------------+-----------------------------------------------+
-| Build in Debugging Mode                                         | -DCMAKE_BUILD_TYPE=Debug                      |
-+-----------------------------------------------------------------+-----------------------------------------------+
-| Disable testing (not recommended)                               | -DBuild_Tests=OFF                             |
-+-----------------------------------------------------------------+-----------------------------------------------+
-| Build the documentation                                         | -DBuild_Documentation=ON                      |
-+-----------------------------------------------------------------+-----------------------------------------------+
+The MPS solver relies on ITensors.jl through ``juliacall``. See ``README_JULIA.txt``
+in the repository root for step-by-step setup instructions specific to the Julia
+environment.
