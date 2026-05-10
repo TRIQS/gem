@@ -44,7 +44,16 @@ source_suffix = '.rst'
 
 # Turn on sphinx.ext.autosummary
 autosummary_generate = True
-autosummary_imported_members=False
+autosummary_imported_members = False
+
+# Mock optional heavy dependencies so Sphinx can import all modules
+autodoc_mock_imports = [
+    'juliacall', 'julia',
+    'edipack2triqs', 'mpi4py',
+    'block2', 'pyblock2',
+    'pyscf',
+    'primme',
+]
 
 project = '@PROJECT_NAME@'
 version = '@PROJECT_VERSION@'

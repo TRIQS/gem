@@ -1,0 +1,76 @@
+name: docs
+
+on:
+  push:
+    branches: [unstable]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one deployment runs at a time; any in-progress run is cancelled.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: |
+          pip install numpy scipy numba h5py
+          pip install $(grep -v '^#' packages4doc.txt | tr '\n' ' ')
+
+      - name: Generate version.py
+        run: |
+          GIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+          sed \
+            -e "s|@PROJECT_VERSION@|0.1.0|g" \
+            -e "s|@PROJECT_GIT_HASH@|${GIT_HASH}|g" \
+            -e "s|@PROJECT_NAME@|triqs_ghostGA|g" \
+            python/triqs_ghostGA/version.py.in \
+            > python/triqs_ghostGA/version.py
+
+      - name: Generate conf.py
+        run: |
+          DOC_DIR="${GITHUB_WORKSPACE}/doc"
+          sed \
+            -e "s|@CMAKE_CURRENT_SOURCE_DIR@|${DOC_DIR}|g" \
+            -e "s|@PROJECT_NAME@|triqs_ghostGA|g" \
+            -e "s|@PROJECT_VERSION@|0.1.0|g" \
+            doc/conf.py.in > doc/conf.py
+
+      - name: Build documentation
+        env:
+          PYTHONPATH: ${{ github.workspace }}/python
+        run: |
+          sphinx-build -E -W --keep-going -b html doc doc/_build/html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: doc/_build/html
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

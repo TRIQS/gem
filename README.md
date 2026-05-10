@@ -1,5 +1,8 @@
 # TRIQS ghostGA
 
+[![Documentation](https://img.shields.io/badge/docs-online-blue)](https://triqs.github.io/ghostGA)
+[![docs](https://github.com/TRIQS/ghostGA/actions/workflows/docs.yml/badge.svg)](https://github.com/TRIQS/ghostGA/actions/workflows/docs.yml)
+
 About
 -----
 
