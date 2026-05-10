@@ -55,6 +55,29 @@ Testing
 | pytest | Test runner (``make test``) |
 +--------+-----------------------------+
 
+Documentation
+-------------
+
+Required to build the HTML documentation (``cmake -DBuild_Documentation=ON``):
+
++-------------------+----------------------------------------------+
+| Package           | Purpose                                      |
++===================+==============================================+
+| sphinx-rtd-theme  | Read the Docs HTML theme                     |
++-------------------+----------------------------------------------+
+| nbsphinx          | Jupyter notebook support                     |
++-------------------+----------------------------------------------+
+| myst-parser       | Markdown source file support                 |
++-------------------+----------------------------------------------+
+| sphinx-autorun    | Executable code blocks in docs               |
++-------------------+----------------------------------------------+
+| numpydoc          | NumPy-style docstring parser                 |
++-------------------+----------------------------------------------+
+| linkify-it-py     | Auto-linking of bare URLs                    |
++-------------------+----------------------------------------------+
+| matplotlib        | Plots in documentation via plot directive    |
++-------------------+----------------------------------------------+
+
 Installation Steps
 ==================
 
