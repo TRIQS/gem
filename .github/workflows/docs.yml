@@ -2,7 +2,7 @@ name: docs
 
 on:
   push:
-    branches: [unstable]
+    branches: [unstable, thermal_refactored]
   workflow_dispatch:
 
 permissions:
