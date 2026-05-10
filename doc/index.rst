@@ -63,5 +63,6 @@ in correlated materials.
    install
    documentation
    user_guide
+   issues
    ChangeLog.md
    about

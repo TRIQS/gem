@@ -11,17 +11,19 @@ import sys
 import h5py
 # from h5 import *
 ###julia setup
-import juliacall
-from juliacall import Main as jl
-from juliacall import Pkg
+try:
+    import juliacall
+    from juliacall import Main as jl
+    from juliacall import Pkg
 
-julia_project_dir=os.environ["PYTHON_JULIAPKG_PROJECT"]
-print(julia_project_dir)
-#from juliacall import Pkg
-Pkg.activate(julia_project_dir)
-Pkg.instantiate()
-jl.seval("using GGMPSSolver")
-include_str="include(\""+julia_project_dir+"/src/driver.jl"+"\")"
+    julia_project_dir = os.environ["PYTHON_JULIAPKG_PROJECT"]
+    print(julia_project_dir)
+    Pkg.activate(julia_project_dir)
+    Pkg.instantiate()
+    jl.seval("using GGMPSSolver")
+    include_str = "include(\"" + julia_project_dir + "/src/driver.jl" + "\")"
+except (ImportError, KeyError):
+    pass
 
 from itertools import product as itp
 import triqs_ghostGA

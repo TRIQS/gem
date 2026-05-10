@@ -24,7 +24,7 @@ class SolverTemplate(object):
                    eloc, # MANDATORY: the impurity one-body term
                    Lambdac, # MANDATORY: the bath one-body term
                    V2E, # MANDATORY: the two-body interaction in the impurity
-                   verbose=0 # MANDATORY: verbose level
+                   verbose=0, # MANDATORY: verbose level
                    spin_pen=0, sz_pen=0, sx_pen=0, sy_pen=0 # eventually penalty terms to enforce symmetries
                    ):
         print("build_Hemb not implemented yet")

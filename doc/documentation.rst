@@ -42,7 +42,7 @@ Green's function, the kinetic energy, adjusts the chemical potential to enforce
 a target filling, and most importantly, it updates the relevant observables to update the hybridisation function of each fragment.
 
 ``gdmft`` — Simple Self-Consistency Driver
--------------------------------------
+------------------------------------------
 
 The :mod:`triqs_ghostGA.gdmft` module provides the :class:`~triqs_ghostGA.gdmft.Gdmft`
 class, which drives the ghost-DMFT self-consistency loop for a simple single fragment case.

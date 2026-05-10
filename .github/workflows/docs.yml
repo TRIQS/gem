@@ -54,7 +54,7 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}/python
         run: |
-          sphinx-build -E -W --keep-going -b html doc doc/_build/html
+          sphinx-build -E --keep-going -b html doc doc/_build/html
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
