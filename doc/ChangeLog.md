@@ -2,34 +2,12 @@
 
 # Changelog
 
-## Version 3.1.0
+## Version 0.1.0
 
-triqs_ghostGA version 3.1.0 is a compatibility
-release for TRIQS version 3.1.0 that
-* moves to cmake 3.12.4 and c++20
-* improves ghactions and jenkins configuration
-* switches documentation to read-the-docs theme
-* uses googletest main branch
-* fixes several skeleton issues
+triqs_ghostGA version 0.1.0 is the first release for this project.
+* initial implementation of the ghost Gutzwiller Approximation and finite temperature extension
+* Impurity solvers provided: SimpleED, PyBlock2, EDIpack, ITensorMPS.
+* Sphinx documentation with API reference, intallation guide, and used guide.
 
-We thank all contributors: Alexander Hampel, Dylan Simon, Nils Wentzell
+We thank all contributors: S. Giuli, T.-H. Lee, O. Gingras.
 
-
-## Version 3.0.0
-
-triqs_ghostGA version 3.0.0 is a compatibility
-release for TRIQS version 3.0.0 that
-* introduces compatibility with Python 3 (Python 2 no longer supported)
-* adds a cmake-based dependency management
-* fixes several application issues
-
-
-## Version 2.2.0
-
-triqs_ghostGA Version 2.2.0 provides a project
-skeleton for TRIQS applications based on
-the TRIQS Library Version 2.2.0.
-It is intended for applications with both
-Python and C++ components.
-
-This is the initial release for this project.
