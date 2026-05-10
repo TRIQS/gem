@@ -49,7 +49,7 @@ class Gdmft(object):
     def __init__(self, ntot, nimp, nbath, eks, eloc, Utensor,
                  wks=None, spin_sym=True, orb_sym=False,
                  soc=False, R=None, Lambda=None, D=None, Lambda_c=None,
-                 edsolver=None, suff='', T=1e-2,
+                 edsolver=None, suff='',
                  verbose=0,spin_pen=0):
         print("##### INITIALIZATON OF THE GRISB OBJECT (DMFT-like algorithm)#####")
         self.ntot = ntot
@@ -64,7 +64,6 @@ class Gdmft(object):
         self.orb_sym = orb_sym
         self.gs_wf = None
         self.suff = suff    # Suffixe for file writting when many cpu at same time
-        self.T = T
         self.verb = verbose
         self.spin_pen = spin_pen
 
@@ -98,11 +97,10 @@ class Gdmft(object):
         self.etot = self.ekin + self.epot - mu*self.Fragment.nfill
 
 # THIS FOR TEMP
-    def run(self, mu=0.0, itmax=200, mix=0.5, tol=1e-6, beta=200., n_target=None, n_tolerance=1e-3,
+    def run(self, mu=0.0, itmax=200, mix=0.5, tol=1e-6, T=1e-3, n_target=None, n_tolerance=1e-3,
             silence=True, spin_pen=0.0, sz_pen=0.0, idx=0, num_eig=2, ed_verbose=0, n_fit_method='qp'):
 
         print("mu = ", mu)
-        T = 1./beta
         self.T = T
         self.diff = 1e20
         self.mu = mu
