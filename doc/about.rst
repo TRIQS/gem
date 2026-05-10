@@ -3,6 +3,6 @@
 About triqs_ghostGA
 *******************
 
-An example application using ``cpp2py`` and TRIQS.
 
-Written and maintained by N. Wentzell with contributions from H. U.R. Strand.
+
+Written and maintained by S. Giuli, T.-H. Lee and O. Gingras.
