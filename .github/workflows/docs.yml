@@ -29,7 +29,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install numpy scipy numba h5py
-          pip install $(grep -v '^#' packages4doc.txt | tr '\n' ' ')
+          pip install nbsphinx myst-parser sphinx-autorun sphinx-rtd-theme numpydoc linkify-it-py
 
       - name: Generate version.py
         run: |
