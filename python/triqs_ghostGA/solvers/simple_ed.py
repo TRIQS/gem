@@ -26,7 +26,7 @@ class SimpleED(object):
     Simple exact diagonalization class aim to solve general impurity Hamiltonian.
     '''
     def __init__(self, norb, use_Ntot=False, use_Sz=False,
-                 thermal=False, dtype=np.float64, Nparticle=None,
+                 dtype=np.float64, Nparticle=None,
                  solver_params=None,
                  ):
         '''
@@ -35,7 +35,6 @@ class SimpleED(object):
           norb: int. number of orbitals including spin
           use_Ntot: bool. If using particle number symmetry
           use_Sz: bool. If using Sz symmetry
-          thermal: bool. If performing thermal calculation.
           dtype: dtype. data type of the Hamiltonian
         '''
         self.type = "SimpleED"
@@ -43,10 +42,7 @@ class SimpleED(object):
         self.norb = norb # number of orbitals
         self.use_Ntot = use_Ntot # use Ntot symmetry
         self.use_Sz = use_Sz # use Sz symmtery
-        self.thermal = thermal # use thermal ensemble
-        if( self.thermal and ( self.use_Ntot or self.use_Sz ) ):
-            warnings.warn("Thermal calculations should be performed without symmetries, otherwise the partition function is not correctly computed.")
-
+        
         self.strb = '{0:0'+str(norb)+'b}' # string to convert integer to binary string
         self.strb_red = '{0:0'+str(norb//2)+'b}' # string to convert integer to binary string in reudced Hilbert space
         self.data_type = dtype # data type of the Hamiltonian
@@ -77,7 +73,7 @@ class SimpleED(object):
 
 
 #MANDATORY FUNCTIONS
-    def build_Hemb(self, D, eloc, Lambdac, V2E, debug=False, verbose=0,
+    def build_Hemb(self, D, eloc, Lambdac, V2E, mu=0.0, debug=False, verbose=0,
                    spin_pen=None, sz_pen=None, sx_pen=None, sy_pen=None):
         '''
         build the Hamiltonian and return Hamiltonian
@@ -87,11 +83,12 @@ class SimpleED(object):
         sx_pen   = self.solver_params.get('sx_pen',   0) if sx_pen   is None else sx_pen
         sy_pen   = self.solver_params.get('sy_pen',   0) if sy_pen   is None else sy_pen
         print('build one-body')
-        self.build_h1e(eloc, D, Lambdac, 0, verbose=verbose)
+        self.build_h1e(eloc, D, Lambdac, mu, verbose=verbose)
         self.build_one_body(self.h1e)
         print('build two-body')
-        if self.Htwo is None:
+        if (self.Htwo is None) or np.any(V2E!=self.V2E):
             self.build_two_body(V2E)
+            self.V2E = V2E.copy()
         print('one-body + two-body')
         self.M = {"up": self.h1e[::2, ::2], "dn": self.h1e[1::2, 1::2]}
         self.Ham = self.Hone + self.Htwo + spin_pen*self.S2
@@ -104,6 +101,9 @@ class SimpleED(object):
         '''
         diagonalize the Hamiltonian
         '''
+        if( T>0.0 and ( self.use_Ntot or self.use_Sz ) ):
+            warnings.warn("Thermal calculations should be performed without symmetries, otherwise the partition function is not correctly computed.")
+
         which = self.solver_params.get('which', 'SA') if which is None else which
         tol   = self.solver_params.get('tol',   1e-8) if tol   is None else tol
         print('diagonalizing num_eig= {:d}'.format(num_eig))
