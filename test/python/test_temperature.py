@@ -47,7 +47,7 @@ class test_temperature(unittest.TestCase):
         Utensor[1, 1, 0, 0] = U
 
         edsolver = SimpleED(ntot, use_Ntot=False,
-                      use_Sz=False, dtype=np.complex128, thermal=True)
+                      use_Sz=False, dtype=np.complex128)
 
         grisb = Gdmft(ntot, nimp, nbath, eks, eloc, Utensor,
                       wks=wks, R=R0, Lambda=Lambda0, edsolver=edsolver)
@@ -59,10 +59,10 @@ class test_temperature(unittest.TestCase):
 
         for iT, T in enumerate(T_list):
             print(f"\n***** T={T:.4e} ({iT+1}/{len(T_list)}) *****")
-            grisb.run(itmax=50, mix=0.05, tol=1e-4, beta=1.0 / T, silence=True)
+            grisb.run(itmax=50, mix=0.05, tol=1e-4, T= T, silence=True)
             T_results.append(T)
             docc_results.append(np.array(grisb.docc).real)
-            grisb.compute_energy(beta=1.0 / T)
+            grisb.compute_energy(beta=1/T)
             etot_results.append(grisb.etot.real)
             func_results.append(grisb.get_functional().real)
 
