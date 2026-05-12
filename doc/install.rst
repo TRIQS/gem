@@ -73,10 +73,12 @@ Required to build the HTML documentation (``cmake -DBuild_Documentation=ON``):
 +-------------------+----------------------------------------------+
 | numpydoc          | NumPy-style docstring parser                 |
 +-------------------+----------------------------------------------+
-| linkify-it-py     | Auto-linking of bare URLs                    |
-+-------------------+----------------------------------------------+
-| matplotlib        | Plots in documentation via plot directive    |
-+-------------------+----------------------------------------------+
+| linkify-it-py       | Auto-linking of bare URLs                    |
++---------------------+----------------------------------------------+
+| matplotlib          | Plots in documentation via plot directive    |
++---------------------+----------------------------------------------+
+| sphinxcontrib-bibtex| BibTeX citations and reference list          |
++---------------------+----------------------------------------------+
 
 Installation Steps
 ==================

@@ -21,7 +21,11 @@ extensions = ['sphinx.ext.autodoc',
               'nbsphinx',
               'myst_parser',
               'matplotlib.sphinxext.plot_directive',
-              'numpydoc']
+              'numpydoc',
+              'sphinxcontrib.bibtex']
+
+bibtex_bibfiles = ['@CMAKE_CURRENT_SOURCE_DIR@/references.bib']
+bibtex_default_style = 'unsrt'
 
 myst_enable_extensions = [
     "amsmath",
