@@ -52,7 +52,7 @@ class Lattice():
             Hk_qp = self.Rtot @ ek @ self.Rtot.T.conj() + self.Ltot
             Dk = calc_nf(Hk_qp,Tuse).T
             self.Delta_p_tot += wk*Dk
-            self.ERD_tot   += wk*(ek @ self.Rtot.T.conj() @ Dk)
+            self.ERD_tot   += wk*(ek @ self.Rtot.T.conj() @ Dk.T)
 
         imp_stride=0
         bath_stride=0
