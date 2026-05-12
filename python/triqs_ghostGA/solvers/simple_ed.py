@@ -16,8 +16,6 @@ import h5py
 from math import factorial
 from itertools import combinations
 
-#SAMUELE'S QUESTION
-# Global change of debug with verbose options for printing
 
 
 #DEFINITION
@@ -139,7 +137,7 @@ class SimpleED(object):
         else:
             print('Building GS partition function')
             if num_eig > 1:
-                for it in range(1,num_eig):
+                for it in range(1, np.minimum(num_eig,len(self.evals))):
                     if np.abs(self.e0 - self.evals[it]) < 1e-4:#1e-5:
                         self.deg += 1
                         self.Zpart += 1
