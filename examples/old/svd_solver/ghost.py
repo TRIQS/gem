@@ -3,7 +3,7 @@
 from triqs_ghostGA.grisb import *
 import numpy as np
 from numpy.linalg import norm
-from triqs_ghostGA.solvers.ci import CI
+from triqs_ghostGA.solvers.simple_ed import SimpleED
 from  triqs_ghostGA.solvers import svd_solver2
 import os
 import h5py
@@ -73,7 +73,7 @@ for u, U in enumerate(Us):
 
         t0 = time()
 
-        edsolver=CI(ntot, use_Ntot=True, use_Sz=False, spin_pen=10)
+        edsolver = SimpleED(ntot, use_Ntot=True, use_Sz=False, spin_pen=10)
         grisb = Grisb(ntot, nimp, nbath, eks, eloc, ci_U, R=R0,
                       Lambda=Lambda0, edsolver=edsolver)
 

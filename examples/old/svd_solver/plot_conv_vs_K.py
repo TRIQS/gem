@@ -4,7 +4,7 @@ from triqs_ghostGA.grisb import *
 import numpy as np
 from matplotlib import pyplot as plt
 from numpy.linalg import norm
-from triqs_ghostGA.solvers.ci import CI
+from triqs_ghostGA.solvers.simple_ed import SimpleED
 from  triqs_ghostGA.solvers import svd_solver2
 import os
 import h5py

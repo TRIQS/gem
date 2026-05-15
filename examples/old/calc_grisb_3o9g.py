@@ -49,8 +49,9 @@ class TestGrisb(unittest.TestCase):
         #eloc[3,1] = 0.0
         Utensor = U_matrix_kanamori(2, U, J)
         #print(Utensor.shape)
-        from triqs_ghostGA.ci import CI
-        edsolver=CI(ntot, use_Ntot=True, use_Sz=True, dtype=np.complex128)
+        from triqs_ghostGA.solvers.simple_ed import SimpleED
+        edsolver = SimpleED(ntot, use_Ntot=True, use_Sz=True,
+                            N_sector=ntot//2, Sz_sector=0, dtype=np.complex128)
         grisb = Grisb(ntot, nimp, nbath, eks, eloc, Utensor, R=R0, Lambda=Lambda0, edsolver=edsolver)
         grisb.run(itmax=100, mix=0.5, tol=1e-6, beta=500, silence=False, spin_pen=0.05)
 

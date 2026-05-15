@@ -11,7 +11,7 @@ from triqs_ghostGA.grisb import *
 from triqs_ghostGA.utility.utils_TH import U_matrix_kanamori
 from triqs_ghostGA.utility.e_list import EList_SemiCircular
 from triqs_ghostGA.utility.delta_fit import *
-from triqs_ghostGA.solvers.ci import CI
+from triqs_ghostGA.solvers.simple_ed import SimpleED
 
 class TestGrisb(unittest.TestCase):
     def runTest(self):
@@ -50,7 +50,7 @@ class TestGrisb(unittest.TestCase):
         Utensor[0,0,1,1] = U
         Utensor[1,1,0,0] = U
         
-        Solver=CI(ntot, use_Ntot=True, spin_pen=10)
+        Solver = SimpleED(ntot, use_Ntot=True, spin_pen=10)
         t1_i=time.time()
         grisb = Grisb(ntot, nimp, nbath, eks, eloc, Utensor, R=R0, Lambda=Lambda0, edsolver=Solver, spin_sym=True,write=True)
         grisb.run(itmax=1000, mix=0.5, tol=1e-5, beta=500, silence=True)

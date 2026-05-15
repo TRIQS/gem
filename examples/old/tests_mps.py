@@ -67,13 +67,14 @@ if __name__ == "__main__":
     solver.build_Hemb(D, eloc, Lambda_c, Utensor)
 
     solver.solve_Hemb(outfile="test_data")  #CHECK: is passing the filename as a keyword arg working properly?
-    denMat_ftps = solver.calc_density_matrix()
+    denMat_mps = solver.calc_density_matrix()
     print('denMat_mps=')
-    print(denMat_ftps)
+    print(denMat_mps)
 
     if do_ci_calc:
-        from ci import *
-        edsolver = CI(ntot, use_Ntot=True, use_Sz=True, dtype=np.complex128)
+        from simple_ed import *
+        edsolver = SimpleED(ntot, use_Ntot=True, use_Sz=True,
+                            N_sector=ntot//2, Sz_sector=0, dtype=np.complex128)
         
         h1e = np.zeros((ntot//2,ntot//2),dtype=complex)
         h1e[:nimp//2,:nimp//2] = eloc[::2,::2]
@@ -93,10 +94,10 @@ if __name__ == "__main__":
         np.set_printoptions(precision=3, threshold=np.inf, linewidth=np.inf)
         print('density matrix CI=')
         print(denMat)
-        print('density matrix FTPS=')
-        print(denMat_ftps)
+        print('density matrix MPS=')
+        print(denMat_mps)
         
         
         print('diff in density matrix=')
-        print(denMat-denMat_ftps)
+        print(denMat-denMat_mps)
     
