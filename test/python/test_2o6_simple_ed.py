@@ -67,7 +67,7 @@ class test_hemb_2o6_simple_ed(unittest.TestCase):
         grisb = Gdmft(ntot, nimp, nbath, eks, eloc, Utensor, wks=wks,
                       R=R0, Lambda=L0, edsolver=edsolver, verbose=4,
                       spin_sym=True, orb_sym=False)
-        grisb.run(itmax=9, mix=0.0, tol=1e-5, beta=1000, silence=False)
+        grisb.run(itmax=9, mix=0.0, tol=1e-5, T=1e-3, silence=False)
 
         name = "2o6_ci"
         with h5py.File(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "r") as A:

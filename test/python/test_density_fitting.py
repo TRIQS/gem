@@ -39,7 +39,7 @@ def _make_grisb():
 
 N_TARGET = 0.85
 N_TOLERANCE = 1e-3
-RUN_KWARGS = dict(itmax=150, mix=0.2, tol=1e-5, beta=500, silence=True,
+RUN_KWARGS = dict(itmax=150, mix=0.2, tol=1e-5, T=2e-3, silence=True,
                   n_target=N_TARGET, n_tolerance=N_TOLERANCE)
 
 

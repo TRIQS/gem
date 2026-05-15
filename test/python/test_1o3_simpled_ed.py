@@ -51,7 +51,7 @@ class test_hemb_simple_ed_1o3(unittest.TestCase):
         edsolver = SimpleED(ntot, use_Ntot=True,
                       use_Sz=True, dtype=np.complex128)
         grisb = Gdmft(ntot, nimp, nbath, eks, eloc, Utensor, wks=wks, edsolver=edsolver)
-        grisb.run(itmax=30, mix=0.2, tol=1e-5, beta=500,
+        grisb.run(itmax=30, mix=0.2, tol=1e-5, T=2e-3,
                   silence=True)
 
         name = "1o3_ci"
