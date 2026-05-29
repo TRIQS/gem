@@ -78,6 +78,7 @@ class SimpleED(object):
         self.Hone_list      = [None] * len(self.sectors)
         self.Htwo_list      = [None] * len(self.sectors)
         self.V2E            = None  # cached interaction tensor for rebuild check
+        self.prev_gs_list   = [None] * len(self.sectors)
 
         for s, (N, Sz) in enumerate(self.sectors):
             basis_s = self._build_basis(N, Sz)
@@ -171,10 +172,12 @@ class SimpleED(object):
             if hsize_s < 4000:
                 vals, vecs = eigh(Ham_s.toarray())
             else:
-                vals, vecs = eigsh(Ham_s, k=num_eig, which=which, tol=tol)
+                v0 = self.prev_gs_list[s] if T == 0.0 else None
+                vals, vecs = eigsh(Ham_s, k=num_eig, which=which, tol=tol, v0=v0)
             so = vals.argsort()
             self.evals_list.append(vals[so])
             self.evecs_list.append(vecs[:, so])
+            self.prev_gs_list[s] = vecs[:, so[0]].copy()
 
         # global ground-state energy
         self.gs_ene = min(evals[0] for evals in self.evals_list)
