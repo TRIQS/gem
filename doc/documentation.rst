@@ -3,11 +3,12 @@
 API Reference
 *************
 
-The package is organised into two core objects that represent the main components of the ghost-GA method, namely the :class:`~triqs_ghostGA.fragment.Fragment` and the :class:`~triqs_ghostGA.lattice.Lattice`.
-The :class:`~triqs_ghostGA.fragment.Fragment` class represents the locally correlated space (site or cluster) and takes care of solvinf the correspondig embedding problem and updating the self-energy and hybridization parameters.
+The package is organised into two core objects that represent the main components of the ghost-GA method, namely the :class:`~triqs_ghostGA.fragment.Fragment` and the :class:`~triqs_ghostGA.lattice.Lattice` objects.
+The :class:`~triqs_ghostGA.fragment.Fragment` class represents the locally correlated space (site or cluster) and takes care of solving the correspondig embedding problem and updating the self-energy and hybridization parameters.
 The :class:`~triqs_ghostGA.lattice.Lattice` class represents the lattice, takes care of the Brillouin-zone integration, and makes the fragments talk to each other.
 
-The software provides a collection of impurity solvers, which are organised in the :mod:`triqs_ghostGA.solvers` subpackage.  Each solver implements the common interface defined in :mod:`triqs_ghostGA.solvers.solver_template`, which allows them to be used interchangeably within the self-consistency loop.
+The software provides a collection of impurity solvers, which are organised in the :mod:`triqs_ghostGA.solvers` subpackage.
+Each solver implements the common interface defined in :mod:`triqs_ghostGA.solvers.solver_template`, which allows them to be used interchangeably within the self-consistency loop.
 
 Say something about the gdmft object too?
 
@@ -25,21 +26,45 @@ Core Modules
    triqs_ghostGA.gdmft
 
 
-``fragment`` 
+``fragment``
 ----------------------------------
 
 The :mod:`triqs_ghostGA.fragment` module provides the :class:`~triqs_ghostGA.fragment.Fragment`
 class, which represents a single correlated site (or cluster) together with its ghost
-orbital bath.  It exposes methods for solving the embedding problem, computing
-quasiparticle weights, and enforcing symmetry constraints.
+orbital bath.  It holds the embedding Hamiltonian, the quasiparticle weights, and the
+self-energy parameters (:math:`R`, :math:`\Lambda`) and hybridisation parameters
+(:math:`D`, :math:`\Lambda_c`) that connect the fragment to the lattice.
+The key methods are:
 
-``lattice`` 
+- :meth:`~triqs_ghostGA.fragment.Fragment.solve_impurity` — solves the quantum-impurity
+  (embedding) problem at a given chemical potential and temperature, returning the
+  ground-state (or thermal) density matrix.
+
+- :meth:`~triqs_ghostGA.fragment.Fragment.update_self_energy` — updates the ghost-GA
+  self-energy parameters :math:`R` and :math:`\Lambda` by minimising the ghost-GA
+  energy functional with respect to these parameters, given the current impurity solution.
+
+- :meth:`~triqs_ghostGA.fragment.Fragment.update_hybridization` — updates the
+  hybridisation parameters :math:`D` and :math:`\Lambda_c` by minimising the ghost-GA
+  energy functional with respect to these parameters, given the current impurity solution.
+
+``lattice``
 -----------------------------------------
 
 The :mod:`triqs_ghostGA.lattice` module provides the :class:`~triqs_ghostGA.lattice.Lattice`
-class, which wraps the Brillouin-zone integration.  It computes the local lattice
-Green's function, the kinetic energy, adjusts the chemical potential to enforce
-a target filling, and most importantly, it updates the relevant observables to update the hybridisation function of each fragment.
+class, which wraps the Brillouin-zone integration over the non-interacting dispersion.
+It assembles the quasiparticle Hamiltonian from the self-energy parameters of all
+fragments, integrates it over the Brillouin zone to obtain the thermal expectation values
+to update the hybridization function, and feeds these results back to the fragments.
+The key methods are:
+
+- :meth:`~triqs_ghostGA.lattice.Lattice.solve_qp` — performs the quasiparticle
+  Brillouin-zone integration given the current self-energy parameters of each fragment,
+  computes the thermal expectation values to update the hybridization function,
+  and feeds these results back to the fragments.
+
+- :meth:`~triqs_ghostGA.lattice.Lattice.fit_mu` — adjusts the chemical potential
+  iteratively until the total lattice filling matches a prescribed target.
 
 ``gdmft`` — Simple Self-Consistency Driver
 ------------------------------------------
@@ -92,5 +117,5 @@ Utilities
 Helper routines used throughout the code:
 
 * :mod:`~triqs_ghostGA.utility.utilities` — general linear-algebra and Green's-function helpers.
-* :mod:`~triqs_ghostGA.utility.delta_fit` — fitting of the hybridisation function
+* :mod:`~triqs_ghostGA.utility.delta_fit` — routines to perform thermal density matrix fitting of the hybridisation function and self-energy parameters.
   to a discrete bath.

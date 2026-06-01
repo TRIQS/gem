@@ -63,13 +63,15 @@ project = '@PROJECT_NAME@'
 version = '@PROJECT_VERSION@'
 
 # this makes the current project version available as var in every rst file
-rst_epilog = """
+rst_epilog = f"""
 .. |PROJECT_VERSION| replace:: {version}
-""".format(
-version = version,
-)
+.. |PROJECT_NAME| replace:: {project}
+.. |bold_project_name| replace:: **{project}**
+"""
 
-copyright = '2018-2021 The Simons Foundation, authors: A. Hampel, O. Parcollet, D. Simons, H. Strand, N. Wentzell'
+
+
+copyright = '2026 The Simons Foundation, authors: S. Giuli, O. Gingras'
 
 mathjax_path = "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/MathJax.js?config=default"
 templates_path = ['@CMAKE_CURRENT_SOURCE_DIR@/_templates']

@@ -28,7 +28,9 @@ The following packages are required for the core functionality of the software:
 Solvers
 -------
 
-Install only the packages corresponding to the solvers you intend to use:
+|bold_project_name| comes with a simple internal exact diagonlization solver and with interfaces to external solvers
+If you want to use an external solver then install the packages corresponding to the solvers you intend to use.
+When using a solver different from ``SimpleED`` please make sure to cite the appropriate references along the |bold_project_name| one.
 
 +-------------+---------------------------------------------------------------+
 | Solver      | Extra packages required                                       |
@@ -58,27 +60,28 @@ Testing
 Documentation
 -------------
 
-Required to build the HTML documentation (``cmake -DBuild_Documentation=ON``):
+The following python packages are required to build the HTML documentation.
+To enable building the documentation locally pass the appropriate flag to cmake (``cmake -DBuild_Documentation=ON``):
 
-+-------------------+----------------------------------------------+
-| Package           | Purpose                                      |
-+===================+==============================================+
-| sphinx-rtd-theme  | Read the Docs HTML theme                     |
-+-------------------+----------------------------------------------+
-| nbsphinx          | Jupyter notebook support                     |
-+-------------------+----------------------------------------------+
-| myst-parser       | Markdown source file support                 |
-+-------------------+----------------------------------------------+
-| sphinx-autorun    | Executable code blocks in docs               |
-+-------------------+----------------------------------------------+
-| numpydoc          | NumPy-style docstring parser                 |
-+-------------------+----------------------------------------------+
-| linkify-it-py       | Auto-linking of bare URLs                    |
-+---------------------+----------------------------------------------+
-| matplotlib          | Plots in documentation via plot directive    |
-+---------------------+----------------------------------------------+
-| sphinxcontrib-bibtex| BibTeX citations and reference list          |
-+---------------------+----------------------------------------------+
++---------------------+--------------------------------------------+
+| Package             | Purpose                                    |
++=====================+============================================+
+| sphinx-rtd-theme    | Read the Docs HTML theme                   |
++---------------------+--------------------------------------------+
+| nbsphinx            | Jupyter notebook support                   |
++---------------------+--------------------------------------------+
+| myst-parser         | Markdown source file support               |
++---------------------+--------------------------------------------+
+| sphinx-autorun      | Executable code blocks in docs             |
++---------------------+--------------------------------------------+
+| numpydoc            | NumPy-style docstring parser               |
++---------------------+--------------------------------------------+
+| linkify-it-py       | Auto-linking of bare URLs                  |
++---------------------+--------------------------------------------+
+| matplotlib          | Plots in documentation via plot directive  |
++---------------------+--------------------------------------------+
+| sphinxcontrib-bibtex| BibTeX citations and reference list        |
++---------------------+--------------------------------------------+
 
 Installation Steps
 ==================
@@ -101,7 +104,7 @@ Installation Steps
 Custom CMake Options
 ====================
 
-The build can be configured with CMake options::
+The build can be configured with the following CMake options::
 
     cmake ../ghostGA -DOPTION1=value1 -DOPTION2=value2 ...
 
@@ -116,10 +119,6 @@ The build can be configured with CMake options::
 +--------------------------------------------------------------+-----------------------------------------------+
 | Build the documentation                                      | ``-DBuild_Documentation=ON``                  |
 +--------------------------------------------------------------+-----------------------------------------------+
+| Path to sphinx                                               | ``-DSPHINXBUILD_EXECUTABLE=<path>``           |
++--------------------------------------------------------------+-----------------------------------------------+
 
-MPS / ITensor Solver (Julia)
-============================
-
-The MPS solver relies on ITensors.jl through ``juliacall``. See ``README_JULIA.txt``
-in the repository root for step-by-step setup instructions specific to the Julia
-environment.
