@@ -1,6 +1,6 @@
 using ITensors
-# activate /home/hh8367/anaconda3/envs/triqs_base/triqs_ghostGA.src/julia
-# please add this file into your julia project which should be in: path-to-env/triqs_ghostGA.src/julia/src
+# activate /home/hh8367/anaconda3/envs/triqs_base/gem.src/julia
+# please add this file into your julia project which should be in: path-to-env/gem.src/julia/src
 # then recompile
 
 # confirmed to correctly build the EH
