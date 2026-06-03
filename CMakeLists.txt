@@ -1,20 +1,23 @@
 # ##############################################################################
 #
-# triqs_ghostGA - An example application using triqs and cpp2py
+# gem - Ghost Embedding Method
 #
-# Copyright (C) ...
+# A Python package for quantum embedding calculations based on the ghost Gutzwiller approximation.
 #
-# triqs_ghostGA is free software: you can redistribute it and/or modify it under the
+# Copyright (C) 2026, The Simons Foundation
+#
+#
+# gem is free software: you can redistribute it and/or modify it under the
 # terms of the GNU General Public License as published by the Free Software
 # Foundation, either version 3 of the License, or (at your option) any later
 # version.
 #
-# triqs_ghostGA is distributed in the hope that it will be useful, but WITHOUT ANY
+# gem is distributed in the hope that it will be useful, but WITHOUT ANY
 # WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
 # A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License along with
-# triqs_ghostGA (in the file COPYING.txt in this directory). If not, see
+# gem (in the file COPYING.txt in this directory). If not, see
 # <http://www.gnu.org/licenses/>.
 #
 # ##############################################################################
@@ -24,7 +27,7 @@ cmake_policy(VERSION 3.20)
 
 # ############
 # Define Project
-project(triqs_ghostGA VERSION 0.1.0 LANGUAGES C CXX)
+project(gem VERSION 0.1.0 LANGUAGES C CXX)
 get_directory_property(IS_SUBPROJECT PARENT_DIRECTORY)
 if(POLICY CMP0144)
   cmake_policy(SET CMP0144 NEW)
