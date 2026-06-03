@@ -1,13 +1,12 @@
-# TRIQS ghostGA
+# gem - Ghost Embedding Method
 
-[![Documentation](https://img.shields.io/badge/docs-online-blue)](https://triqs.github.io/ghostGA)
-[![docs](https://github.com/TRIQS/ghostGA/actions/workflows/docs.yml/badge.svg)](https://github.com/TRIQS/ghostGA/actions/workflows/docs.yml)
+[![Documentation](https://img.shields.io/badge/docs-online-blue)](https://triqs.github.io/gem)
+[![docs](https://github.com/TRIQS/gem/actions/workflows/docs.yml/badge.svg)](https://github.com/TRIQS/gem/actions/workflows/docs.yml)
 
 About
 -----
 
-This is an implement of the ghost-Gutwiller approximation [1,2] (ghost-GA) based
-on the TRIQS library.
+This is an implement of the ghost-Gutwiller approximation and its finate temperature extension [1,2] (ghost-GA).
 
 Dependencies
 ------------
@@ -43,11 +42,11 @@ Initial Setup
 To install this package, run the following commands in order:
 
 ```bash
-git clone https://github.com/TRIQS/ghostGA.git
+git clone https://github.com/TRIQS/gem.git
 
-mkdir ghostGA.build && cd ghostGA.build
+mkdir gem.build && cd gem.build
 
-cmake ../ghostGA
+cmake ../gem
 
 make
 make test
