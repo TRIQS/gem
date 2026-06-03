@@ -1,8 +1,0 @@
-&inputpp 
-   prefix             = 'vo2'
-   outdir             = './out/',
-   seedname           = 'vo2'
-   write_mmn          = .true.
-   write_amn          = .true.
-   write_unk          = .false.
-/

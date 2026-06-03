@@ -1,6 +1,0 @@
-&BANDS
-   prefix  = 'vo2',
-   outdir  = './out/',
-   filband = 'vo2_bands.dat'
-   lsym    = .false.,
-/

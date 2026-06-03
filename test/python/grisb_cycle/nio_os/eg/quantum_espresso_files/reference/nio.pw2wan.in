@@ -1,8 +1,0 @@
-&inputpp 
-   prefix             = 'nio'
-   outdir             = './out/',
-   seedname           = 'nio'
-   write_mmn          = .true.
-   write_amn          = .true.
-   write_unk          = .false.
-/
