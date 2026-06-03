@@ -27,8 +27,15 @@ Module containing GEM : Ghost Embedding Method
 
 import warnings
 
-warnings.warn(
-    "gem is in beta stage and is provided as-is; no guarantee is made that it works for your use case.",
-    UserWarning,
-    stacklevel=2,
-)
+_warning_message = """
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                                  ⚠️  WARNING  ⚠️                                 ║
+║                                                                                ║
+║  This software is in BETA STAGE and is provided as-is.                         ║
+║  No guarantee is made that it works for your use case or that it is            ║
+║  free from bugs. Use at your own risk and verify results independently.        ║
+║                                                                                ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+"""
+
+warnings.warn(_warning_message, UserWarning, stacklevel=2)
