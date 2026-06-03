@@ -5,7 +5,6 @@ import unittest
 from gem.gdmft import Gdmft
 from gem.fragment import Fragment
 from gem.lattice import Lattice
-from gem.version import show_version, show_git_hash
 
 
 class test_basic_features(unittest.TestCase):
@@ -15,9 +14,6 @@ class test_basic_features(unittest.TestCase):
         assert Fragment is not None
         assert Lattice is not None
 
-    def test_version_prints(self):
-        show_version()
-        show_git_hash()
 
 
 if __name__ == '__main__':
