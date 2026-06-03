@@ -1,10 +1,9 @@
 ################################################################################
 #
-# TRIQS: a Toolbox for Research in Interacting Quantum Systems
-#
-# Copyright (C) 2016-2018, N. Wentzell
-# Copyright (C) 2018-2019, The Simons Foundation
-#   author: N. Wentzell
+# gem : Ghost Embedding Method
+# 
+# Copyright (C) 2026, The Simons Foundation
+#   author: S. Giuli
 #
 # TRIQS is free software: you can redistribute it and/or modify it under the
 # terms of the GNU General Public License as published by the Free Software
@@ -22,9 +21,14 @@
 ################################################################################
 
 r"""
-Module containing the ghost-Gutzwiller approximation lattice solver
+Module containing GEM : Ghost Embedding Method
 
 """
 
-#from .lattice import LatticeSolver
-#__all__ = ["LatticeSolver"]
+import warnings
+
+warnings.warn(
+    "gem is in beta stage and is provided as-is; no guarantee is made that it works for your use case.",
+    UserWarning,
+    stacklevel=2,
+)
