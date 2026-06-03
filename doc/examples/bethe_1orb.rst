@@ -20,9 +20,9 @@ We start from importing the necessary modules::
 
     import numpy as np
     import matplotlib.pyplot as plt
-    from triqs_ghostGA.lattice import Lattice
-    from triqs_ghostGA.fragment import Fragment
-    from triqs_ghostGA.solvers.simple_ed import SimpleED
+    from gem.lattice import Lattice
+    from gem.fragment import Fragment
+    from gem.solvers.simple_ed import SimpleED
 
 
 We sample the semicircular DOS on a fine energy mesh, we use to build the
@@ -84,6 +84,12 @@ and indicating the corresponding sectors `N_sector=ntot//2` and `Sz_sector=0`.
 The call to ``impose_spin_SU2_symmetry`` after each step enforces that the
 :math:`\uparrow` and :math:`\downarrow` sectors remain identical, keeping the
 solution in the paramagnetic state throughout the sweep.
+When performing single site calculations, the quasiparticle weight can be computed from local self-energy
+and the fragment object provides a method ``compute_Z`` to do so.
+
+Results
+-------
+
 
 Performing the sweep over :math:`U` and plotting the resulting :math:`Z(U)` curve, we can clearly see the Mott transition and the difference in critical interaction
 between the standard GA (:math:`B=1`, orange) and ghost GA (:math:`B > 1` , in this case :math:`B=3`, blue ):
