@@ -89,7 +89,7 @@ jobs:
         make -j1 install VERBOSE=1
         cd ../
 
-    - name: Build triqs_ghostGA
+    - name: Build gem
       env:
         CC: ${{ matrix.cc }}
         CXX: ${{ matrix.cxx }}
@@ -99,7 +99,7 @@ jobs:
         mkdir build && cd build && cmake ..
         make -j2 || make -j1 VERBOSE=1
 
-    - name: Test triqs_ghostGA
+    - name: Test gem
       env:
         DYLD_FALLBACK_LIBRARY_PATH: /usr/local/opt/llvm/lib
       run: |

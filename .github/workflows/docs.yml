@@ -37,16 +37,16 @@ jobs:
           sed \
             -e "s|@PROJECT_VERSION@|0.1.0|g" \
             -e "s|@PROJECT_GIT_HASH@|${GIT_HASH}|g" \
-            -e "s|@PROJECT_NAME@|triqs_ghostGA|g" \
-            python/triqs_ghostGA/version.py.in \
-            > python/triqs_ghostGA/version.py
+            -e "s|@PROJECT_NAME@|gem|g" \
+            python/gem/version.py.in \
+            > python/gem/version.py
 
       - name: Generate conf.py
         run: |
           DOC_DIR="${GITHUB_WORKSPACE}/doc"
           sed \
             -e "s|@CMAKE_CURRENT_SOURCE_DIR@|${DOC_DIR}|g" \
-            -e "s|@PROJECT_NAME@|triqs_ghostGA|g" \
+            -e "s|@PROJECT_NAME@|gem|g" \
             -e "s|@PROJECT_VERSION@|0.1.0|g" \
             doc/conf.py.in > doc/conf.py
 
