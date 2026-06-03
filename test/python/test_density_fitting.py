@@ -3,9 +3,9 @@
 import unittest
 import numpy as np
 
-from triqs_ghostGA.gdmft import *
-#from triqs_ghostGA.utility.e_list import EList_SemiCircular
-from triqs_ghostGA.solvers.simple_ed import SimpleED
+from gem.gdmft import *
+#from gem.utility.e_list import EList_SemiCircular
+from gem.solvers.simple_ed import SimpleED
 
 
 def _make_grisb():

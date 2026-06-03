@@ -2,11 +2,11 @@
 
 import unittest
 
-from triqs_ghostGA.gdmft import *
-from triqs_ghostGA.utility.utilities import U_matrix_kanamori
+from gem.gdmft import *
+from gem.utility.utilities import U_matrix_kanamori
 import numpy as np
 import h5py
-from triqs_ghostGA.solvers.simple_ed import SimpleED
+from gem.solvers.simple_ed import SimpleED
 import os
 
 

@@ -8,7 +8,7 @@ matrices, double occupancy, and energies.
 """
 import unittest
 import numpy as np
-from triqs_ghostGA.solvers.simple_ed import SimpleED
+from gem.solvers.simple_ed import SimpleED
 
 
 def _make_hemb_inputs(U=1.5, B=3, seed=42):

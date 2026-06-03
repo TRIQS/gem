@@ -2,10 +2,10 @@
 
 import unittest
 
-from triqs_ghostGA.gdmft import Gdmft
-from triqs_ghostGA.fragment import Fragment
-from triqs_ghostGA.lattice import Lattice
-from triqs_ghostGA.version import show_version, show_git_hash
+from gem.gdmft import Gdmft
+from gem.fragment import Fragment
+from gem.lattice import Lattice
+from gem.version import show_version, show_git_hash
 
 
 class test_basic_features(unittest.TestCase):

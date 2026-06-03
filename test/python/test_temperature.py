@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 import unittest
 
-from triqs_ghostGA.gdmft import *
+from gem.gdmft import *
 import numpy as np
-from triqs_ghostGA.solvers.simple_ed import SimpleED
+from gem.solvers.simple_ed import SimpleED
 import os
 import h5py
 
