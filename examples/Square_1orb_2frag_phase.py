@@ -1,7 +1,7 @@
 import numpy as np
-from triqs_ghostGA.fragment import Fragment
-from triqs_ghostGA.lattice import Lattice
-from triqs_ghostGA.solvers.simple_ed import SimpleED
+from gem.fragment import Fragment
+from gem.lattice import Lattice
+from gem.solvers.simple_ed import SimpleED
 
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
