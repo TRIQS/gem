@@ -102,7 +102,7 @@ Available solvers:
 * **MPS/ITensor** (:mod:`~gem.solvers.mps`) — tensor-network solver
   using ITensors.jl through juliacall.
 * **SVD Solver** (:mod:`~gem.solvers.svd_solver2`) — low-rank SVD
-  compression of the Green's function.
+  compression of the hybridisation function.
 
 Utilities
 =========
