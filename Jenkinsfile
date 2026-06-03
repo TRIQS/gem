@@ -1,4 +1,4 @@
-def projectName = "triqs_ghostGA" /* set to app/repo name */
+def projectName = "gem" /* set to app/repo name */
 
 def dockerName = projectName.toLowerCase();
 /* which platform to build documentation on */
