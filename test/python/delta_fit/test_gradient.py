@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 
-from triqs_ghostGA.utility.delta_fit import (
+from gem.utility.delta_fit import (
     pack_params,
     residual_LR,
     residual_LcD,
