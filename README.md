@@ -3,6 +3,10 @@
 [![Documentation](https://img.shields.io/badge/docs-online-blue)](https://triqs.github.io/gem)
 [![docs](https://github.com/TRIQS/gem/actions/workflows/docs.yml/badge.svg)](https://github.com/TRIQS/gem/actions/workflows/docs.yml)
 
+> **Disclaimer:** This software is in **beta stage**. It is provided as-is, and no guarantee is made that it works for your use case or is free from bugs.
+>
+> Use at your own risk and verify results independently.
+
 About
 -----
 
