@@ -18,7 +18,7 @@ B = 3
 Bsize = int(B * size)
 beta = 100
 noise = 3e-3
-data_dir = Path("input_data") / "B3"
+data_dir = Path(__file__).parent / "delta_fit" / "input_data" / "B3"
 
 
 class TestSelfEnergySolverB3(unittest.TestCase):
