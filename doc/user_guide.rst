@@ -3,7 +3,7 @@
 User Guide
 **********
 
-This section provides a brief introduction to the theory behind ghostGA and
+This section provides a brief introduction to the theory behind gem and
 worked examples showing how to set up and run calculations.
 
 .. contents::
