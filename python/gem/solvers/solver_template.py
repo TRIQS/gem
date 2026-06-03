@@ -1,5 +1,5 @@
 #######################################################
-# Template for solvers to solve the embedding Hamiltonian in ghostGA.
+# Template for solvers to solve the embedding Hamiltonian in gem.
 # Author: Samuele Giuli
 # Email:  samuele.giuli@gmail.com
 #######################################################

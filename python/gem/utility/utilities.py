@@ -3,16 +3,11 @@
 ###########################################
 
 import numpy as np
-from numpy import sqrt, heaviside as hside, pi, arcsin
-from numpy.linalg import inv, eigh
-import h5py
-import cmath
+from numpy.linalg import  eigh
 from cmath import sqrt
 import itertools as it
-from numba import jit  #, prange
-import numba
-import matplotlib.pyplot as plt
-from scipy.optimize import bisect
+from numba import jit 
+#from scipy.optimize import bisect
 from scipy.special import factorial as fact
 
 
@@ -301,11 +296,11 @@ def U_matrix_kanamori(n_orb, U_int, J_hund):
     m_range = range(n_orb)
     for m, mp in it.product(m_range, m_range):
         if m == mp:
-            U_matrix[m, m, mp, mp] = U_int
+            U_matrix[m, m, mp, mp] = U_int # intra-orbital
         else:
-            U_matrix[m, m, mp, mp] = U_int - 2.0 * J_hund
-            U_matrix[m, mp, mp, m] = J_hund
-            U_matrix[m, mp, m, mp] = J_hund
+            U_matrix[m, m, mp, mp] = U_int - 2.0 * J_hund # inter-orbital opposite-spin
+            U_matrix[m, mp, mp, m] = J_hund # spin-flip
+            U_matrix[m, mp, m, mp] = J_hund # pair-hopping
     norb = U_matrix.shape[0]
     norb2 = norb * 2
     Ufull_matrix = np.zeros((norb2, norb2, norb2, norb2), dtype=np.complex128)

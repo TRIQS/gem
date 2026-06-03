@@ -4,7 +4,7 @@ import sys
 import h5py
 
 from itertools import product as itp
-import triqs_ghostGA
+import gem
 from scipy.sparse.linalg import eigsh
 
 def get_group_keys(data_path: str) -> str:

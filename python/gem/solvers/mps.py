@@ -5,6 +5,8 @@
 # When using this solver please cite the following articles:
 # - M. Fishman et al, SciPost Phys. Codebases 4 (2022)
 
+# To be changed once we have the interface with the triqs-itensor solver.
+
 import numpy as np
 import os
 import sys
@@ -26,8 +28,8 @@ except (ImportError, KeyError):
     pass
 
 from itertools import product as itp
-import triqs_ghostGA
-from triqs_ghostGA.solvers.utility.utils_mps import setup_MPS, rotateBath, rotateDensityMatrix, rotateToTsungHanConvention
+import gem
+from gem.solvers.utility.utils_mps import setup_MPS, rotateBath, rotateDensityMatrix, rotateToTsungHanConvention
 
 #SAMUELE's COMMENT
 # - implement docc
