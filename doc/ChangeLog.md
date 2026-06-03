@@ -4,7 +4,7 @@
 
 ## Version 0.1.0
 
-triqs_ghostGA version 0.1.0 is the first release for this project.
+gem version 0.1.0 is the first release for this project.
 * initial implementation of the ghost Gutzwiller Approximation and finite temperature extension
 * Impurity solvers provided: SimpleED, PyBlock2, EDIpack, ITensorMPS.
 * Sphinx documentation with API reference, intallation guide, and used guide.

@@ -51,6 +51,9 @@ When using a solver different from ``SimpleED`` please make sure to cite the app
 Testing
 -------
 
+The following python packages are required to build and run the tests.
+To enable building and runnning the tests locally pass the appropriate flag to cmake (``cmake -DBuild_Tests=ON``):
+
 +--------+-----------------------------+
 | Package| Purpose                     |
 +========+=============================+
@@ -88,12 +91,12 @@ Installation Steps
 
 #. Clone the repository::
 
-     git clone https://github.com/TRIQS/ghostGA.git
+     git clone https://github.com/TRIQS/gem.git
 
 #. Create a build directory and run CMake::
 
-     mkdir ghostGA.build && cd ghostGA.build
-     cmake ../ghostGA
+     mkdir gem.build && cd gem.build
+     cmake ../gem
 
 #. Build and install::
 
@@ -106,18 +109,18 @@ Custom CMake Options
 
 The build can be configured with the following CMake options::
 
-    cmake ../ghostGA -DOPTION1=value1 -DOPTION2=value2 ...
+    cmake ../gem -DOPTION1=value1 -DOPTION2=value2 ...
 
 +--------------------------------------------------------------+-----------------------------------------------+
 | Option                                                       | Syntax                                        |
 +==============================================================+===============================================+
 | Specify a custom installation prefix                         | ``-DCMAKE_INSTALL_PREFIX=<path>``             |
 +--------------------------------------------------------------+-----------------------------------------------+
-| Build in debug mode                                          | ``-DCMAKE_BUILD_TYPE=Debug``                  |
+| Build in debug mode                                          | ``-DCMAKE_BUILD_TYPE=Release/Debug``          |
 +--------------------------------------------------------------+-----------------------------------------------+
-| Disable tests (not recommended)                              | ``-DBuild_Tests=OFF``                         |
+| Disable tests (not recommended)                              | ``-DBuild_Tests=OFF/ON``                      |
 +--------------------------------------------------------------+-----------------------------------------------+
-| Build the documentation                                      | ``-DBuild_Documentation=ON``                  |
+| Build the documentation                                      | ``-DBuild_Documentation=OFF/ON``              |
 +--------------------------------------------------------------+-----------------------------------------------+
 | Path to sphinx                                               | ``-DSPHINXBUILD_EXECUTABLE=<path>``           |
 +--------------------------------------------------------------+-----------------------------------------------+

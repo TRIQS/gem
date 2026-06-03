@@ -1,6 +1,6 @@
 .. _about:
 
-About triqs_ghostGA
+About gem
 *******************
 
 

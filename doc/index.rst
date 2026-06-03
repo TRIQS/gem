@@ -1,6 +1,6 @@
 .. _welcome:
 
-TRIQS / |PROJECT_NAME|
+TRIQS / |PROJECT_NAME| - Ghost Embedding Method
 ***************
 
 .. sidebar:: |PROJECT_NAME| |PROJECT_VERSION|
@@ -10,7 +10,7 @@ TRIQS / |PROJECT_NAME|
    .. image:: _static/logo_github.png
       :width: 75%
       :align: center
-      :target: https://github.com/TRIQS/ghostGA
+      :target: https://github.com/TRIQS/gem
 
 
 |bold_project_name| is a Python implementation of the ghost Gutzwiller Approximation (ghost-GA) 
