@@ -1,0 +1,54 @@
+easyblock = 'CMakeMake'
+
+name = 'gem'
+version = '0.0.0'
+
+homepage = 'https://triqs.github.io/gem/'
+description = """
+ gem - Ghost Embedding Method is a Python package for quantum embedding calculations based on the ghost Gutzwiller approximation.
+"""
+
+docurls = ['https://triqs.github.io/gem/%(version_major_minor)s.x/']
+software_license = 'LicenseGPLv3'
+
+toolchain = {'name': 'foss', 'version': '2021b'}
+toolchainopts = {'pic': True, 'usempi': True}
+
+source_urls = ['https://github.com/TRIQS/gem/releases/download/%(version)s/']
+sources = ['gem-%(version)s.tar.gz']
+checksums = ['PUT HERE THE SHA256 OF THE RELEASE TARBALL']
+
+dependencies = [
+    ('Python', '3.9.6'),
+    ('SciPy-bundle', '2021.10'),
+    ('numba', '0.54.1'),
+    ('h5py', '3.6.0'),
+]
+
+builddependencies = [
+    ('CMake', '3.22.1')
+]
+
+separate_build_dir = True
+
+runtest = 'test'
+
+sanity_check_paths = {
+    'files': ['lib/libgem_c.a'],
+    'dirs': ['include/gem', 'lib', 'share',
+             'lib/python%(pyshortver)s/site-packages/gem'],
+}
+
+sanity_check_commands = ["python -c 'import gem'"]
+
+modextrapaths = {
+    'CPLUS_INCLUDE_PATH': 'include',
+    'PYTHONPATH': 'lib/python%(pyshortver)s/site-packages',
+    'CMAKE_PREFIX_PATH': 'lib/cmake/gem',
+}
+modextravars = {
+    'GEM_ROOT': '%(installdir)s',
+    'GEM_VERSION': '%(version)s',
+}
+
+moduleclass = 'phys'

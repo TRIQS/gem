@@ -1,11 +1,11 @@
 {% set version = "3.2.0" %}
 
 package:
-  name: triqs_ghostGA
+  name: gem
   version: {{ version }}
 
 source:
-  url: https://github.com/TRIQS/triqs_ghostGA/releases/download/{{ version }}/triqs_ghostGA-{{ version }}.tar.gz
+  url: https://github.com/TRIQS/gem/releases/download/{{ version }}/gem-{{ version }}.tar.gz
   sha256: PUT HERE THE SHA256 OF YOUR RELEASE TARBALL
 
 build:
@@ -42,10 +42,10 @@ test:
     - export OMPI_MCA_rmaps_base_oversubscribe=yes
     - export OMPI_MCA_btl_vader_single_copy_mechanism=none
     - export mpiexec="mpiexec --allow-run-as-root"
-    - python -c "import triqs_ghostGA"
+    - python -c "import gem"
 
 about:
-  home: https://triqs.github.io/triqs_ghostGA
+  home: https://triqs.github.io/gem
   license: GPL-3.0-or-later
   license_family: GPL
   license_file: LICENSE.txt
