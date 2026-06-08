@@ -26,7 +26,7 @@ def _detect_gpu_backend():
     if not _JAX_AVAILABLE:
         return False
     try:
-        return jax.default_backend().lower() in ('cuda', 'rocm')
+        return jax.default_backend().lower() in ('gpu', 'cuda', 'rocm')
     except Exception:
         return False
 
