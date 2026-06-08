@@ -25,13 +25,12 @@ import numpy as np
 import time
 
 from gem.solvers.simple_ed import SimpleED
-from gem.solvers.simple_ed_gpu import SimpleEDGPU, _GPU_BACKEND
+from gem.solvers.simple_ed_gpu import SimpleEDGPU, _JAX_GPU
 
 
-_GPU_AVAILABLE = _GPU_BACKEND is not None
-_BACKEND       = _GPU_BACKEND.upper() if _GPU_AVAILABLE else "none"
-# MLX (Apple Silicon) uses float32; JAX (CUDA) uses float64
-_ATOL          = 1e-4 if _GPU_BACKEND == 'mlx' else 1e-10
+_GPU_AVAILABLE = _JAX_GPU
+_BACKEND       = "CUDA" if _JAX_GPU else "none"
+_ATOL          = 1e-10
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +91,7 @@ def _solve_timed(solver, nimp, eloc, D, Lambdac, V2E, T, mu=0.0, n_repeats=5):
 # ---------------------------------------------------------------------------
 
 @unittest.skipUnless(_GPU_AVAILABLE,
-                     "No GPU backend available (install jax-metal or jax[cuda12])")
+                     "No CUDA GPU available (install JAX with: pip install jax[cuda12])")
 class TestGpuVsCpu(unittest.TestCase):
     """GPU (no-symmetry) vs CPU (no-symmetry) — correctness and timing."""
 
