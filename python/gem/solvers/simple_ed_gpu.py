@@ -10,7 +10,6 @@
 import warnings
 import numpy as np
 from scipy.linalg import eigh
-from scipy.sparse.linalg import eigsh
 
 try:
     import jax
@@ -91,15 +90,17 @@ class SimpleEDGPU(SimpleED):
     # -- Overridden mandatory methods --
 
     def solve_Hemb(self, num_eig=1, which=None, tol=None, verbose=0, T=0.0):
-        """Like SimpleED.solve_Hemb but uses GPU eigh for sectors >= gpu_thresh."""
+        """Like SimpleED.solve_Hemb but always uses full GPU diagonalisation.
+
+        num_eig, which, tol are accepted for API compatibility but ignored —
+        there is no sparse eigensolver path in this GPU-only solver.
+        """
+        del num_eig, which, tol  # no sparse path; accepted for API compatibility only
         if T > 0.0 and ((self.use_Ntot and self.N_sector is not None) or
                          (self.use_Sz   and self.Sz_sector is not None)):
             warnings.warn(
                 "A restricted symmetry sector is selected: the partition "
                 "function may be incomplete at T>0.")
-
-        which = self.solver_params.get('which', 'SA') if which is None else which
-        tol   = self.solver_params.get('tol',   1e-8) if tol   is None else tol
 
         self.evals_list = []
         self.evecs_list = []
@@ -108,15 +109,11 @@ class SimpleEDGPU(SimpleED):
             hsize_s = self.hsize_list[s]
             if verbose > 0:
                 print(f'Sector {s}: diagonalising (dim={hsize_s})')
-            if hsize_s < 4000:
-                mat = Ham_s.toarray()
-                if hsize_s >= self.gpu_thresh:
-                    vals, vecs = self._eigh_gpu(mat)
-                else:
-                    vals, vecs = eigh(mat)
+            mat = Ham_s.toarray()
+            if hsize_s >= self.gpu_thresh:
+                vals, vecs = self._eigh_gpu(mat)
             else:
-                v0 = self.prev_gs_list[s] if T == 0.0 else None
-                vals, vecs = eigsh(Ham_s, k=num_eig, which=which, tol=tol, v0=v0)
+                vals, vecs = eigh(mat)
             so = vals.argsort()
             self.evals_list.append(vals[so])
             self.evecs_list.append(vecs[:, so])
