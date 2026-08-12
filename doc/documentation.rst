@@ -83,7 +83,6 @@ Solvers
    :template: autosummary_module_template.rst
    :recursive:
 
-   gem.solvers
 
 The :mod:`gem.solvers` subpackage collects all supported impurity solvers.
 Each solver implements the common interface defined in
@@ -103,10 +102,9 @@ Utilities
    :template: autosummary_module_template.rst
    :recursive:
 
-   gem.utility
 
 Helper routines used throughout the code:
 
-* :mod:`~gem.utility.utilities` — general linear-algebra and Green's-function helpers.
-* :mod:`~gem.utility.delta_fit` — routines to perform thermal density matrix fitting of the hybridisation function and self-energy parameters.
+* :mod:`gem.utilities` — general linear-algebra and Green's-function helpers.
+* :mod:`gem.delta_fit` — routines to perform thermal density matrix fitting of the hybridisation function and self-energy parameters.
   to a discrete bath.

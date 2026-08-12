@@ -237,9 +237,9 @@ where :math:`\Omega_{\alpha}` are the free-energies associated to the following 
 
    \begin{align}
    \hat{H}_{\text{qp}}        &= \sum_{ij} \sum_{a=1}^{\mathcal{B} \nu_i} \sum_{b=1}^{\mathcal{B} \nu_j} f^\dagger_{i a} \, [ \delta_{ij} (\Lambda^i)_{ ab} + \sum_{\alpha \beta} R_{i, a \alpha} \, t^{ij}_{\alpha\beta} \, R^\dagger_{j,\beta b}  ] \, f_{ j b}\\
-   \hat{H}^{i}_{\text{emb}}     &= \hat{H}^{i}_{\text{int}}[ c^\dagger_i ,c_i ] + \sum_{ a=1}^{\mathcal{B} \nu_i} \sum_{ \alpha=1 }^{\nu_i} [ (D^i)_{ a \alpha } \, b^\dagger_{i, a} c_{i, \alpha} + \text{h.c.} ]
-                          + \sum_{\alpha\beta=1}^{\mathcal{B} \nu_i} (\Lambda_c^i)_{\alpha\beta} \, f^\dagger_\alpha b_\beta \\
-   \hat{H}^{i}_{0,\text{emb}} &= \sum_{a,b=1}^{B\nu_i} \big[\Lambda^i\big]_{ab}\, f^\dagger_{ia} f_{ib} +  \sum_{a,b=1}^{B \nu_i}  \Big(\big[D^i R_i^{T}\big]_{ab}\, f^\dagger_{ib} b_{ia}+\text{H.c.}\Big)+ \sum_{a,b=1}^{B\nu_i}\big[\Lambda^i_c\big]_{ab}\,b^\dagger_{ib} b_{ia}
+   \hat{H}^{i}_{\text{emb}}     &= \sum_{\alpha , \beta=1}^{\nu_i} [\epsilon_i]_{\alpha \beta } c^\dagger_{i \alpha } c_{i \beta} + \hat{H}^{i}_{\text{int}}[ c^\dagger_i ,c_i ] \\
+   &+ \sum_{ a=1}^{\mathcal{B} \nu_i} \sum_{ \alpha=1 }^{\nu_i} [ (D^i)_{ a \alpha } \, b^\dagger_{i, a} c_{i, \alpha} + \text{h.c.} ]  + \sum_{\alpha\beta=1}^{\mathcal{B} \nu_i} (\Lambda_c^i)_{\alpha\beta} \, f^\dagger_\alpha b_\beta \\
+   \hat{H}^{i}_{0,\text{emb}} &= \sum_{a,b=1}^{B\nu_i} \big[\Lambda^i\big]_{ab}\, f^\dagger_{ia} f_{ib} +  \sum_{a,b=1}^{B \nu_i}  \Big(\big[D^i R_i^{T}\big]_{ab}\, f^\dagger_{ib} b_{ia}+\text{H.c.}\Big)+ \sum_{a,b=1}^{B\nu_i}\big[\Lambda^i_c\big]_{ab}\,b_{ib} b^\dagger_{ia}
    \end{align}
 
 The saddle point equations of the functional at :math:`T=0` retrieve the ghost-GA self-consistency equations and generalize them to finite temperature, while the limit :math:`B \to \infty` retrieves the DMFT functional and self-consistency equations.
