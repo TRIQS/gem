@@ -309,7 +309,8 @@ for iU, U in enumerate(U_list):
 
     edsolver = SimpleED(ntot, use_Ntot=True, use_Sz=True,
                         N_sector=ntot // 2, Sz_sector=0,
-                        dtype=np.complex128)
+                        dtype=np.complex128,
+                        solver_params={'num_eig': 20, 'spin_pen': spin_pen})
     fragment = Fragment(nimp, nbath, eloc, Utensor, edsolver,
                         Lambda=Lambda0, R=R0, verbose=0)
 
@@ -325,7 +326,7 @@ for iU, U in enumerate(U_list):
                                          verbose=False)
         fragment.impose_spin_SU2_symmetry()
 
-        fragment.solve_impurity(mu, T=T, num_eig=20, spin_pen=spin_pen)
+        fragment.solve_impurity(mu, T=T)
 
 
         Lambda_old = fragment.Lambda.copy()
