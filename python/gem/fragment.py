@@ -146,7 +146,7 @@ class Fragment():
         self.solver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor)
         
         if(T>=0.0):
-            self.solver.solve_Hemb(verbose=self.verb , T=T)
+            self.solver.solve_Hemb(T=T, verbose=self.verb )
         else:
             raise ValueError("Temperature T must be non-negative")
 
