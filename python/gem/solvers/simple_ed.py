@@ -17,12 +17,14 @@ from math import factorial
 from itertools import combinations
 
 # List of what can be passed via solver_params:
-# spin_pen : Coupling of (\hat{S})^2 to enforce spin singlet. Can be passed directly to solve_impurity()
+# spin_pen : Coupling of (\hat{S})^2 to enforce spin singlet
 # Sx_pen   : Coupling of (\hat{S}_x)^2 to unfavor magnetization in X direction
 # Sy_pen   : Coupling of (\hat{S}_y)^2 to unfavor magnetization in Y direction
 # Sz_pen   : Coupling of (\hat{S}_z)^2 to unfavor magnetization in Z direction
 # which    : Parameter of scipy.sparse.linalg
 # tol      : Parameter of scipy.sparse.linalg
+# num_eig  : Number of eigenvalues to compute. If absent (or None), the ground
+#            state only at T=0 and the full spectrum at T>0.
 
 class SimpleED(object):
     '''
@@ -165,16 +167,27 @@ class SimpleED(object):
         if debug:
             return self.Ham_list
 
-    def solve_Hemb(self, num_eig=1, which=None, tol=None, verbose=0, T=0.0):
-        '''Diagonalise each sector and build the global (thermal) partition function.'''
+    def solve_Hemb(self, num_eig=None, which=None, tol=None, verbose=0, T=0.0):
+        '''Diagonalise each sector and build the global (thermal) partition function.
+
+        :param num_eig: int, optional. Number of eigenvalues to compute. Read
+            from solver_params when not given; if it is None there too, only
+            the ground state is computed at T=0 while at T>0 the full
+            Hamiltonian of each sector is diagonalised.
+        '''
         if T > 0.0 and ((self.use_Ntot and self.N_sector is not None) or
                          (self.use_Sz   and self.Sz_sector is not None)):
             warnings.warn(
                 "A restricted symmetry sector is selected: the partition "
                 "function may be incomplete at T>0.")
 
-        which = self.solver_params.get('which', 'SA') if which is None else which
-        tol   = self.solver_params.get('tol',   1e-8) if tol   is None else tol
+        which   = self.solver_params.get('which', 'SA') if which is None else which
+        tol     = self.solver_params.get('tol',   1e-8) if tol   is None else tol
+        num_eig = self.solver_params.get('num_eig') if num_eig is None else num_eig
+
+        # num_eig still unset: ground state only at T=0, full spectrum at T>0
+        full_diag = (num_eig is None) and (T > 0.0)
+        k_eig     = 1 if num_eig is None else num_eig
 
         # diagonalise every sector
         self.evals_list = []
@@ -183,11 +196,11 @@ class SimpleED(object):
         for s, Ham_s in enumerate(self.Ham_list):
             hsize_s = self.hsize_list[s]
             if(verbose > 0): print(f'Sector {s}: diagonalising (dim={hsize_s})')
-            if hsize_s < 4000:
+            if hsize_s < 4000 or full_diag:
                 vals, vecs = eigh(Ham_s.toarray())
             else:
                 v0 = self.prev_gs_list[s] if T == 0.0 else None
-                vals, vecs = eigsh(Ham_s, k=num_eig, which=which, tol=tol, v0=v0)
+                vals, vecs = eigsh(Ham_s, k=k_eig, which=which, tol=tol, v0=v0)
             so = vals.argsort()
             self.evals_list.append(vals[so])
             self.evecs_list.append(vecs[:, so])

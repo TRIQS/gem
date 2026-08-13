@@ -36,26 +36,25 @@ class SolverTemplate(object):
                    Lambdac, # MANDATORY: the bath one-body term
                    V2E, # MANDATORY: the two-body interaction in the impurity
                    verbose=0, # MANDATORY: verbose level
-                   spin_pen=0, sz_pen=0, sx_pen=0, sy_pen=0 # eventually penalty terms to enforce symmetries
                    ):
         '''
         Construct the embedded Hamiltonian.
+
+        Solver-specific parameters are read from self.solver_params with sensible defaults,
+        e.g.: my_param = self.solver_params.get('my_param', default_value).
+        This includes the penalty terms used to enforce symmetries ('spin_pen', 'sz_pen',
+        'sx_pen', 'sy_pen' in SimpleED): Fragment.solve_impurity does not pass them.
 
         :param D:           array. D matrix.
         :param eloc:        array. Local part of the Hamiltonian.
         :param Lambdac:     array. Lambda_c matrix.
         :param V2E:         array. Two-body interaction of the impurity (Fragment).
         :param verbose:     int. Level of verbosity (default 0).
-        :param spin_pen:    float. Penalty for states with non-zero <S^2> (default 0).
-        :param sz_pen:      float. Penalty for states with non-zero <S_z^2> (default 0).
-        :param sx_pen:      float. Penalty for states with non-zero <S_x^2> (default 0).
-        :param sy_pen:      float. Penalty for states with non-zero <S_y^2> (default 0).
         '''
         print("build_Hemb not implemented yet")
 
 
     def solve_Hemb(self,
-                   num_eig=1, # MANDATORY: number of eigenvalues to compute
                    verbose=1, # MANDATORY: verbose level
                    tol=1e-8,  # MANDATORY: tolerance for convergence
                    T=0.0 # MANDATORY: inverse temperature
@@ -64,8 +63,9 @@ class SolverTemplate(object):
         Solve the embedded Hamiltonian. Either for the ground state or also some excited states, if not all.
         Solver-specific parameters are read from self.solver_params with sensible defaults,
         e.g.: my_param = self.solver_params.get('my_param', default_value).
+        This includes how many eigenvectors to solve for ('num_eig' in SimpleED):
+        Fragment.solve_impurity does not pass it.
 
-        :param num_eig:     int. Number of eigenvectors to solve for, starting from the lower energy (default 1 for ground states)..
         :param verbose:     int. Level of verbosity (default 1).
         :param tol:         float. Tolerance for convergence (default 1e-8).
         :param T:           float. Electronic temperature (default 0 for ground states).
