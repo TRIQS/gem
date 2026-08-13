@@ -16,6 +16,8 @@ import h5py
 from math import factorial
 from itertools import combinations
 
+from .gem_solver import gemSolver
+
 # List of what can be passed via solver_params:
 # spin_pen : Coupling of (\hat{S})^2 to enforce spin singlet
 # Sx_pen   : Coupling of (\hat{S}_x)^2 to unfavor magnetization in X direction
@@ -26,7 +28,7 @@ from itertools import combinations
 # num_eig  : Number of eigenvalues to compute. If absent (or None), the ground
 #            state only at T=0 and the full spectrum at T>0.
 
-class SimpleED(object):
+class SimpleED(gemSolver):
     '''
     Simple exact diagonalization solver for a general embedding Hamiltonian.
 
@@ -66,8 +68,7 @@ class SimpleED(object):
         if kwargs:
             raise TypeError(f"Unexpected keyword arguments: {list(kwargs.keys())}")
 
-        self.type = "SimpleED"
-        self.solver_params = solver_params if solver_params is not None else {}
+        super().__init__(solver_params=solver_params, solver_type="SimpleED")
         self.norb      = norb
         self.use_Ntot  = use_Ntot
         self.use_Sz    = use_Sz

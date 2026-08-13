@@ -4,9 +4,12 @@
 # Email:  samuele.giuli@gmail.com
 ###########################################
 
+import warnings
+
 import numpy as np
 from .utilities import Hermitian_list, funcMat, denR, calc_Lambda, calc_Lambda_c
 from .delta_fit import update_self_energy_thermal_penalty, update_hybridization_thermal_penalty
+from .solvers.gem_solver import gemSolver
 
 
 class Fragment():
@@ -65,6 +68,16 @@ class Fragment():
         self.Utensor = Utensor.copy()
 
         #CHECK THE SOLVER CLASS
+        if not isinstance(solver, gemSolver):
+            raise TypeError(
+                f"solver must be a gemSolver, got {type(solver)}. Every GEM solver "
+                "must inherit from gem.solvers.gem_solver.gemSolver, see "
+                "gem.solvers.solver_template.SolverTemplate for a skeleton.")
+        missing = solver.missing_methods()
+        if missing:
+            warnings.warn(
+                f"The solver {solver.type} does not implement {', '.join(missing)}: "
+                "solve_impurity will fail.")
         self.solver = solver
 
         #Self-energy parameters
@@ -230,7 +243,7 @@ class Fragment():
         Return:
           E: float. Energy of the fragment.
         '''
-        self.E1loc = self.solver.compute_E1loc()
+        self.E1loc = self.solver.compute_E1loc(self.nimp)
         self.E2loc = self.solver.compute_E2loc()
         E = self.E1loc + self.E2loc
         return E

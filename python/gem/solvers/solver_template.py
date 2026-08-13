@@ -5,40 +5,46 @@
 #######################################################
 import numpy as np
 
-class SolverTemplate(object):
+from .gem_solver import gemSolver
+
+class SolverTemplate(gemSolver): # MANDATORY: every GEM solver inherits from gemSolver
     '''
     Generic Solver class. The aim of this object that, given a general impurity Hamiltonian, it should be able to solve it an return the density matrix.
+
+    Only what appears below is used by the Fragment: the methods marked MANDATORY,
+    plus the gs_ene and Zpart attributes set by solve_Hemb. Everything else
+    (dimensions, symmetry sectors, whether the calculation is thermal, bond
+    dimensions, ...) is solver-specific: it is decided here, at initialization,
+    or read from self.solver_params, and the Fragment never sets it.
     '''
     def __init__(self,
-                 norb,
-                 use_Ntot=False,
-                 use_Sz=False, # eventually flags to use symmetries
-                 thermal=False, # flag to indicate if the calculations is thermal or not
-                 solver_params=None, # dict of solver-specific parameters; keys depend on the solver
+                 norb, # SOLVER-SPECIFIC: dimensions, symmetry flags, ... are decided here, the Fragment does not pass them
+                 solver_params=None, # MANDATORY: dict of solver-specific parameters; keys depend on the solver
                  ):
         '''
         Initialization of the Solver object.
+        The signature is free: only the caller who builds the solver sees it,
+        not the Fragment.
 
         :param norb:            int. Number of orbitals. Defines the dimensions of the Hamiltonian.
-        :param use_Ntot:        bool. Whether or not the number of fermions is conserved (default False).
-        :param use_Sz:          bool. Whether or not the Sz symmetry is enforced (default False).
-        :param thermal:         bool. Flag to indicate whether the calculation is thermal or not.
         :param solver_params:   dict. Solver-specific parameters. Keys depend on the solver.
         '''
         #things that re relevant for the solver
-        self.type = "SolverTemplate"
-        self.solver_params = solver_params if solver_params is not None else {}
+        # MANDATORY: sets self.type and self.solver_params (a copy of the dict above)
+        super().__init__(solver_params=solver_params, solver_type="SolverTemplate")
+        self.norb = norb
 
 
     def build_Hemb(self,
                    D, # MANDATORY: the hybridization matrix
-                   eloc, # MANDATORY: the impurity one-body term
+                   eloc, # MANDATORY: the impurity one-body term, already containing -mu
                    Lambdac, # MANDATORY: the bath one-body term
                    V2E, # MANDATORY: the two-body interaction in the impurity
-                   verbose=0, # MANDATORY: verbose level
+                   verbose=0, # SOLVER-SPECIFIC: the Fragment calls build_Hemb with the four arguments above only
                    ):
         '''
         Construct the embedded Hamiltonian.
+        The four matrices are the only things the Fragment passes, positionally.
 
         Solver-specific parameters are read from self.solver_params with sensible defaults,
         e.g.: my_param = self.solver_params.get('my_param', default_value).
@@ -56,18 +62,19 @@ class SolverTemplate(object):
 
     def solve_Hemb(self,
                    verbose=1, # MANDATORY: verbose level
-                   tol=1e-8,  # MANDATORY: tolerance for convergence
-                   T=0.0 # MANDATORY: inverse temperature
+                   T=0.0 # MANDATORY: electronic temperature
                    ):
         '''
         Solve the embedded Hamiltonian. Either for the ground state or also some excited states, if not all.
+        These two keyword arguments are the only ones the Fragment passes.
+
         Solver-specific parameters are read from self.solver_params with sensible defaults,
         e.g.: my_param = self.solver_params.get('my_param', default_value).
-        This includes how many eigenvectors to solve for ('num_eig' in SimpleED):
-        Fragment.solve_impurity does not pass it.
+        This includes how many eigenvectors to solve for ('num_eig' in SimpleED)
+        and the tolerance of the diagonalization ('tol'): Fragment.solve_impurity
+        does not pass them.
 
         :param verbose:     int. Level of verbosity (default 1).
-        :param tol:         float. Tolerance for convergence (default 1e-8).
         :param T:           float. Electronic temperature (default 0 for ground states).
         '''
         self.gs_ene = None # MANDATORY: ground state energy
@@ -79,7 +86,7 @@ class SolverTemplate(object):
 
     def calc_density_matrix(self):
         '''
-        Compute the denstiy matrix.
+        Compute the denstiy matrix. Takes no argument.
 
         Return:
           denmat: numpy.array. Densty matrix, <c^\dagger_i c_j>, of the system (impurity+bath).
@@ -89,43 +96,57 @@ class SolverTemplate(object):
         return denMat
 
 
-    def compute_E1loc(self,eloc,mu=0.0):
+    def compute_E1loc(self,
+                      nimp, # number of impurity spin-orbital levels
+                      ):
         '''
         Compute the local one-body energy E1loc = Tr[eloc * denmat_impurity].
+        The one-body Hamiltonian is the one stored by build_Hemb, so it already
+        contains eloc - mu.
+        OPTIONAL: only needed by Fragment.compute_energy.
 
-        :param eloc:    array. Local part of the Hamiltonian.
-        :param mu:      float. Chemical potential (default 0).
+        :param nimp:    int. Number of impurity spin-orbital levels.
 
         Return:
           E1loc: float. Local one-body energy.
         '''
         # THIS IS A POSSIBLE IMPLEMENTATION GIVEN THE DENSITY MATRIX AND THE LOCAL ONE-BODY HAMILTONIAN
         denMat = self.calc_density_matrix()
-        E1loc = np.trace((eloc - mu * np.eye(self.nimp)).dot(denMat[:self.nimp,:self.nimp].T))
+        E1loc = np.trace(self.h1e[:nimp,:nimp].dot(denMat[:nimp,:nimp].T))
         return E1loc
 
-    def compute_E2loc(self,eloc,D,Lambdac,mu=0.0):
+    def compute_E2loc(self):
         '''
-        Compute the local energy, including local one- and two-body terms from a given set of thermal states.
+        Compute the local two-body energy from a given set of thermal states.
         Works also at zero temperature for ground states.
-
-        :param eloc:    array. Local part of the Hamiltonian.
-        :param D:       array. D matrix.
-        :param Lambdac: array. Lambda_c matrix.
-        :param mu:      float. Chemical potential (default 0).
+        Takes no argument: eloc, D and Lambda_c are the ones stored by build_Hemb.
 
         Return:
-          Eloc: float. Total local energy.
+          E2loc: float. Local two-body energy.
         '''
         print("compute_E2loc not implemented yet")
         #HERE IS A POSSIBLE IMPLEMENTATION GIVEN THE DENSITY MATRIX, THE ONE-BODY HAMILTONIAN AND THE GROUND STATE ENERGY
+        #N.B. it only holds for the ground state: at T>0 the two-body term has to be
+        #averaged over the thermal states, as SimpleED.compute_E2loc does.
         denMat = self.calc_density_matrix()
-        E1tot = 0.0
-        E1tot+=np.trace((eloc - mu * np.eye(self.nimp)).dot(denMat[:self.nimp,:self.nimp].T)) #eloc part
-        E1tot+=np.trace(Lambdac.dot(denMat[self.nimp:,:self.nimp].T)) #bath part
-        E1tot+=np.trace(D.dot(denMat[self.nimp:,self.nimp:].T)) #hybridization part
-        E1tot+=np.trace(D.T.conjg().dot(denMat[:self.nimp,self.nimp:].T)) #hybridization part
+        E1tot = np.trace(self.h1e.dot(denMat.T)) #eloc - mu, Lambda_c and D blocks at once
         E2loc = self.gs_ene - E1tot
         return E2loc
+
+    def calc_double_occ(self,
+                        i, # index of the impurity level
+                        ):
+        '''
+        Compute the double occupancy <n_up n_dn> of the impurity level i.
+        OPTIONAL: only needed by Gdmft.run.
+
+        :param i:   int. Index of the impurity level.
+
+        Return:
+          docc: float. Double occupancy of the impurity level i.
+        '''
+        print("calc_double_occ not implemented yet")
+        docc = None
+        return docc
 
 
