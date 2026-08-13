@@ -8,7 +8,8 @@ The :class:`~gem.fragment.Fragment` class represents the locally correlated spac
 The :class:`~gem.lattice.Lattice` class represents the lattice, takes care of the Brillouin-zone integration, and makes the fragments talk to each other.
 
 The software provides a collection of impurity solvers, which are organised in the :mod:`gem.solvers` subpackage.
-Each solver implements the common interface defined in :mod:`gem.solvers.solver_template`, which allows them to be used interchangeably within the self-consistency loop.
+Every solver inherits from :class:`~gem.solvers.gem_solver.gemSolver` and implements the common interface documented in :mod:`gem.solvers.solver_template`, which allows them to be used interchangeably within the self-consistency loop.
+:class:`~gem.fragment.Fragment` checks that the solver it is given is a :class:`~gem.solvers.gem_solver.gemSolver`.
 
 Say something about the gdmft object too?
 
@@ -85,8 +86,11 @@ Solvers
 
 
 The :mod:`gem.solvers` subpackage collects all supported impurity solvers.
-Each solver implements the common interface defined in
-:mod:`gem.solvers.solver_template`.
+Each solver inherits from :class:`~gem.solvers.gem_solver.gemSolver` and
+implements the common interface documented in
+:mod:`gem.solvers.solver_template`. Solver-specific parameters are never passed
+by the :class:`~gem.fragment.Fragment`: they are given once, as the
+``solver_params`` dictionary, when the solver is built.
 
 Available solvers:
 
