@@ -30,6 +30,8 @@ from .gem_solver import gemSolver
 # dense_cutoff : Sectors smaller than this are diagonalized fully with
 #            scipy.linalg.eigh, the larger ones with scipy.sparse.linalg.eigsh
 #            (default 4000).
+# bw_cutoff : Smallest Boltzmann weight kept in the partition function at T>0
+#            (default 1e-8).
 
 class SimpleED(gemSolver):
     '''
@@ -172,7 +174,7 @@ class SimpleED(gemSolver):
             return self.Ham_list
 
     def solve_Hemb(self, num_eig=None, which=None, tol=None, dense_cutoff=None,
-                   verbose=0, T=0.0):
+                   bw_cutoff=None, verbose=0, T=0.0):
         '''Diagonalise each sector and build the global (thermal) partition function.
 
         :param num_eig: int, optional. Number of eigenvalues to compute. Read
@@ -182,6 +184,10 @@ class SimpleED(gemSolver):
         :param dense_cutoff: int, optional. Sectors of dimension smaller than
             this are diagonalised fully (eigh), the larger ones partially
             (eigsh). Read from solver_params when not given, default 4000.
+        :param bw_cutoff: float, optional. At T>0, states whose Boltzmann weight
+            exp(-beta*(E-gs_ene)) falls below this are dropped from the
+            partition function. Read from solver_params when not given,
+            default 1e-8.
         '''
         if T > 0.0 and ((self.use_Ntot and self.N_sector is not None) or
                          (self.use_Sz   and self.Sz_sector is not None)):
@@ -194,6 +200,8 @@ class SimpleED(gemSolver):
         num_eig = self.solver_params.get('num_eig') if num_eig is None else num_eig
         dense_cutoff = (self.solver_params.get('dense_cutoff', 4000)
                         if dense_cutoff is None else dense_cutoff)
+        bw_cutoff    = (self.solver_params.get('bw_cutoff', 1e-8)
+                        if bw_cutoff is None else bw_cutoff)
 
         # num_eig still unset: ground state only at T=0, full spectrum at T>0
         full_diag = (num_eig is None) and (T > 0.0)
@@ -231,7 +239,7 @@ class SimpleED(gemSolver):
                 bw_s = []
                 for eit in evals_s:
                     bw = float(np.exp(-beta * (eit - self.gs_ene)))
-                    if bw > 1e-8:
+                    if bw > bw_cutoff:
                         bw_s.append(bw)
                         self.Zpart   += bw
                         self.Tstates += 1
