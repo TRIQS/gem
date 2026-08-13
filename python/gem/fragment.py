@@ -113,14 +113,12 @@ class Fragment():
             print(self.Lambda_c)
         print("##### END OF FRAGMENT INITIALIZATION #####")
 
-    def solve_impurity(self, mu, T=0.0, num_eig=1, spin_pen=0.0):
+    def solve_impurity(self, mu, T=0.0):
         """
         Solve embedding problem using the solver from Fragment
 
         :param mu: float. Chemical potential.
         :param T: float, optional. Temperature (default: 0.0).
-        :param num_eig: int, optional. Number of eigenvalues to compute (default: 1).
-        :param spin_pen: float, optional. Penalty for spin singlet symmetry breaking (default: 0.0).
         """
         h1e = np.zeros((self.ntot,self.ntot), dtype=np.complex128)
         h1e[:self.nimp,:self.nimp] = self.eloc - mu*np.eye(self.nimp)
@@ -132,10 +130,10 @@ class Fragment():
             print(f"Solving embedding problem with solver  {self.solver.type}")
             print(" Temperature T =", T)
         
-        self.solver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor, spin_pen=spin_pen)
+        self.solver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor)
         
         if(T>=0.0):
-            self.solver.solve_Hemb(num_eig=num_eig, verbose=self.verb , T=T)
+            self.solver.solve_Hemb(verbose=self.verb , T=T)
         else:
             raise ValueError("Temperature T must be non-negative")
 

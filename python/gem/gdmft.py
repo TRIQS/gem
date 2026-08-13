@@ -56,7 +56,7 @@ class Gdmft(object):
                  wks=None, spin_sym=True, orb_sym=False,
                  soc=False, R=None, Lambda=None, D=None, Lambda_c=None,
                  edsolver=None, suff='',
-                 verbose=0,spin_pen=0):
+                 verbose=0):
         print("##### INITIALIZATON OF THE GRISB OBJECT (DMFT-like algorithm)#####")
         self.ntot = ntot
         self.nimp = nimp
@@ -71,7 +71,6 @@ class Gdmft(object):
         self.gs_wf = None
         self.suff = suff    # Suffixe for file writting when many cpu at same time
         self.verb = verbose
-        self.spin_pen = spin_pen
 
 
         if edsolver is None:
@@ -104,7 +103,7 @@ class Gdmft(object):
 
 # THIS FOR TEMP
     def run(self, mu=0.0, itmax=200, mix=0.5, tol=1e-6, T=1e-3, n_target=None, n_tolerance=1e-3,
-            silence=True, spin_pen=0.0, sz_pen=0.0, idx=0, num_eig=2, ed_verbose=0, n_fit_method='qp'):
+            silence=True, idx=0, ed_verbose=0, n_fit_method='qp'):
 
         print("mu = ", mu)
         self.T = T
@@ -137,7 +136,7 @@ class Gdmft(object):
                     print(self.Fragment.Lambda_c[:,:])
 
             # ED solvers
-            self.Fragment.solve_impurity(self.mu, T=T, num_eig=1, spin_pen=self.spin_pen)
+            self.Fragment.solve_impurity(self.mu, T=T)
 
             #Update R and Update Lambda
             self.nfill = np.trace(self.Fragment.denMat[:self.nimp,:self.nimp])
@@ -151,7 +150,7 @@ class Gdmft(object):
                 mu_new = self.Lattice.fit_mu( n_target, [self.Fragment], T=T, mode=n_fit_method, mu_old=self.mu, ntol=n_tolerance )
                 if(not mu_new is None):
                     self.mu = mu_new
-                    self.Fragment.solve_impurity(self.mu, T=T, num_eig=1, spin_pen=self.spin_pen)
+                    self.Fragment.solve_impurity(self.mu, T=T)
 
             Lambda_old = self.Fragment.Lambda.copy()
             R_old = self.Fragment.R.copy()

@@ -203,7 +203,7 @@ class Lattice():
 
 
 
-    def fit_mu_fragment(self, n_target, Fragments_list, T=1e-2, nsteps=10, dmu0=1e-2, ntol=1e-4, mu_old=0.0, spin_pen=0.0):
+    def fit_mu_fragment(self, n_target, Fragments_list, T=1e-2, nsteps=10, dmu0=1e-2, ntol=1e-4, mu_old=0.0):
         """
         Procedure to fit the chemical potential from the fragment problem.
 
@@ -214,7 +214,6 @@ class Lattice():
         :param dmu0: float, optional. Initial step size for chemical potential adjustment (default: 1e-2).
         :param ntol: float, optional. Tolerance on the filling for convergence (default: 1e-4).
         :param mu_old: float, optional. Previous chemical potential, to help the search (default: 0.0).
-        :param spin_pen: float, optional. Penalty for spin polarization (default: 0.0).
         """
         if not isinstance(Fragments_list, list) or not all(isinstance(F, Fragment) for F in Fragments_list):
             raise TypeError(f"Fragments_list must be a list of Fragment objects")
@@ -226,7 +225,7 @@ class Lattice():
         mu_n = mu_o + dmu
         for _ in range(nsteps):
             for F in Fragments_list:
-                F.solve_impurity(mu_n, num_eig=1, T=Tuse, spin_pen=spin_pen)
+                F.solve_impurity(mu_n, T=Tuse)
             nfill_new = sum(F.nfill for F in Fragments_list)
 
             if abs(nfill_new - n_target) < ntol:
