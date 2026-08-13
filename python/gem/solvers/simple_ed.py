@@ -27,6 +27,9 @@ from .gem_solver import gemSolver
 # tol      : Parameter of scipy.sparse.linalg
 # num_eig  : Number of eigenvalues to compute. If absent (or None), the ground
 #            state only at T=0 and the full spectrum at T>0.
+# dense_cutoff : Sectors smaller than this are diagonalized fully with
+#            scipy.linalg.eigh, the larger ones with scipy.sparse.linalg.eigsh
+#            (default 4000).
 
 class SimpleED(gemSolver):
     '''
@@ -168,13 +171,17 @@ class SimpleED(gemSolver):
         if debug:
             return self.Ham_list
 
-    def solve_Hemb(self, num_eig=None, which=None, tol=None, verbose=0, T=0.0):
+    def solve_Hemb(self, num_eig=None, which=None, tol=None, dense_cutoff=None,
+                   verbose=0, T=0.0):
         '''Diagonalise each sector and build the global (thermal) partition function.
 
         :param num_eig: int, optional. Number of eigenvalues to compute. Read
             from solver_params when not given; if it is None there too, only
             the ground state is computed at T=0 while at T>0 the full
             Hamiltonian of each sector is diagonalised.
+        :param dense_cutoff: int, optional. Sectors of dimension smaller than
+            this are diagonalised fully (eigh), the larger ones partially
+            (eigsh). Read from solver_params when not given, default 4000.
         '''
         if T > 0.0 and ((self.use_Ntot and self.N_sector is not None) or
                          (self.use_Sz   and self.Sz_sector is not None)):
@@ -185,6 +192,8 @@ class SimpleED(gemSolver):
         which   = self.solver_params.get('which', 'SA') if which is None else which
         tol     = self.solver_params.get('tol',   1e-8) if tol   is None else tol
         num_eig = self.solver_params.get('num_eig') if num_eig is None else num_eig
+        dense_cutoff = (self.solver_params.get('dense_cutoff', 4000)
+                        if dense_cutoff is None else dense_cutoff)
 
         # num_eig still unset: ground state only at T=0, full spectrum at T>0
         full_diag = (num_eig is None) and (T > 0.0)
@@ -197,7 +206,7 @@ class SimpleED(gemSolver):
         for s, Ham_s in enumerate(self.Ham_list):
             hsize_s = self.hsize_list[s]
             if(verbose > 0): print(f'Sector {s}: diagonalising (dim={hsize_s})')
-            if hsize_s < 4000 or full_diag:
+            if hsize_s < dense_cutoff or full_diag:
                 vals, vecs = eigh(Ham_s.toarray())
             else:
                 v0 = self.prev_gs_list[s] if T == 0.0 else None
