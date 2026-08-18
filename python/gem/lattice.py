@@ -148,7 +148,7 @@ class Lattice():
         elif m in ('imp', 'impurity', 'frag', 'fragment'):
             return self.fit_mu_fragment( n_target, Fragments_list, T=T, mu_old=mu_old, ntol=ntol )
 
-    def fit_mu_quasiparticle(self, n_target, Fragments_list, T=1e-2, mu_old=0.0, ntol=1e-4):
+    def fit_mu_quasiparticle(self, n_target, Fragments_list, T=0.0, mu_old=0.0, ntol=1e-4):
         """
         Procedure to fit the chemical potential from the quasiparticle problem.
 
@@ -161,7 +161,6 @@ class Lattice():
         if not isinstance(Fragments_list, list) or not all(isinstance(F, Fragment) for F in Fragments_list):
             raise TypeError(f"Fragments_list must be a list of Fragment objects")
         if T < 0.0: raise ValueError("Temperature T must be non-negative")
-        Tuse=np.maximum(1e-2,T) # TO BE SOLVED
         nimp_tot = sum(F.nimp for F in Fragments_list)
         nbath_tot = sum(F.nbath for F in Fragments_list)
 
@@ -184,7 +183,7 @@ class Lattice():
         nqp_target = 0.5*(nbath_tot-nimp_tot) + n_target
         try:
             def residual(mu):
-                return qp_density(mu, Tuse, self.Ltot, self.Rtot, self.eks, self.wks) - nqp_target
+                return qp_density(mu, T, self.Ltot, self.Rtot, self.eks, self.wks) - nqp_target
 
             a, b = -10.0, 10.0
             for _ in range(200):
@@ -218,14 +217,13 @@ class Lattice():
         if not isinstance(Fragments_list, list) or not all(isinstance(F, Fragment) for F in Fragments_list):
             raise TypeError(f"Fragments_list must be a list of Fragment objects")
         if T < 0.0: raise ValueError("Temperature T must be non-negative")
-        Tuse=np.maximum(1e-2,T) #TO BE SOLVED
         nfill_old = sum(F.nfill for F in Fragments_list)
         dmu = dmu0 * np.sign(nfill_old - n_target)
         mu_o = mu_old
         mu_n = mu_o + dmu
         for _ in range(nsteps):
             for F in Fragments_list:
-                F.solve_impurity(mu_n, T=Tuse)
+                F.solve_impurity(mu_n, T=T)
             nfill_new = sum(F.nfill for F in Fragments_list)
 
             if abs(nfill_new - n_target) < ntol:
