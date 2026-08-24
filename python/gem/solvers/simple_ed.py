@@ -134,16 +134,16 @@ class SimpleED(gemSolver):
                 "A spin penalty had been passed. Remember to use this ONLY from T=0 calculations," \
                 "otherwise the boltzmann weights will be wrong at T>0.")
 
-        print('build one-body')
+        if(verbose >1): print('build one-body')
         self.build_h1e(eloc, D, Lambdac, mu, verbose=verbose)
 
         # rebuild two-body only when V2E changes (shared across sectors)
         rebuild_two = (self.Htwo_list[0] is None) or np.any(V2E != self.V2E)
         if rebuild_two:
-            if(verbose > 0): print('build two-body')
+            if(verbose > 1): print('build two-body')
             self.V2E = V2E.copy()
 
-        if(verbose > 0): print('one-body + two-body')
+        if(verbose > 1): print('one-body + two-body')
         self.Ham_list = []
         for s in range(len(self.sectors)):
             basis_s     = self.basis_list[s]
@@ -247,7 +247,7 @@ class SimpleED(gemSolver):
                         break   # eigenvalues are sorted; remaining are smaller
                 self.bw_per_sector.append(bw_s)
         else:
-            print('Building GS partition function across sectors')
+            if( verbose > 0 ):print('Building GS partition function across sectors')
             for evals_s in self.evals_list:
                 bw_s = []
                 for eit in evals_s:
