@@ -202,43 +202,109 @@ class Lattice():
 
 
 
-    def fit_mu_fragment(self, n_target, Fragments_list, T=1e-2, nsteps=10, dmu0=1e-2, ntol=1e-4, mu_old=0.0):
+    def fit_mu_fragment(self, n_target, Fragments_list, T=1e-2, nsteps=30, dmu0=1e-1,
+                        ntol=1e-4, mu_old=0.0, max_expand=60, mu_tol=1e-8):
         """
         Procedure to fit the chemical potential from the fragment problem.
 
+        In an incompressible region n(mu) is flat at the target over a whole
+        interval of mu, so the constraint does not determine mu uniquely.
+        The first mu found within the given tolerance is returned.
+
+        On return the fragments are left solved at the returned mu (at the
+        requested T), so the caller need not re-solve them.
+
         :param n_target: float. Target filling.
         :param Fragments_list: List of Fragment objects that contain the self-energies.
-        :param T: float, optional. Electronic temperature (default: 0.0).
-        :param nsteps: int, optional. Maximum number of steps for fitting (default: 10).
-        :param dmu0: float, optional. Initial step size for chemical potential adjustment (default: 1e-2).
+        :param T: float, optional. Electronic temperature (default: 1e-2).
+        :param nsteps: int, optional. Maximum number of refinement steps (default: 30).
+        :param dmu0: float, optional. Initial bracket half-width, doubled while
+            expanding (default: 1e-1).
         :param ntol: float, optional. Tolerance on the filling for convergence (default: 1e-4).
-        :param mu_old: float, optional. Previous chemical potential, to help the search (default: 0.0).
+        :param mu_old: float, optional. Previous chemical potential, used as the
+            starting point of the bracket search (default: 0.0).
+        :param max_expand: int, optional. Maximum number of bracket expansions (default: 60).
+        :param mu_tol: float, optional. Stop once the bracket is this narrow (default: 1e-8).
+
+        Return:
+            mu: float. Chemical potential reproducing n_target, or the closest
+            bracket endpoint found if the target filling is unreachable.
         """
         if not isinstance(Fragments_list, list) or not all(isinstance(F, Fragment) for F in Fragments_list):
             raise TypeError(f"Fragments_list must be a list of Fragment objects")
         if T < 0.0: raise ValueError("Temperature T must be non-negative")
-        nfill_old = sum(F.nfill for F in Fragments_list)
-        dmu = dmu0 * np.sign(nfill_old - n_target)
-        mu_o = mu_old
-        mu_n = mu_o + dmu
-        for _ in range(nsteps):
+        if dmu0 <= 0.0: raise ValueError("dmu0 must be positive")
+
+        def dens(mu):
             for F in Fragments_list:
-                F.solve_impurity(mu_n, T=T)
-            nfill_new = sum(F.nfill for F in Fragments_list)
+                F.solve_impurity(mu, T=T)
+            return float(np.real(sum(F.nfill for F in Fragments_list)))
 
-            if abs(nfill_new - n_target) < ntol:
+        # --- start from mu_old; do not trust any cached nfill ---------------
+        mu_lo = mu_hi = float(mu_old)
+        n_lo = n_hi = dens(mu_lo)
+        if abs(n_lo - n_target) < ntol:
+            return mu_lo
+
+        # --- expand geometrically until the target is bracketed -------------
+        step = dmu0
+        bracketed = False
+        for _ in range(max_expand):
+            if n_hi < n_target:          # need more electrons -> raise mu
+                mu_lo, n_lo = mu_hi, n_hi
+                mu_hi += step
+                n_hi = dens(mu_hi)
+            else:                        # need fewer electrons -> lower mu
+                mu_hi, n_hi = mu_lo, n_lo
+                mu_lo -= step
+                n_lo = dens(mu_lo)
+            if abs(n_lo - n_target) < ntol:
+                return mu_lo
+            if abs(n_hi - n_target) < ntol:
+                return mu_hi
+            if n_lo <= n_target <= n_hi:
+                bracketed = True
                 break
+            step *= 2.0
 
-            dnfill = nfill_new - nfill_old
-            if abs(dnfill) > 1e-14:
-                mu_interp = mu_o + (mu_n - mu_o) * (n_target - nfill_old) / dnfill
+        if not bracketed:
+            # n_target is outside the reachable filling range: return the
+            # endpoint that gets closest and leave the fragments solved there.
+            warnings.warn(
+                f"fit_mu_fragment could not bracket n_target={n_target} "
+                f"(reached n({mu_lo})={n_lo}, n({mu_hi})={n_hi}); "
+                "returning the closest endpoint.")
+            mu_best = mu_lo if abs(n_lo - n_target) < abs(n_hi - n_target) else mu_hi
+            dens(mu_best)
+            return mu_best
+
+        # --- regula falsi, safeguarded by bisection -------------------------
+        mu = 0.5 * (mu_lo + mu_hi)
+        for _ in range(nsteps):
+            if mu_hi - mu_lo < mu_tol:
+                break
+            dn = n_hi - n_lo
+            if dn > 0.0:
+                mu = mu_lo + (n_target - n_lo) * (mu_hi - mu_lo) / dn
             else:
-                mu_interp = mu_n + dmu
+                mu = 0.5 * (mu_lo + mu_hi)
+            # never sit on (or outside) an endpoint: fall back to bisection
+            margin = 1e-3 * (mu_hi - mu_lo)
+            if not (mu_lo + margin < mu < mu_hi - margin):
+                mu = 0.5 * (mu_lo + mu_hi)
 
-            mu_o, nfill_old = mu_n, nfill_new
-            mu_n = mu_interp
+            n_mu = dens(mu)
+            if abs(n_mu - n_target) < ntol:
+                return mu
+            if n_mu < n_target:
+                mu_lo, n_lo = mu, n_mu
+            else:
+                mu_hi, n_hi = mu, n_mu
 
-        return mu_n
+        # make sure the fragments correspond to the mu we hand back
+        mu = 0.5 * (mu_lo + mu_hi)
+        dens(mu)
+        return mu
 
     def compute_ekin(self, Fragments_list, T, Tsmearing=0.0):
         """
