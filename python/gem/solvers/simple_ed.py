@@ -333,7 +333,7 @@ class SimpleED(gemSolver):
 
         if T > 0.0:
             beta = 1.0 / T
-            for evals_s in self.evals_list:
+            for s, evals_s in enumerate(self.evals_list):
                 bw_s = []
                 for eit in evals_s:
                     bw = float(np.exp(-beta * (eit - self.gs_ene)))
@@ -343,6 +343,9 @@ class SimpleED(gemSolver):
                         Tloc += 1
                     else:
                         break   # eigenvalues are sorted; remaining are smaller
+                if( (self.hsize_list[s]>dense_cutoff) and (len(bw_s)==k_eig) and (not full_diag) ):
+                    Nsec, Szsec = self.sectors[s]
+                    warnings.warn(f"WARNING: For sector (N,Sz)=({Nsec},{Szsec}) the number of thermal states is equal to the ARPACK cutoff. The last Boltzmann weight is: {bw_s[-1]}")
                 self.bw_per_sector.append(bw_s)
         else:
             if( verbose > 0 ):print(f'{self._tag()}Building GS partition function across sectors')
