@@ -449,7 +449,27 @@ class SimpleED(gemSolver):
             Sp += denmat_op[(2*i,   2*i+1)]
             Sm += denmat_op[(2*i+1, 2*i  )]
             Sz += 0.5*denmat_op[(2*i, 2*i)] - 0.5*denmat_op[(2*i+1, 2*i+1)]
-        S2 = Sm.dot(Sp) + Sz.dot(Sz) + Sz
+        # The separately projected Sp and Sm vanish in a fixed-Sz sector,
+        # but S_- S_+ generally does not: the intermediate state lies
+        # outside that sector. Multiplying the projected ladders is incorrect.
+        # S2 = Sm.dot(Sp) + Sz.dot(Sz) + Sz
+
+        # Instead use the exact many-body identity:
+        # S_- S_+ = sum_i n_{i,down}
+        #   - sum_ij (c^dagger_{i,down} c_{j,down})
+        #            (c^dagger_{j,up} c_{i,up}).
+        # Each bilinear preserves N and Sz, so projection before
+        # multiplication is safe. denmat_op stores these Fock-space
+        # operators, not their expectation values.
+        # i,j span impurity and bath orbitals; even/odd indices are up/down.
+        SmSp = csc_matrix((hsize, hsize), dtype=self.data_type)
+        for i in range(self.norb // 2):
+            SmSp += denmat_op[(2*i+1, 2*i+1)]
+            for j in range(self.norb // 2):
+                SmSp -= denmat_op[(2*i+1, 2*j+1)].dot(
+                    denmat_op[(2*j, 2*i)])
+
+        S2 = SmSp + Sz.dot(Sz) + Sz
         Sx = 0.5*(Sp + Sm)
         Sy = 0.5*(Sp - Sm) / 1j
         return S2, Sz, Sx, Sy
