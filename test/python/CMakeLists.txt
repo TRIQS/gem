@@ -19,6 +19,7 @@ set(all_tests
   test_delta_fit_LcD_random
   test_delta_fit_gradient
   test_delta_fit_packing
+  test_lattice_mpi
 )
 
 foreach(test ${all_tests})

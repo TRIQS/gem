@@ -18,44 +18,7 @@ from itertools import combinations
 
 from .gem_solver import gemSolver
 
-try:
-    # importing mpi4py calls MPI_Init; fall back to the serial path if it is
-    # not installed or the MPI runtime refuses to start
-    from mpi4py import MPI
-    _HAS_MPI = True
-except Exception:
-    MPI = None
-    _HAS_MPI = False
-
-
-class _SerialComm:
-    '''Minimal stand-in for an MPI communicator used when mpi4py is absent.
-
-    Every collective is the identity on a single rank, so the sector code below
-    needs no ``if self.mpi_size > 1`` branches.
-    '''
-    rank = 0
-    size = 1
-
-    def Get_rank(self):                     return 0
-    def Get_size(self):                     return 1
-    def allreduce(self, value, op=None):    return value
-    def allgather(self, value):             return [value]
-    def gather(self, value, root=0):        return [value]
-    def bcast(self, value, root=0):         return value
-    def Barrier(self):                      pass
-
-
-def _resolve_comm(comm, solver_params):
-    '''Pick the communicator: explicit one, else COMM_WORLD, else serial.'''
-    if comm is not None:
-        return comm
-    if solver_params.get('use_mpi', True) and _HAS_MPI:
-        return MPI.COMM_WORLD
-    return _SerialComm()
-
-
-_MPI_SUM = MPI.SUM if _HAS_MPI else None
+from ..mpi import MPI, MPI_SUM as _MPI_SUM, resolve_comm
 
 # List of what can be passed via solver_params:
 # spin_pen : Coupling of (\hat{S})^2 to enforce spin singlet
@@ -145,7 +108,7 @@ class SimpleED(gemSolver):
 
         # MPI: the sector list is global and identical on every rank, the work
         # on it is not
-        self.comm     = _resolve_comm(comm, self.solver_params)
+        self.comm     = resolve_comm(comm, self.solver_params.get('use_mpi', True))
         self.mpi_rank = self.comm.Get_rank()
         self.mpi_size = self.comm.Get_size()
 
