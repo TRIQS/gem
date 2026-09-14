@@ -449,7 +449,14 @@ class SimpleED(gemSolver):
             Sp += denmat_op[(2*i,   2*i+1)]
             Sm += denmat_op[(2*i+1, 2*i  )]
             Sz += 0.5*denmat_op[(2*i, 2*i)] - 0.5*denmat_op[(2*i+1, 2*i+1)]
-        S2 = Sm.dot(Sp) + Sz.dot(Sz) + Sz
+        SmSp = csc_matrix((hsize, hsize), dtype=self.data_type)
+        for i in range(self.norb // 2):
+            SmSp += denmat_op[(2*i+1, 2*i+1)]
+            for j in range(self.norb // 2):
+                SmSp -= denmat_op[(2*i+1, 2*j+1)].dot(
+                    denmat_op[(2*j, 2*i)])
+
+        S2 = SmSp + Sz.dot(Sz) + Sz
         Sx = 0.5*(Sp + Sm)
         Sy = 0.5*(Sp - Sm) / 1j
         return S2, Sz, Sx, Sy
