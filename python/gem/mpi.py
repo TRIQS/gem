@@ -3,20 +3,21 @@
 # Author: Samuele Giuli
 # Email:  samuele.giuli@gmail.com
 ###########################################
-'''Communicator resolution and reduction helpers shared by the solvers and the
-lattice.
+'''Communicator and reduction helpers.
 
 Both parallel layers (the sector distribution in ``SimpleED`` and the k-point
 distribution in ``Lattice``) resolve their communicator through
 :func:`resolve_comm`, so that a run without mpi4py, or one that opts out with
 ``use_mpi=False``, takes the same code path with a single-rank stand-in instead
 of branching on ``mpi_size``.
+Any externally developed solver can also use this to avoid
+an explicit dependency on mpi4p in the solver definition.
 '''
 import numpy as np
 
 try:
-    # importing mpi4py calls MPI_Init; fall back to the serial path if it is
-    # not installed or the MPI runtime refuses to start
+    # importing mpi4py calls MPI_Init; fall back to the serial
+    # if it is not installed
     from mpi4py import MPI
     HAS_MPI = True
 except Exception:
@@ -25,11 +26,7 @@ except Exception:
 
 
 class SerialComm:
-    '''Minimal stand-in for an MPI communicator used when mpi4py is absent.
-
-    Every collective is the identity on a single rank, so the callers need no
-    ``if self.mpi_size > 1`` branches.
-    '''
+    '''MPI communicator used when mpi4py is absent.'''
     rank = 0
     size = 1
 
@@ -63,7 +60,9 @@ def split_range(n, rank, size):
     '''Split ``range(n)`` into ``size`` contiguous near-equal blocks.
 
     Returns the ``[start, stop)`` half-open bounds of the block owned by
-    ``rank``. The first ``n % size`` blocks get one extra element, and blocks
+    the ``rank`` calling it.
+    
+    The first ``n % size`` blocks get one extra element, and blocks
     are empty when ``size > n``.
     '''
     base, rest = divmod(n, size)
@@ -85,7 +84,8 @@ def allreduce_array(comm, arr):
 
 
 def allreduce_scalar(comm, value):
-    '''Sum a python/numpy scalar over all ranks.'''
+    '''Sum a python/numpy scalar over all ranks.
+    Anything that is pickable and implements the sum operation.'''
     if comm.Get_size() == 1:
         return value
     return comm.allreduce(value, op=MPI_SUM)
