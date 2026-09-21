@@ -67,7 +67,7 @@ class Lattice():
         if(Tsmearing<0.0): raise ValueError("Temperature Tsmearing must be non-negative")
         if( T==0.0 and Tsmearing==0.0):
             warnings.warn("Both T and Tsmearing are zero in solve_qp. This may lead to numerical instabilities. Consider using a small T or Tsmearing.")
-        Tuse=np.maximum(T,Tsmearing)
+        Tuse=Tsmearing if T==0 else T
         self.Rtot = block_diag(*[F.R for F in Fragments_list])
         self.Ltot = block_diag(*[F.Lambda for F in Fragments_list])
 
@@ -143,7 +143,7 @@ class Lattice():
         if(Tsmearing<0.0): raise ValueError("Temperature Tsmearing must be non-negative")
         if( T==0.0 and Tsmearing==0.0):
             warnings.warn("Both T and Tsmearing are zero in solve_qp. This may lead to numerical instabilities. Consider using a small T or Tsmearing.")
-        Tuse=np.maximum(T,Tsmearing)
+        Tuse=Tsmearing if T==0 else T
         if m in ('qp', 'quasiparticle'):
             if(T<0.0 and Tsmearing==0.0):
                 warnings.warn("Both T and Tsmearing are zero in fit_mu_quasiparticle. This may lead to numerical instabilities. Consider using a small T or Tsmearing.")
@@ -323,7 +323,7 @@ class Lattice():
         if(Tsmearing<0.0): raise ValueError("Temperature Tsmearing must be non-negative")
         if( T==0.0 and Tsmearing==0.0):
             warnings.warn("Both T and Tsmearing are zero in compute_ekin. This may lead to numerical instabilities. Consider using a small T or Tsmearing.")
-        Tuse=np.maximum(T,Tsmearing)
+        Tuse=Tsmearing if T==0 else T
         nimp_tot = sum(F.nimp for F in Fragments_list)
         nbath_tot = sum(F.nbath for F in Fragments_list)
 
@@ -360,7 +360,7 @@ class Lattice():
         if(T==0.0 and Tsmearing==0.0):
             warnings.warn("Both T and Tsmearing are zero in compute_functional. This may lead to numerical instabilities. Consider using a small T or Tsmearing.")
         # If T=0.0, use a small T to compute the functional
-        Tuse=np.maximum(T,Tsmearing)
+        Tuse=Tsmearing if T==0 else T
         for F in Fragments_list:
             if F.solver is None:
                 raise ValueError("Fragment solver is not set")
