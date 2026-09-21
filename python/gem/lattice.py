@@ -67,7 +67,7 @@ class Lattice():
         if(Tsmearing<0.0): raise ValueError("Temperature Tsmearing must be non-negative")
         if( T==0.0 and Tsmearing==0.0):
             warnings.warn("Both T and Tsmearing are zero in solve_qp. This may lead to numerical instabilities. Consider using a small T or Tsmearing.")
-        Tuse=T+Tsmearing
+        Tuse=np.maximum(T,Tsmearing)
         self.Rtot = block_diag(*[F.R for F in Fragments_list])
         self.Ltot = block_diag(*[F.Lambda for F in Fragments_list])
 
@@ -141,10 +141,13 @@ class Lattice():
         m = mode.lower()
         if(T<0.0): raise ValueError("Temperature T must be non-negative")
         if(Tsmearing<0.0): raise ValueError("Temperature Tsmearing must be non-negative")
+        if( T==0.0 and Tsmearing==0.0):
+            warnings.warn("Both T and Tsmearing are zero in solve_qp. This may lead to numerical instabilities. Consider using a small T or Tsmearing.")
+        Tuse=np.maximum(T,Tsmearing)
         if m in ('qp', 'quasiparticle'):
             if(T<0.0 and Tsmearing==0.0):
                 warnings.warn("Both T and Tsmearing are zero in fit_mu_quasiparticle. This may lead to numerical instabilities. Consider using a small T or Tsmearing.")
-            return self.fit_mu_quasiparticle( n_target, Fragments_list, T=T+Tsmearing, mu_old=mu_old, ntol=ntol )
+            return self.fit_mu_quasiparticle( n_target, Fragments_list, T=Tuse, mu_old=mu_old, ntol=ntol )
         elif m in ('imp', 'impurity', 'frag', 'fragment'):
             return self.fit_mu_fragment( n_target, Fragments_list, T=T, mu_old=mu_old, ntol=ntol )
 
@@ -320,6 +323,7 @@ class Lattice():
         if(Tsmearing<0.0): raise ValueError("Temperature Tsmearing must be non-negative")
         if( T==0.0 and Tsmearing==0.0):
             warnings.warn("Both T and Tsmearing are zero in compute_ekin. This may lead to numerical instabilities. Consider using a small T or Tsmearing.")
+        Tuse=np.maximum(T,Tsmearing)
         nimp_tot = sum(F.nimp for F in Fragments_list)
         nbath_tot = sum(F.nbath for F in Fragments_list)
 
@@ -330,7 +334,6 @@ class Lattice():
         self.Ltot = block_diag(*[F.Lambda for F in Fragments_list])
 
         ekin = 0.0
-        Tuse=T+Tsmearing
         for ek,wk in zip(self.eks, self.wks):
             Hk_qp = self.Rtot @ ek @ self.Rtot.T.conj() + self.Ltot
             Dk = calc_nf(Hk_qp,Tuse).T
@@ -357,7 +360,7 @@ class Lattice():
         if(T==0.0 and Tsmearing==0.0):
             warnings.warn("Both T and Tsmearing are zero in compute_functional. This may lead to numerical instabilities. Consider using a small T or Tsmearing.")
         # If T=0.0, use a small T to compute the functional
-        Tuse=T+Tsmearing
+        Tuse=np.maximum(T,Tsmearing)
         for F in Fragments_list:
             if F.solver is None:
                 raise ValueError("Fragment solver is not set")
