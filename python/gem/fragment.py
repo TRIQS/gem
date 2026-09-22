@@ -31,14 +31,14 @@ class Fragment():
                  Lambda=None,R=None,Lambda_c=None,D=None,
                  verbose=0
                   ):
-        """  
+        """
         Initialize the Fragment class with the given parameters.
 
         :param nimp: int. Number of impurity spin-orbital levels.
         :param nbath: int. Number of bath spin-orbital levels.
         :param eloc: ndarray. Local one-body electronic Hamiltonian.
         :param Utensor: ndarray. Tensor of local electron-electron interactions.
-        :param solver: object. Solver for the impurity problem.    
+        :param solver: object. Solver for the impurity problem.
         :param Lambda: ndarray, optional. Self-energy parameters Lambda.
         :param R: ndarray, optional. Self-energy parameters R.
         :param Lambda_c: ndarray, optional. Hybridization parameters Lambda_c.
@@ -142,9 +142,9 @@ class Fragment():
         if(self.verb>0):
             print(f"Solving embedding problem with solver  {self.solver.type}")
             print(" Temperature T =", T)
-        
+
         self.solver.build_Hemb(self.D, self.eloc- mu*np.eye(self.nimp), self.Lambda_c, self.Utensor)
-        
+
         if(T>=0.0):
             self.solver.solve_Hemb(T=T, verbose=self.verb )
         else:
@@ -156,7 +156,7 @@ class Fragment():
         self.nfill  = np.trace( self.denMat[:self.nimp,:self.nimp] )
         self.E2loc  = self.solver.compute_E2loc()
 
-    def update_self_energy(self, T=0.0, move_pen=1e-6, use_Sz=False):
+    def update_self_energy(self, T=0.0, move_pen=1e-6, use_Sz=False, tol=1e-9):
         '''
         This function update the self-energy parameters Lambda and R
 
@@ -179,7 +179,7 @@ class Fragment():
                 L_new, R_new = update_self_energy_thermal_penalty(self.Lambda[spin::sstep,spin::sstep], self.R[spin::sstep,spin::sstep],
                                                                 self.Lambda_c[spin::sstep,spin::sstep], self.D[spin::sstep,spin::sstep],
                                                                 fdagf[spin::sstep,spin::sstep], cdagf[spin::sstep,spin::sstep],
-                                                                beta=1/T, alpha=move_pen, method="dF")
+                                                                beta=1/T, alpha=move_pen, method="dF", tol=tol)
                 L_s.append(L_new); R_s.append(R_new)
         elif T == 0.0:
             hlist = self.Hs_list if use_Sz else self.H_list
@@ -190,7 +190,7 @@ class Fragment():
                 L_s.append(L_new); R_s.append(R_new)
         else:
             raise ValueError("Temperature T must be non-negative")
-        
+
         self.R = np.kron( R_s[0], np.eye(sstep) )
         self.Lambda = np.kron( L_s[0], np.eye(sstep) )
         if(sstep==2):
@@ -198,7 +198,7 @@ class Fragment():
             self.Lambda[1::2,1::2] = L_s[1]
         return self.R, self.Lambda
 
-    def update_hybridization(self, T=0.0, move_pen=1e-6, use_Sz=False):
+    def update_hybridization(self, T=0.0, move_pen=1e-6, use_Sz=False, tol=1e-9):
         '''
         This function update the hybridization parameters Lambda_c and D
 
@@ -217,7 +217,7 @@ class Fragment():
                 Lc_new, D_new = update_hybridization_thermal_penalty(self.Lambda_c[spin::sstep,spin::sstep], self.D[spin::sstep,spin::sstep],
                                                                      self.Lambda[spin::sstep,spin::sstep], self.R[spin::sstep,spin::sstep],
                                                                      self.Delta_qp[spin::sstep,spin::sstep], self.ERD.T[spin::sstep,spin::sstep],
-                                                                     beta=1/T, alpha=move_pen, method="dF")
+                                                                     beta=1/T, alpha=move_pen, method="dF", tol=tol)
                 Lc_s.append(Lc_new); D_s.append(D_new)
         elif T == 0.0:
             hlist = self.Hs_list if use_Sz else self.H_list
@@ -228,14 +228,14 @@ class Fragment():
                 Lc_s.append(Lc_new); D_s.append(D_new)
         else:
             raise ValueError("Temperature T must be non-negative")
-        
+
         self.D = np.kron( D_s[0], np.eye(sstep) )
         self.Lambda_c = np.kron( Lc_s[0], np.eye(sstep) )
         if(sstep==2):
             self.D[1::2,1::2] = D_s[1]
             self.Lambda_c[1::2,1::2] = Lc_s[1]
         return self.D, self.Lambda_c
-    
+
     def compute_energy(self):
         '''
         Compute the energy contributions of the fragment using the density matrix and the Hamiltonian parameters.
@@ -247,7 +247,7 @@ class Fragment():
         self.E2loc = self.solver.compute_E2loc()
         E = self.E1loc + self.E2loc
         return E
-    
+
     def compute_self_energy(self, z, mu=0.0):
         """
         Compute the self-energy from the analytical formula.
@@ -260,9 +260,8 @@ class Fragment():
         I_nu = np.eye(nu, dtype=complex)
         Ainv = np.linalg.inv(z*I_m - self.Lambda)
         M = self.R.conj().T @ Ainv @ self.R
-        
-        return (z)*I_nu - np.linalg.inv(M) - self.eloc + mu*I_nu
 
+        return (z)*I_nu - np.linalg.inv(M) - self.eloc + mu*I_nu
 
     def compute_Z(self, mu=0.0, z0=0.0, h=1e-4):
         """
@@ -288,7 +287,7 @@ class Fragment():
         dSigma = (Sigma(z0 + h) - Sigma(z0 - h)) / (2*h)
 
         return np.linalg.inv(I_nu - dSigma)
-    
+
     ###### ROUTINES TO IMPOSE SYMMETRY #####
     def impose_spin_SU2_symmetry(self):
         """
@@ -318,5 +317,5 @@ class Fragment():
             Lambda_c_new += self.Lambda_c[idx_b, idx_b]
         self.R = np.kron(np.eye(n_orb), R_new)/n_orb
         self.Lambda = np.kron(np.eye(n_orb), Lambda_new)/n_orb
-        self.Lambda_c = np.kron(np.eye(n_orb), Lambda_c_new)/n_orb 
+        self.Lambda_c = np.kron(np.eye(n_orb), Lambda_c_new)/n_orb
         self.D = np.kron(np.eye(n_orb), D_new)/n_orb
