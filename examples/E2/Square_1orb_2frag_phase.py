@@ -5,8 +5,7 @@
 # allow for antiferromagnetic order. The dispersion is generated with
 # TRIQS's TBLattice class. One U per run: the temperature scan is stored
 # in the group U<U>_B<B> of the output file, so repeated runs at different
-# U accumulate in the same file. The critical temperatures and exponents
-# are extracted afterwards by fit_Tc.py.
+# U accumulate in the same file.
 ######################################################################
 
 import numpy as np
@@ -17,49 +16,31 @@ import h5py
 
 # Parameters that determine the physical dimensions
 # 1 orbital with 2 spins, B=3 bath per orbital, total 8
-B = 3
-nimp = 2
+nimp, B = 2, 3
 nbath = nimp * B
 ntot = nimp + nbath
 
 # Physical Parameters
-U = 0.8
+U, mu, t, bfield = 0.8, 0.4, 0.25, 1e-2
 T_list = np.linspace(0.0, 0.10, 51)
-mu = 0.0
-t = 0.25
-bfield = 1e-2 #small magnetic seed removed after few iterations
 
 # Self-consistency Parameters
-itmax = 200
-mix = 0.05
-tol = 1e-3
-move_pen = 1e-8
-# smearing used in the quasiparticle problem, needed because T_list starts at 0
-Tsmearing = 1e-3
+itmax, tol, mix, move_pen, Tsmearing = 200, 1e-3, 0.05, 1e-8, 1e-3
 # Output file
 h5_file = f'data_Square_1orb_2frag_B{B}_phase.h5'
-
 
 from triqs.lattice.tight_binding import TBLattice
 
 # Two-site (Neel) unit cell of the square lattice: A at (0,0), B at (1,0),
 # primitive vectors along the diagonals so that the two sublattices alternate.
-a1 = np.array([1.0,  1.0, 0.0])
-a2 = np.array([1.0, -1.0, 0.0])
-
+a1, a2 = np.array([1.0,  1.0, 0.0]), np.array([1.0, -1.0, 0.0])
 H_t = TBLattice(
     units=[a1, a2],
-    hoppings={
-        ( 0,  0): [[0.0, -t], [-t, 0.0]],
-        (-1, -1): [[0.0, -t], [0.0, 0.0]],
-        ( 1,  1): [[0.0, 0.0], [-t, 0.0]],
-        ( 0, -1): [[0.0, -t], [0.0, 0.0]],
-        ( 0,  1): [[0.0, 0.0], [-t, 0.0]],
-        (-1,  0): [[0.0, -t], [0.0, 0.0]],
-        ( 1,  0): [[0.0, 0.0], [-t, 0.0]],
-    },
-    orbital_positions=[(0.0, 0.0, 0.0), (1.0, 0.0, 0.0)],
-    orbital_names=['A', 'B'],
+    hoppings={( 0,  0): [[0, -t], [-t, 0]],
+              (-1, -1): [[0, -t], [ 0, 0]], ( 1,  1): [[0,  0], [-t, 0]],
+              ( 0, -1): [[0, -t], [ 0, 0]], ( 0,  1): [[0,  0], [-t, 0]],
+              (-1,  0): [[0, -t], [ 0, 0]], ( 1,  0): [[0,  0], [-t, 0]]},
+    orbital_positions=[(0, 0, 0), (1, 0, 0)], orbital_names=['A', 'B'],
 )
 
 # Build the k-grid
@@ -76,8 +57,6 @@ lattice = Lattice(eks)
 
 # Local Hamiltonian
 eloc = np.zeros((nimp, nimp))
-eloc[0, 0] = -U / 2.
-eloc[1, 1] = -U / 2.
 # Interaction tensor of the embedded space
 Utensor = np.zeros((nimp, nimp, nimp, nimp))
 Utensor[0, 0, 1, 1] = U
@@ -106,11 +85,6 @@ with h5py.File(h5_file, 'a') as _:  # 'a' append, 'w' write and delete previous
 mag_grid = np.zeros( (2,len(T_list)) )
 magA = 0.0; magB = 0.0
 
-nT = len(T_list)
-arr_R_A      = np.zeros((nT, nbath, nimp), dtype=np.complex128)
-arr_R_B      = np.zeros((nT, nbath, nimp), dtype=np.complex128)
-arr_Lambda_A = np.zeros((nT, nbath, nbath), dtype=np.complex128)
-arr_Lambda_B = np.zeros((nT, nbath, nbath), dtype=np.complex128)
 
 for iT, T in enumerate(T_list):
     print('--------------------------------------------------------')
@@ -155,9 +129,8 @@ for iT, T in enumerate(T_list):
         fragmentB.Lambda = (1 - mix) * fragmentB.Lambda + mix * Lambda_old_B
         fragmentB.R = (1 - mix) * fragmentB.R + mix * R_old_B
 
-        magA_old = magA
-        magB_old = magB
 
+        magA_old, magB_old = magA, magB
         magA = (fragmentA.denMat[0, 0].real - fragmentA.denMat[1, 1].real)
         magB = (fragmentB.denMat[0, 0].real - fragmentB.denMat[1, 1].real)
 
@@ -178,10 +151,6 @@ for iT, T in enumerate(T_list):
     magB = (fragmentB.denMat[0,0].real - fragmentB.denMat[1,1].real)
     mag_grid[0,iT] = magA; mag_grid[1,iT] = magB
 
-    arr_R_A[iT]      = fragmentA.R
-    arr_R_B[iT]      = fragmentB.R
-    arr_Lambda_A[iT] = fragmentA.Lambda
-    arr_Lambda_B[iT] = fragmentB.Lambda
 
     print('--------------------------------------------------------')
     print(f'GEM loop ended with U={U} and T={T}')
@@ -195,12 +164,5 @@ with h5py.File(h5_file, 'a') as h5f:
         del h5f[grp_name]
     grp = h5f.create_group(grp_name)
     grp.create_dataset('T_list',   data=T_list)
-    grp.create_dataset('R_A',      data=arr_R_A)
-    grp.create_dataset('R_B',      data=arr_R_B)
-    grp.create_dataset('Lambda_A', data=arr_Lambda_A)
-    grp.create_dataset('Lambda_B', data=arr_Lambda_B)
     grp.create_dataset('mag_grid',  data=mag_grid)
 print(f'Written U={U:.2f} to {h5_file}')
-
-# Post-processing (Tc and beta fits) lives in fit_Tc.py, which scans the
-# output file for all the U groups available at this B.
