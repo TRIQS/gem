@@ -25,9 +25,9 @@ from ..mpi import MPI, MPI_SUM as _MPI_SUM, resolve_comm
 
 # List of what can be passed via solver_params:
 # spin_pen : Coupling of (\hat{S})^2 to enforce spin singlet
-# Sx_pen   : Coupling of (\hat{S}_x)^2 to unfavor magnetization in X direction
-# Sy_pen   : Coupling of (\hat{S}_y)^2 to unfavor magnetization in Y direction
-# Sz_pen   : Coupling of (\hat{S}_z)^2 to unfavor magnetization in Z direction
+# sx_pen   : Coupling of (\hat{S}_x)^2 to unfavor magnetization in X direction
+# sy_pen   : Coupling of (\hat{S}_y)^2 to unfavor magnetization in Y direction
+# sz_pen   : Coupling of (\hat{S}_z)^2 to unfavor magnetization in Z direction
 # which    : Parameter of scipy.sparse.linalg
 # tol      : Parameter of scipy.sparse.linalg
 # num_eig  : Number of eigenvalues to compute. If absent (or None), the ground
