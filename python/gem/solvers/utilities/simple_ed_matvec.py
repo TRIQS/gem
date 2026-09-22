@@ -178,11 +178,15 @@ def docc_target(i, bsr, bit_max, norb):
 # the nonzero terms only.
 
 def one_body_terms(h1e, tol=1e-8):
-    '''Nonzero ``h1e[i, j]`` as ``(i, j, value)`` arrays. Mirrors _build_one_body.'''
+    '''Nonzero ``h1e[i, j]`` as ``(i, j, value)`` arrays. Mirrors _build_one_body.
+
+    The values keep ``h1e``'s own dtype, so the kernels specialise real when the
+    embedding problem is real.
+    '''
     ii, jj = np.nonzero(np.abs(h1e) >= tol)
     return (np.ascontiguousarray(ii, dtype=np.int64),
             np.ascontiguousarray(jj, dtype=np.int64),
-            np.ascontiguousarray(h1e[ii, jj], dtype=np.complex128))
+            np.ascontiguousarray(h1e[ii, jj]))
 
 
 def two_body_terms(V2E, tol=1e-8):
@@ -202,18 +206,18 @@ def two_body_terms(V2E, tol=1e-8):
                     vv.append(0.5 * V2E[i, j, k, l])
     return (np.array(ii, dtype=np.int64), np.array(jj, dtype=np.int64),
             np.array(kk, dtype=np.int64), np.array(ll, dtype=np.int64),
-            np.array(vv, dtype=np.complex128))
+            np.array(vv, dtype=V2E.dtype))
 
 
-def empty_one_body_terms():
+def empty_one_body_terms(dtype=np.complex128):
     return (np.empty(0, dtype=np.int64), np.empty(0, dtype=np.int64),
-            np.empty(0, dtype=np.complex128))
+            np.empty(0, dtype=dtype))
 
 
-def empty_two_body_terms():
+def empty_two_body_terms(dtype=np.complex128):
     return (np.empty(0, dtype=np.int64), np.empty(0, dtype=np.int64),
             np.empty(0, dtype=np.int64), np.empty(0, dtype=np.int64),
-            np.empty(0, dtype=np.complex128))
+            np.empty(0, dtype=dtype))
 
 
 # -- kernels -------------------------------------------------------------
@@ -279,7 +283,8 @@ def accum_denmat(basis, index, bit_max, norb, nmax, U, bw, dm):
     every pair, and the same ``O(dim * nmax**2 * nstates)`` cost, but the
     operators are never stored.
     '''
-    nst = bw.size
+    nst  = bw.size
+    zero = np.zeros(1, dtype=U.dtype)[0]   # numba types acc from this
     for c in range(basis.size):
         bsr = basis[c]
         for i in range(nmax):
@@ -290,7 +295,7 @@ def accum_denmat(basis, index, bit_max, norb, nmax, U, bw, dm):
                 r = lookup(bsl, basis, index)
                 if r < 0:
                     continue
-                acc = 0.0 + 0.0j
+                acc = zero
                 for n in range(nst):
                     acc += bw[n] * np.conj(U[r, n]) * U[c, n]
                 dm[i, j] += sign * acc
@@ -299,8 +304,9 @@ def accum_denmat(basis, index, bit_max, norb, nmax, U, bw, dm):
 @jit(nopython=True)
 def accum_docc(basis, index, bit_max, norb, i, U, bw):
     '''``sum_n bw[n] <n| n_i n_{i+1} |n>``.'''
-    nst = bw.size
-    total = 0.0 + 0.0j
+    nst   = bw.size
+    zero  = np.zeros(1, dtype=U.dtype)[0]   # numba types the sums from this
+    total = zero
     for c in range(basis.size):
         bsl, sign = docc_target(i, basis[c], bit_max, norb)
         if sign == 0:
@@ -308,7 +314,7 @@ def accum_docc(basis, index, bit_max, norb, i, U, bw):
         r = lookup(bsl, basis, index)
         if r < 0:
             continue
-        acc = 0.0 + 0.0j
+        acc = zero
         for n in range(nst):
             acc += bw[n] * np.conj(U[r, n]) * U[c, n]
         total += sign * acc
@@ -320,9 +326,8 @@ def accum_docc(basis, index, bit_max, norb, i, U, bw):
 class EmbeddingHamiltonian(LinearOperator):
     '''Matrix-free ``H = H_one + H_two`` in one symmetry sector.
 
-    Passed straight to ``scipy.sparse.linalg.eigsh``. ``dtype`` is always
-    ``complex128``: ``build_h1e`` builds ``h1e`` complex, so the stored CSC path
-    upcasts to complex too.
+    Passed straight to ``scipy.sparse.linalg.eigsh``. ``dtype`` follows the term
+    lists, i.e. real when the embedding problem is real.
     '''
 
     def __init__(self, basis, index, norb, ob_terms, tb_terms):
@@ -333,26 +338,27 @@ class EmbeddingHamiltonian(LinearOperator):
         self.ob_terms = ob_terms
         self.tb_terms = tb_terms
         n = basis.size
-        super().__init__(dtype=np.complex128, shape=(n, n))
+        super().__init__(dtype=np.result_type(ob_terms[2], tb_terms[4]),
+                         shape=(n, n))
 
     def _matvec(self, x):
-        x   = np.ascontiguousarray(np.asarray(x).ravel(), dtype=np.complex128)
-        out = np.zeros(self.shape[0], dtype=np.complex128)
+        x   = np.ascontiguousarray(np.asarray(x).ravel(), dtype=self.dtype)
+        out = np.zeros(self.shape[0], dtype=self.dtype)
         apply_terms(*self.ob_terms, *self.tb_terms,
                     self.basis, self.index, self.bit_max, self.norb, x, out)
         return out
 
     def apply_two_body(self, x):
         '''``H_two @ x``, needed by compute_E2loc.'''
-        x   = np.ascontiguousarray(np.asarray(x).ravel(), dtype=np.complex128)
-        out = np.zeros(self.shape[0], dtype=np.complex128)
-        apply_terms(*empty_one_body_terms(), *self.tb_terms,
+        x   = np.ascontiguousarray(np.asarray(x).ravel(), dtype=self.dtype)
+        out = np.zeros(self.shape[0], dtype=self.dtype)
+        apply_terms(*empty_one_body_terms(self.dtype), *self.tb_terms,
                     self.basis, self.index, self.bit_max, self.norb, x, out)
         return out
 
     def to_dense(self):
         '''Dense ``H``, for the sectors small enough to go through eigh.'''
-        Hd = np.zeros(self.shape, dtype=np.complex128)
+        Hd = np.zeros(self.shape, dtype=self.dtype)
         build_dense(*self.ob_terms, *self.tb_terms,
                     self.basis, self.index, self.bit_max, self.norb, Hd)
         return Hd

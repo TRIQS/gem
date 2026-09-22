@@ -89,6 +89,13 @@ class SimpleED(gemSolver):
     full-spectrum fallback cannot work without the matrix), and it does not
     support the spin penalties. Results are otherwise identical to the stored
     path, sign for sign.
+
+    **Precision.** ``dtype`` is a request, resolved into ``self.data_type`` at
+    every ``build_Hemb``. A real one is honoured, and the whole solve then stays
+    real (operators, diagonalisation, eigenvectors, density matrix, at about
+    half the cost of the complex path in the stored branch), unless ``eloc``,
+    ``D``, ``Lambda_c``, ``V2E`` or the ``sy_pen`` penalty is complex — then the
+    solve is upcast to ``complex128`` and a warning is issued once.
     '''
 
     def __init__(self, norb, use_Ntot=False, use_Sz=False,
@@ -100,7 +107,10 @@ class SimpleED(gemSolver):
         :param norb: int. Total number of spin-orbital levels in the embedding Hamiltonian.
         :param use_Ntot: bool, optional. Whether to exploit particle-number conservation (default: False).
         :param use_Sz: bool, optional. Whether to exploit Sz conservation (default: False).
-        :param dtype: Data type for the solver.
+        :param dtype: Working precision (default: ``np.complex128``). A real
+            type is honoured only when the embedding problem really is real,
+            otherwise the solve is upcast to ``complex128`` with a warning; see
+            the class docstring.
         :param N_sector: int, optional. Particle-number sector to solve if use_Ntot is True (default: None).
         :param Sz_sector: int, optional. Sz sector to solve if use_Sz is True (default: None).
         :param solver_params: dict, optional. Parameters for the solver (default: None).
@@ -124,8 +134,9 @@ class SimpleED(gemSolver):
         self.N_sector  = N_sector
         self.Sz_sector = Sz_sector
 
-        # Not enforced hardly, be cautios to give float
-        self.data_type = dtype
+        # resolved at every build_Hemb: a real dtype is only a request
+        self.data_type     = np.dtype(dtype)
+        self._dtype_warned = False
 
         # matrix-free: apply the Hamiltonian and the c^dag_i c_j operators on
         # the fly instead of storing them
@@ -242,6 +253,23 @@ class SimpleED(gemSolver):
         if(verbose >1): print('build one-body')
         self.build_h1e(eloc, D, Lambdac, mu, verbose=verbose)
 
+        # a real data_type is a request: honour it only if nothing here is
+        # complex, otherwise upcast the whole solve and say so once
+        want_real = not np.issubdtype(self.data_type, np.complexfloating)
+        real = (want_real and np.abs(self.h1e.imag).max() < 1e-12
+                and np.abs(np.imag(V2E)).max() < 1e-12 and not sy_pen)
+        if want_real and not real:
+            if not self._dtype_warned and self.mpi_rank == 0:
+                warnings.warn(
+                    f"dtype={self.data_type} was requested but eloc/D/Lambda_c, "
+                    "V2E or the Sy penalty is complex: solving in complex128.")
+                self._dtype_warned = True
+            self.V2E = None        # forces the two-body rebuild at the new dtype
+            self.data_type = np.dtype(np.complex128)
+        if real:
+            self.h1e = self.h1e.real.copy()
+            V2E      = np.real(V2E)
+
         # rebuild two-body only when V2E changes (shared across sectors)
         if self.matrix_free:
             rebuild_two = (self.V2E is None) or np.any(V2E != self.V2E) \
@@ -280,11 +308,13 @@ class SimpleED(gemSolver):
             if rebuild_two:
                 self.Htwo_list[s] = self._build_two_body(V2E, basis_s, hsize_s)
 
-            Ham_s = (Hone_s + self.Htwo_list[s]
-                     + spin_pen * self.S2_list[s]
-                     + sz_pen   * self.Sz_list[s].dot(self.Sz_list[s])
-                     + sx_pen   * self.Sx_list[s].dot(self.Sx_list[s])
-                     + sy_pen   * self.Sy_list[s].dot(self.Sy_list[s]))
+            # add only the penalties switched on: a zero coefficient would
+            # still drag its operator's dtype into Ham (Sy is complex)
+            Ham_s = Hone_s + self.Htwo_list[s]
+            if spin_pen: Ham_s = Ham_s + spin_pen * self.S2_list[s]
+            for pen, op in ((sz_pen, self.Sz_list[s]), (sx_pen, self.Sx_list[s]),
+                            (sy_pen, self.Sy_list[s])):
+                if pen: Ham_s = Ham_s + pen * op.dot(op)
             self.Ham_list.append(Ham_s)
 
 
@@ -491,10 +521,10 @@ class SimpleED(gemSolver):
         Same result as calling ``_weighted_trace`` on every ``denmat_op[(i,j)]``
         of local sector ``s``, without those operators existing.
         '''
-        blk = np.zeros((nmax, nmax), dtype=np.complex128)
+        blk = np.zeros((nmax, nmax), dtype=self.data_type)
         accum_denmat(self.basis_list[s], self.index_list[s],
                      2**(self.norb - 1), self.norb, nmax,
-                     np.ascontiguousarray(U_s, dtype=np.complex128),
+                     np.ascontiguousarray(U_s, dtype=self.data_type),
                      np.ascontiguousarray(bw_s, dtype=np.float64), blk)
         return blk
 
@@ -793,7 +823,7 @@ class SimpleED(gemSolver):
                 result += accum_docc(
                     self.basis_list[s], self.index_list[s],
                     2**(self.norb - 1), self.norb, i,
-                    np.ascontiguousarray(U_s, dtype=np.complex128),
+                    np.ascontiguousarray(U_s, dtype=self.data_type),
                     np.ascontiguousarray(bw_s, dtype=np.float64)).real
                 continue
             docc_op = self._build_docc_op_sector(i, s)
