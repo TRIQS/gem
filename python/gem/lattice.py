@@ -10,6 +10,7 @@ from scipy.optimize import brentq, bisect
 from .fragment import Fragment
 from .utilities import calc_nf, calc_Fermi
 from .delta_fit import build_H
+from .mpi import resolve_comm, split_range, allreduce_array, allreduce_scalar
 from numba import jit
 
 
@@ -18,7 +19,8 @@ class Lattice():
     Class for the lattice part of the formalism. It is used to solve the quasiparticle problem.
     '''
     def __init__(self,
-                 ek_list: np.ndarray, wk_list: np.ndarray = None, verbose=0
+                 ek_list: np.ndarray, wk_list: np.ndarray = None, verbose=0,
+                 use_mpi=True, comm=None
                  ):
         """
         Initialize the Lattice class with the given parameters.
@@ -26,7 +28,16 @@ class Lattice():
         :param ek_list: ndarray. List of one-body electronic Hamiltonian terms.
         :param wk_list: ndarray, optional. Weights for each ek value (default: uniform weights).
         :param verbose: int, optional. Level of verbosity (default: 0).
+        :param use_mpi: bool, optional. Distribute the k-point sums over the
+            ranks of ``comm`` (default: True). Ignored when mpi4py is absent.
+        :param comm: mpi4py communicator, optional. Defaults to
+            ``MPI.COMM_WORLD``. Pass a sub-communicator to nest the k-point
+            splitting inside another level of parallelism.
 
+        **MPI.** Every sum over k in this class runs over the contiguous k-points (splitted at construction)
+        owned by this rank and is closed by *allreduce*. All ranks exit with the same global result.
+        That matters for :meth:`fit_mu_quasiparticle`, whose bisection must take the same branch
+        everywhere.
         """
 
         if not isinstance(verbose, int): raise TypeError(f"verbose must be int, got {type(verbose)}")
@@ -40,11 +51,36 @@ class Lattice():
         if wk_list.ndim != 1 or wk_list.shape[0] != ek_list.shape[0]:
             raise ValueError(f"wk_list must be (A,) matching ek_list first dim, got {wk_list.shape}")
 
+        #Check that the weights are normalised to 1, otherwise raise an error
+        wk_sum = float(np.sum(wk_list))
+        if abs(wk_sum - 1.0) > 1e-8:
+            raise ValueError(
+                f"wk_list must sum to 1, got {wk_sum}. Normalise it with "
+                "wk_list = wk_list/np.sum(wk_list) before building the Lattice.")
+
         self.eks  = ek_list.copy()
         self.wks  = wk_list.copy()
         self.verb = verbose
 
-        print("##### END OF LATTICE INITIALIZATION #####")
+        # MPI setup
+        self.comm     = resolve_comm(comm, use_mpi)
+        self.mpi_rank = self.comm.Get_rank()
+        self.mpi_size = self.comm.Get_size()
+        # rank r owns eks[k0:k1]
+        self.k0, self.k1 = split_range(self.wks.shape[0], self.mpi_rank, self.mpi_size)
+        if self.mpi_rank == 0 and self.mpi_size > self.wks.shape[0]:
+            warnings.warn(
+                f"Lattice: {self.mpi_size} ranks for {self.wks.shape[0]} k-points; "
+                "some ranks are idle in the k sums.")
+
+        if self.mpi_rank == 0:
+            if self.mpi_size > 1:
+                print(f"##### k-points distributed over {self.mpi_size} MPI ranks #####")
+            print("##### END OF LATTICE INITIALIZATION #####")
+
+    def _my_ks(self):
+        '''Iterate over the (ek, wk) pairs owned by this rank.'''
+        return zip(self.eks[self.k0:self.k1], self.wks[self.k0:self.k1])
 
     def solve_qp(self, Fragments_list, T=0.0, Tsmearing=0.0):
         """
@@ -73,11 +109,13 @@ class Lattice():
 
         self.Delta_p_tot = np.zeros( (nbath_tot,nbath_tot), dtype=complex )
         self.ERD_tot   = np.zeros( (nimp_tot ,nbath_tot), dtype=complex )
-        for ek,wk in zip(self.eks, self.wks):
+        for ek,wk in self._my_ks():
             Hk_qp = self.Rtot @ ek @ self.Rtot.T.conj() + self.Ltot
             Dk = calc_nf(Hk_qp,Tuse).T
             self.Delta_p_tot += wk*Dk
             self.ERD_tot   += wk*(ek @ self.Rtot.T.conj() @ Dk.T)
+        allreduce_array(self.comm, self.Delta_p_tot)
+        allreduce_array(self.comm, self.ERD_tot)
 
         imp_stride=0
         bath_stride=0
@@ -121,8 +159,12 @@ class Lattice():
             return Gloc_w
 
         Gloc = np.zeros( (len(w_list),nimp_tot,nimp_tot), dtype=np.complex128 )
+        eks_loc = np.ascontiguousarray(self.eks[self.k0:self.k1])
+        wks_loc = np.ascontiguousarray(self.wks[self.k0:self.k1])
         for i,w in enumerate(w_list):
-            Gloc[i,:,:] = compute_Gloc_at_w(w, self.Rtot, self.Ltot, self.eks, self.wks, eps)
+            Gloc[i,:,:] = compute_Gloc_at_w(w, self.Rtot, self.Ltot, eks_loc, wks_loc, eps)
+        # one reduction for the whole cube, not one per frequency
+        allreduce_array(self.comm, Gloc)
         return Gloc
 
 
@@ -174,19 +216,21 @@ class Lattice():
         self.Ltot = block_diag(*[F.Lambda for F in Fragments_list])
 
         #Check if can be jitted
-        def qp_density( mu, T, Lqp, Rqp, ek_qp, wk_qp):
+        def qp_density( mu, T, Lqp, Rqp):
             dens=0.0
             Lmu = Lqp - mu* Rqp @ np.eye(Rqp.shape[1]) @Rqp.T.conj()
-            for ek,wk in zip(ek_qp, wk_qp):
+            for ek,wk in self._my_ks():
                 Hk_qp = Rqp @ ek @ Rqp.T.conj() + Lmu
                 ekvals = np.linalg.eigvalsh(Hk_qp)
                 dens += np.sum(calc_Fermi(ekvals/T))*wk
-            return dens/np.sum(wk_qp)
+            # allreduce, not reduce: the bisection below runs on every rank and
+            # must see the same density
+            return allreduce_scalar(self.comm, dens)
 
         nqp_target = 0.5*(nbath_tot-nimp_tot) + n_target
         try:
             def residual(mu):
-                return qp_density(mu, T, self.Ltot, self.Rtot, self.eks, self.wks) - nqp_target
+                return qp_density(mu, T, self.Ltot, self.Rtot) - nqp_target
 
             a, b = -10.0, 10.0
             for _ in range(200):
@@ -334,11 +378,11 @@ class Lattice():
         self.Ltot = block_diag(*[F.Lambda for F in Fragments_list])
 
         ekin = 0.0
-        for ek,wk in zip(self.eks, self.wks):
+        for ek,wk in self._my_ks():
             Hk_qp = self.Rtot @ ek @ self.Rtot.T.conj() + self.Ltot
             Dk = calc_nf(Hk_qp,Tuse).T
             ekin += wk*np.sum( ( np.dot(self.Rtot, np.dot(ek, self.Rtot.T.conj() ) ) ) * Dk )
-        return ekin
+        return allreduce_scalar(self.comm, ekin)
 
     def compute_functional(self, Fragments_list , T=0.0, Tsmearing=0.0):
         """
@@ -367,11 +411,13 @@ class Lattice():
             else:
                 Omega_imps += F.solver.gs_ene - T*np.log( F.solver.Zpart)
         #Quasiparticle part of the functional
-        for ek,wk in zip(self.eks, self.wks):
+        # only this term is a k sum: Omega_imps and Omega_mix are per-fragment
+        # and already identical on every rank
+        for ek,wk in self._my_ks():
             Hk_qp = self.Rtot @ ek @ self.Rtot.T.conj() + self.Ltot
             ekvals = np.linalg.eigvalsh(Hk_qp)
             Omega_qp += np.sum(np.log(1+np.exp(-ekvals/Tuse) ) )*wk
-        Omega_qp *= -Tuse
+        Omega_qp = -Tuse*allreduce_scalar(self.comm, Omega_qp)
         #Mixed part of the functional
         for F in Fragments_list:
             H_mix = build_H(F.Lambda, F.Lambda_c, F.D, F.R)

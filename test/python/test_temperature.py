@@ -1,4 +1,10 @@
-#!/usr/bin/env python
+'''Regression test of the finite-temperature ghost-GA cycle.
+
+One orbital at B=3, swept over 30 temperatures; the double occupancy,
+energies, functional and entropy are compared against
+``results_temperature.h5``.
+'''
+
 import unittest
 
 from gem.gdmft import *

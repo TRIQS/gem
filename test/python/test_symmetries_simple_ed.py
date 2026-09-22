@@ -1,22 +1,21 @@
-#!/usr/bin/env python
-"""
+'''
 Compare SimpleED with no-symmetry (full Hilbert space) versus all (N,Sz) sectors
 for a given embedding Hamiltonian at finite temperature T=0.1, U=1.5.
 
 Both solvers span the same Hilbert space and must give identical density
 matrices, double occupancy, and energies.
-"""
+'''
 import unittest
 import numpy as np
 from gem.solvers.simple_ed import SimpleED
 
 
 def _make_hemb_inputs(U=1.5, B=3, seed=42):
-    """
+    '''
     Return (nimp, ntot, eloc, D, Lambdac, V2E) for a single-orbital
     embedding Hamiltonian with B bath levels.
     Values are representative of a converged ghost-GA at moderate U.
-    """
+    '''
     nimp  = 2
     nbath = nimp * B
     ntot  = nimp + nbath

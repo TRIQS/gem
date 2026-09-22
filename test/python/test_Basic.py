@@ -1,4 +1,5 @@
-#!/usr/bin/env python
+'''Smoke test: the top-level GEM classes must be importable.
+'''
 
 import unittest
 

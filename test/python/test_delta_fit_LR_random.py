@@ -18,13 +18,13 @@ noise = 1e-3
 
 
 def random_hermitian(n: int, rng: np.random.Generator, scale: float = 1.0) -> np.ndarray:
-    """Random complex Hermitian matrix of shape (n, n)."""
+    '''Random complex Hermitian matrix of shape (n, n).'''
     A = (rng.standard_normal((n, n)) + 1j * rng.standard_normal((n, n))) * scale + np.diag(np.linspace(-1.5, 1.5, n, endpoint=True))
     return 0.5 * (A + A.T.conj())
 
 
 def random_complex(shape, rng: np.random.Generator, scale: float = 1.0) -> np.ndarray:
-    """Random complex array."""
+    '''Random complex array.'''
     return (rng.standard_normal(shape) + 1j * rng.standard_normal(shape)) * scale+ np.ones( (B,1) )/np.sqrt(B)
 
 
@@ -139,4 +139,4 @@ class TestSelfEnergySolverB3_random_generated(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main(verbosity=2)
+    unittest.main()

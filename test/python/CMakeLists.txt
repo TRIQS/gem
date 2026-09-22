@@ -13,12 +13,14 @@ set(all_tests
   test_2o2_simple_ed
   # test_2o6_simple_ed
   test_symmetries_simple_ed
+  test_matrix_free_simple_ed
   test_delta_fit_LR_B3
   test_delta_fit_LR_random
   test_delta_fit_LcD_B3
   test_delta_fit_LcD_random
   test_delta_fit_gradient
   test_delta_fit_packing
+  test_lattice_mpi
 )
 
 foreach(test ${all_tests})
