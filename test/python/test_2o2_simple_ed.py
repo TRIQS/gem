@@ -14,7 +14,7 @@ from gem.solvers.simple_ed import SimpleED
 import os
 
 
-class test_hemb_2o6_simple_ed(unittest.TestCase):
+class test_hemb_2o2_simple_ed(unittest.TestCase):
 
     def test_gdmft_simple_ed(self):
 
@@ -71,32 +71,28 @@ class test_hemb_2o6_simple_ed(unittest.TestCase):
         grisb = Gdmft(ntot, nimp, nbath, eks, eloc, Utensor, wks=wks,
                       R=R0, Lambda=L0, edsolver=edsolver, verbose=4,
                       spin_sym=True, orb_sym=False)
-        grisb.run(itmax=9, mix=0.0, tol=1e-5, T=1e-3, silence=False)
+        # the cycle oscillates for the first ~25 iterations before settling on
+        # the symmetric fixed point, so itmax must be well above it
+        grisb.run(itmax=100, mix=0.5, tol=1e-5, T=1e-3, silence=False)
 
-        # TODO: Add Ref
-        # name = "2o2_ci"
-        # with h5py.File(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "r") as A:
+        name = "2o2_ci"
+        with h5py.File(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "r") as A:
 
-        #     print("Compare docc")
-        #     docc_true = [A[name]["docc"][str(i)][0] + 1j*A[name]["docc"][str(i)][1] for i in range(len(grisb.docc))]
-        #     np.testing.assert_allclose(grisb.docc, docc_true, atol=1e-3)
+            print("Compare docc")
+            docc_true = [A[name]["docc"][str(i)][0] + 1j*A[name]["docc"][str(i)][1] for i in range(len(grisb.docc))]
+            np.testing.assert_allclose(grisb.docc, docc_true, atol=1e-3)
 
-        #     print("Compare denMat")
-        #     denmat_true = A[name]["denMat"][...,0] + 1j*A[name]["denMat"][...,1]
-        #     ref_denM_eval, ref_denM_evec = np.linalg.eig(denmat_true)
-        #     idx = ref_denM_eval.argsort()[::-1]
-        #     ref_denM_eval = ref_denM_eval[idx]
+            print("Compare denMat")
+            denmat_true = A[name]["denMat"][...,0] + 1j*A[name]["denMat"][...,1]
+            ref_denM_eval, ref_denM_evec = np.linalg.eig(denmat_true)
+            idx = ref_denM_eval.argsort()[::-1]
+            ref_denM_eval = ref_denM_eval[idx]
 
-        #     test_denM_eval, test_denM_evec = np.linalg.eig(grisb.Fragment.denMat)
-        #     idx = test_denM_eval.argsort()[::-1]
-        #     test_denM_eval = test_denM_eval[idx]
+            test_denM_eval, test_denM_evec = np.linalg.eig(grisb.Fragment.denMat)
+            idx = test_denM_eval.argsort()[::-1]
+            test_denM_eval = test_denM_eval[idx]
 
-        #     np.testing.assert_allclose(test_denM_eval, ref_denM_eval, atol=1e-3)
-
-        # with h5py.File(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "a") as A:
-        #     grp = A.require_group(name)
-        #     grp["docc"] = grisb.docc
-        #     grp["denMat"] = grisb.Fragment.denMat
+            np.testing.assert_allclose(test_denM_eval, ref_denM_eval, atol=1e-3)
 
 
 if __name__ == '__main__':
