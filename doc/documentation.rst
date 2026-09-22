@@ -276,8 +276,7 @@ every ``build_Hemb``:
 
 If one of these is not real, the fallback is using ``complex128`` and
 a warning is issued once — the results stay correct, only the speedup is lost.
-``solver.data_type`` holds the requested precision and ``solver.work_dtype`` the
-one actually in use.
+``solver.data_type`` always holds the precision actually in use.
 
 The keys :class:`~gem.solvers.simple_ed.SimpleED` reads from ``solver_params``
 are:
