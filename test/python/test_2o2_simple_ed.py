@@ -1,4 +1,8 @@
-#!/usr/bin/env python
+'''Regression test of the ghost-GA cycle with SimpleED, two orbitals at B=1.
+
+Kanamori interaction; the reference is the ``2o2_ci`` group of
+``result_tests.h5``.
+'''
 
 import unittest
 

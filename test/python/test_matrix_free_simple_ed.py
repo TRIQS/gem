@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-"""
+'''
 Compare the matrix-free SimpleED path against the stored-CSC one.
 
 solver_params['matrix_free'] = True never builds the Hamiltonian, the
@@ -7,7 +6,7 @@ c^dag_i c_j operators or the spin operators; ARPACK gets a LinearOperator and
 the observables are accumulated by numba kernels instead. The two paths share
 the bit algebra in gem/solvers/utilities/simple_ed_matvec.py, so they must
 agree to machine precision, not merely to physical accuracy.
-"""
+'''
 import unittest
 import numpy as np
 
@@ -19,11 +18,11 @@ from test_symmetries_simple_ed import _make_hemb_inputs, _solve
 
 
 def _kanamori_inputs(U=1.2, J=0.3, seed=7):
-    """2 orbitals x 2 spins with a full Kanamori interaction.
+    '''2 orbitals x 2 spins with a full Kanamori interaction.
 
     Density-density alone leaves the spin-flip / pair-hopping terms of
     two_body_target untested, and those are the ones with non-trivial signs.
-    """
+    '''
     from gem.utilities import U_matrix_kanamori
 
     nimp, nbath = 4, 4
@@ -38,7 +37,7 @@ def _kanamori_inputs(U=1.2, J=0.3, seed=7):
 
 
 def _solve_gs(solver, nimp, eloc, D, Lambdac, V2E, T, mu=0.0):
-    """_solve plus the two scalars Lattice.compute_functional reads."""
+    '''_solve plus the two scalars Lattice.compute_functional reads.'''
     dm, e1, e2, docc = _solve(solver, nimp, eloc, D, Lambdac, V2E, T, mu=mu)
     return dm, e1, e2, docc, solver.gs_ene, solver.Zpart
 
@@ -54,7 +53,7 @@ def _assert_same(self, ref, got, atol, tag):
 
 
 class TestMatrixFreeOperator(unittest.TestCase):
-    """The LinearOperator must reproduce the stored matrix element by element."""
+    '''The LinearOperator must reproduce the stored matrix element by element.'''
 
     def test_matvec_and_dense_match_stored(self):
         ntot, nimp, _, eloc, D, Lambdac, V2E = _make_hemb_inputs()
@@ -94,7 +93,7 @@ class TestMatrixFreeOperator(unittest.TestCase):
 
 
 class TestMatrixFreeObservables(unittest.TestCase):
-    """End-to-end: every quantity the rest of GEM reads back."""
+    '''End-to-end: every quantity the rest of GEM reads back.'''
 
     def _compare(self, inputs, T, atol=1e-10, **params):
         ntot, nimp, _, eloc, D, Lambdac, V2E = inputs
@@ -121,11 +120,11 @@ class TestMatrixFreeObservables(unittest.TestCase):
         self._compare(_kanamori_inputs(), T=0.3)
 
     def test_arpack_branch(self):
-        """dense_cutoff below the largest sector forces eigsh on the operator.
+        '''dense_cutoff below the largest sector forces eigsh on the operator.
 
         num_eig must stay under dim-1 for the sectors that reach ARPACK, hence
         the cutoff of 25 rather than 0.
-        """
+        '''
         inputs = _make_hemb_inputs(B=4)
         self._compare(inputs, T=0.0, atol=1e-9,
                       dense_cutoff=25, num_eig=1, tol=0.0)
@@ -133,7 +132,7 @@ class TestMatrixFreeObservables(unittest.TestCase):
                       dense_cutoff=25, num_eig=15, tol=0.0)
 
     def test_no_symmetry(self):
-        """Full 2^ntot Fock space as a single block."""
+        '''Full 2^ntot Fock space as a single block.'''
         ntot, nimp, _, eloc, D, Lambdac, V2E = _make_hemb_inputs()
         out = []
         for matrix_free in (False, True):
@@ -144,7 +143,7 @@ class TestMatrixFreeObservables(unittest.TestCase):
         _assert_same(self, out[0], out[1], 1e-10, "no symmetry")
 
     def test_binary_search_fallback(self):
-        """mf_lookup_max_norb=0 drops the lookup table for np.searchsorted."""
+        '''mf_lookup_max_norb=0 drops the lookup table for np.searchsorted.'''
         ntot, nimp, _, eloc, D, Lambdac, V2E = _make_hemb_inputs()
         out = []
         for params in ({'matrix_free': False},
@@ -174,7 +173,7 @@ class TestMatrixFreeUnsupported(unittest.TestCase):
                 solver.build_Hemb(D, eloc, Lambdac, V2E)
 
     def test_full_spectrum_at_finite_T_rejected(self):
-        """T>0 with num_eig unset needs the whole spectrum, which needs H."""
+        '''T>0 with num_eig unset needs the whole spectrum, which needs H.'''
         _, _, _, eloc, D, Lambdac, V2E = self.inputs
         solver = self._solver(dense_cutoff=0)
         solver.build_Hemb(D, eloc, Lambdac, V2E)

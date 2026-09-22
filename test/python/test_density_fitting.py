@@ -1,4 +1,7 @@
-#!/usr/bin/env python
+'''The density fitting must reach the target filling.
+
+Checked both for the quasiparticle problem and for the impurity problem.
+'''
 
 import unittest
 import numpy as np

@@ -1,4 +1,8 @@
-#!/usr/bin/env python
+'''Regression test of the ghost-GA cycle with SimpleED, one orbital at B=3.
+
+The converged density matrix and observables are compared against the
+``1o3_ci`` group of ``result_tests.h5``.
+'''
 
 import unittest
 

@@ -1,3 +1,9 @@
+'''Unit tests of the k-point decomposition used by the MPI layer of Lattice.
+
+``split_range`` must be a partition for any number of k-points and ranks,
+and a Lattice built with ``use_mpi=False`` must own all of them.
+'''
+
 import unittest
 import numpy as np
 
