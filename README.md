@@ -17,7 +17,7 @@ Start to learn about GEM on our website at [https://triqs.github.io/gem/](triqs.
 About
 -----
 
-This is an implement of the ghost-Gutwiller approximation and its finate temperature extension [1,2] (ghost-GA).
+This is an implement of the ghost-Gutwiller approximation and its finite temperature extension [1,2] (ghost-GA).
 
 Dependencies
 ------------
