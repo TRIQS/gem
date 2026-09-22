@@ -591,14 +591,12 @@ class SimpleED(gemSolver):
         to the least loaded rank. The cost of a sector is taken as
         ``dim**mpi_weight_exp`` (default exponent 3, i.e. dense diagonalisation
         dominates, or 1 in matrix-free mode, where the cost is a number of
-        matvecs); the arithmetic is done on exact Python ints so that it is
-        identical on every rank and cannot overflow.
+        matvecs).
         '''
         owner = [0] * len(self.sectors)
         if self.mpi_size == 1:
             return owner
-        default_exp = 1 if self.matrix_free else 3
-        exp     = self.solver_params.get('mpi_weight_exp', default_exp)
+        exp     = self.solver_params.get('mpi_weight_exp', 1 if self.matrix_free else 3)
         weights = [d**exp for d in self.sector_dims]
         load    = [0] * self.mpi_size
         for s in sorted(range(len(self.sectors)), key=lambda s: (-weights[s], s)):
@@ -754,13 +752,6 @@ class SimpleED(gemSolver):
         if verbose > 3:
             print("h1e"); print(self.h1e)
 
-    def build_docc_op(self, i, debug=False):
-        '''
-        Build double-occupancy operator for orbitals (i, i+1) in the first
-        sector owned by this rank. For multi-sector use, call
-        _build_docc_op_sector(i, s) directly with a local sector index.
-        '''
-        return self._build_docc_op_sector(i, s=0)
 
     def _build_docc_op_sector(self, i, s):
         '''Double-occupancy operator in *local* sector s.'''
@@ -844,11 +835,6 @@ class SimpleED(gemSolver):
     def h5read_state(self, filename, group_path, name):
         with h5py.File(filename, "r") as f:
             return f[group_path][name][:]
-
-    def inner(self, bra, ket, operator=None):
-        if operator is not None:
-            return np.vdot(bra, operator.dot(ket))
-        return np.vdot(bra, ket)
 
 
 # -- binary basis utilities --
