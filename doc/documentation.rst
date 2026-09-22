@@ -235,7 +235,10 @@ It is constructed as::
        them.
    * - ``dtype``
      - default ``np.complex128``
-     - Working precision. Not enforced aggressively, so pass a floating type.
+     - Working precision. ``np.float64`` keeps the whole solve real — operators,
+       diagonalisation, eigenvectors and density matrix — which costs roughly
+       half the time of the complex path in the stored branch. See
+       :ref:`precision <simple_ed_precision>` for when the request is honoured.
    * - ``solver_params``
      - dict, optional
      - Solver-specific options; see the table below.
@@ -256,6 +259,25 @@ reduced quantities are identical on every rank. ``build_Hemb``, ``solve_Hemb``,
 ``calc_density_matrix``, ``compute_E1loc``, ``compute_E2loc`` and
 ``calc_double_occ`` are therefore **collective** — calling one of them inside an
 ``if rank == 0:`` block deadlocks.
+
+.. _simple_ed_precision:
+
+Real and complex precision
+""""""""""""""""""""""""""
+
+``dtype`` is a *request*, not a guarantee. A real type is honoured only when
+nothing in the embedding problem carries an imaginary part, which is checked at
+every ``build_Hemb``:
+
+* the one-body Hamiltonian, assembled from ``eloc``, ``D`` and ``Lambda_c``,
+* the interaction tensor ``Utensor``,
+* the ``sy_pen`` penalty, whose :math:`\hat{S}_y` operator is complex by
+  construction.
+
+If one of these is not real, the fallback is using ``complex128`` and
+a warning is issued once — the results stay correct, only the speedup is lost.
+``solver.data_type`` holds the requested precision and ``solver.work_dtype`` the
+one actually in use.
 
 The keys :class:`~gem.solvers.simple_ed.SimpleED` reads from ``solver_params``
 are:
