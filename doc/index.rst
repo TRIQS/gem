@@ -1,9 +1,9 @@
 .. _welcome:
 
 TRIQS / |PROJECT_NAME_UPPERCASE| - Ghost Embedding Method
-***************
+*********************************************************
 
-.. sidebar:: |PROJECT_NAME_UPPERCASE| |PROJECT_VERSION|
+.. sidebar:: GEM
 
    Latest release: |PROJECT_VERSION|
 
@@ -13,11 +13,19 @@ TRIQS / |PROJECT_NAME_UPPERCASE| - Ghost Embedding Method
       :target: https://github.com/triqs/gem
 
 
-**|PROJECT_NAME_UPPERCASE|** is a Python implementation of the ghost Gutzwiller Approximation (ghost-GA)
+|bold_project_name| is a Python implementation of the ghost Gutzwiller Approximation (ghost-GA)
 and its finite-temperature extension.
-
 It provides a general and flexible implementation to solve lattice Hamiltonians with local interactions.
 It supports different impurity solvers and provide a template to create your own solver.
+
+
+.. image:: _static/Gem-01.png
+   :width: 75%
+   :align: center
+   :target: https://github.com/triqs/gem
+
+
+
 
 
 .. toctree::

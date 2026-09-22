@@ -60,7 +60,7 @@ autodoc_mock_imports = [
 ]
 
 project = '@PROJECT_NAME@'
-project_uppercase = '@PROJECT_NAME@'
+project_uppercase = '@PROJECT_NAME_UPPERCASE@'
 version = '@PROJECT_VERSION@'
 
 # this makes the current project version available as var in every rst file

@@ -25,6 +25,15 @@ The following packages are required for the core functionality of the software:
 | h5py     | HDF5 file I/O                                |
 +----------+----------------------------------------------+
 
+Optionally, GEM provide MPI parallelization support for k-points summations and for the internal solver SimpleED.
+To enable MPI support, the following packages are required:
+
++----------+----------------------------------------------+
+| Package  | Purpose                                      |
++==========+==============================================+
+| mpi4py   | MPI support for parallelization              |
++----------+----------------------------------------------+
+
 Solvers
 -------
 
@@ -125,6 +134,5 @@ Please source it with the proper replacement of (`INSTALL_PREFIX`):
 
         source $INSTALL_PREFIX/share/gem/gemvars.sh
 
-To automate this process, please add this line to your [~/.bash_profile](<https://en.wikipedia.org/wiki/Bash_(Unix_shell)#Startup_scripts>)
-(or [~/.zprofile](http://zsh.sourceforge.net/FAQ/zshfaq03.html#l19>)).
-
+To automate this process, please add this line to your `~/.bash_profile`
+(or `~/.zprofile`).
