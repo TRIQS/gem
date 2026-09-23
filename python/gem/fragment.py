@@ -4,12 +4,14 @@
 # Email:  samuele.giuli@gmail.com
 ###########################################
 
+import os
 import warnings
 
 import numpy as np
 from .utilities import Hermitian_list, funcMat, denR, calc_Lambda, calc_Lambda_c
 from .delta_fit import update_self_energy_thermal_penalty, update_hybridization_thermal_penalty
 from .solvers.gem_solver import gemSolver
+import h5py
 
 
 class Fragment():
@@ -235,7 +237,64 @@ class Fragment():
             self.D[1::2,1::2] = D_s[1]
             self.Lambda_c[1::2,1::2] = Lc_s[1]
         return self.D, self.Lambda_c
-    
+
+    ###### ROUTINES TO SAVE AND LOAD #####
+    def save_fragment(self,filename, overwrite=True):
+        '''
+        Save the fragment parameters to a file.
+
+        **Not collective, and not MPI-aware: guard it yourself.** The fragment is
+        replicated on every rank, so under MPI exactly one rank must call this::
+
+            if comm.Get_rank() == 0:
+                fragment.save_fragment('fragment.h5')
+
+        :param filename: str. Path to the file where the fragment parameters will be saved.
+        :param overwrite: bool, optional. Whether to overwrite the file if it already exists (default: True).
+        '''
+        if not overwrite and os.path.exists(filename):
+            raise FileExistsError(f'Fragment.save file {filename} already exists.'
+                                  f'Use overwrite=True to overwrite it.')
+
+        with h5py.File(filename,'w') as f:
+            f.create_dataset('nimp', data=self.nimp)
+            f.create_dataset('nbath', data=self.nbath)
+            f.create_dataset('eloc', data=self.eloc)
+            f.create_dataset('Utensor', data=self.Utensor)
+            f.create_dataset('Lambda', data=self.Lambda)
+            f.create_dataset('R', data=self.R)
+            f.create_dataset('Lambda_c', data=self.Lambda_c)
+            f.create_dataset('D', data=self.D)
+            f.create_dataset('verbose', data=self.verb)
+
+    @staticmethod
+    def load_fragment(filename,solver):
+        '''
+        Load the fragment parameters from a file.
+
+        Read-only, so unlike :meth:`save_fragment` it needs no rank guard: every
+        rank can call it and they all end up with the same fragment.
+
+        :param filename: str. Path to the file containing the fragment parameters.
+        :param solver: gemSolver object required at fragment initialization. It is not saved in the file and must be provided.
+        '''
+               
+        with h5py.File(filename,'r') as f:
+            nimp = int(f['nimp'][()])
+            nbath = int(f['nbath'][()])
+            eloc = f['eloc'][()]
+            Utensor = f['Utensor'][()]
+            Lambda = f['Lambda'][()]
+            R = f['R'][()]
+            Lambda_c = f['Lambda_c'][()]
+            D = f['D'][()]
+            verbose = int(f['verbose'][()])
+        
+        return Fragment(nimp, nbath, eloc, Utensor, solver, Lambda, R, Lambda_c, D, verbose)
+
+
+
+    ###### ROUTINES TO COMPUTE OBSERVABLES #####
     def compute_energy(self):
         '''
         Compute the energy contributions of the fragment using the density matrix and the Hamiltonian parameters.
