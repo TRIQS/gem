@@ -449,11 +449,12 @@ class Lattice():
                                   f'Use overwrite=True to overwrite it.')
 
         with h5py.File(filename,'w') as f:
-            f.create_dataset('ek_list', data=self.ek_list)
-            f.create_dataset('wk_list', data=self.wk_list)
+            f.create_dataset('ek_list', data=self.eks)
+            f.create_dataset('wk_list', data=self.wks)
             f.create_dataset('verbose', data=self.verb)
 
-    def load_lattice(self, filename, use_mpi=True, comm=None):
+    @staticmethod
+    def load_lattice(filename, use_mpi=True, comm=None):
         '''
         Load the lattice parameters from a file.
 
@@ -467,8 +468,8 @@ class Lattice():
         '''
                
         with h5py.File(filename,'r') as f:
-            eks = int(f['ek_list'][()])
-            wks = int(f['wk_list'][()])
+            eks = f['ek_list'][()]
+            wks = f['wk_list'][()]
             verbose = int(f['verbose'][()])
         
         return Lattice(eks, wks, verbose=verbose, use_mpi=use_mpi, comm=comm)
