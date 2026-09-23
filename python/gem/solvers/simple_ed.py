@@ -316,15 +316,16 @@ class SimpleED(gemSolver):
         if debug:
             return self.Ham_list
 
-    def solve_Hemb(self, num_eig=1, which="SA", tol=1e-8, dense_cutoff=None,
+    def solve_Hemb(self, num_eig=None, which=None, tol=None, dense_cutoff=None,
                    bw_cutoff=None, verbose=0, T=0.0):
         '''
         Solve for the ground state, and some excited states if not all, of the embedded Hamiltonian of this fragment.
         For thermal calculation, the global partition function is required.
 
-        :param num_eig:     int. Number of eigenfunctions that are solved for (default 1).
-        :param which:       str. Parameter for the type of eigenvector solving method in scipy.eigsh (default "SA").
-        :param tol:         float. Tolerance of the eigenvector solving, also a parameter of scipy.eighs (default 1e-8).
+        :param num_eig: int, optional. Number of eigenvalues to compute. Read
+            from solver_params when not given; if it is None there too, only
+            the ground state is computed at T=0 while at T>0 the full
+            Hamiltonian of each sector is diagonalised.
         :param dense_cutoff: int, optional. Sectors of dimension smaller than
             this are diagonalised fully (eigh), the larger ones partially
             (eigsh). Read from solver_params when not given, default 4000.
@@ -346,6 +347,9 @@ class SimpleED(gemSolver):
                 "A restricted symmetry sector is selected: the partition "
                 "function may be incomplete at T>0.")
 
+        which   = self.solver_params.get('which', 'SA') if which is None else which
+        tol     = self.solver_params.get('tol',   1e-8) if tol   is None else tol
+        num_eig = self.solver_params.get('num_eig') if num_eig is None else num_eig
         dense_cutoff = (self.solver_params.get('dense_cutoff', 4000)
                         if dense_cutoff is None else dense_cutoff)
         bw_cutoff    = (self.solver_params.get('bw_cutoff', 1e-8)
