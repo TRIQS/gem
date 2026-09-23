@@ -1,5 +1,6 @@
 '''The ghost-GA self-consistency loop, as the regression tests drive it.
-Transcribed from the ``Gdmft`` driver that used to live in ``gem/gdmft.py``.
+Collected here so the tests that compare against stored reference data all
+take exactly the same steps.
 '''
 
 import numpy as np
