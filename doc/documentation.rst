@@ -24,7 +24,6 @@ Core Modules
 
    gem.fragment
    gem.lattice
-   gem.gdmft
    gem.solvers
 
 Everything is expressed in **spin-orbital** indices, with spin as the *fastest*
@@ -167,14 +166,6 @@ The key methods are:
 
 - :meth:`~gem.lattice.Lattice.fit_mu` — adjusts the chemical potential
   iteratively until the total lattice filling matches a prescribed target.
-
-``gdmft`` — Simple Self-Consistency Driver
-------------------------------------------
-
-The :mod:`gem.gdmft` module provides a legacy implementation of the :class:`~gem.gdmft.Gdmft`
-class, which drives the ghost-GA self-consistency loop for a simple single fragment case.
-It manages the exchange of hybridisation functions between the lattice and the impurity fragments and evaluates
-the total-energy functional.
 
 ``solvers``
 -----------
