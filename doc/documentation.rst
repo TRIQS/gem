@@ -110,6 +110,12 @@ The key methods are:
   hybridisation parameters :math:`D` and :math:`\Lambda_c` by imposing the stationarity condition of the ghost-GA
   energy functional with respect to these parameters.
 
+- :meth:`~gem.fragment.Fragment.save_fragment` — saves the fragment's parameters to a file.
+
+- :meth:`~gem.fragment.Fragment.load_fragment` — loads the fragment's parameters from a file.
+
+
+
 ``lattice``
 -----------------------------------------
 
@@ -167,6 +173,10 @@ The key methods are:
 - :meth:`~gem.lattice.Lattice.fit_mu` — adjusts the chemical potential
   iteratively until the total lattice filling matches a prescribed target.
 
+- :meth:`~gem.fragment.Lattice.save_lattice` — saves the lattice's parameters to a file.
+
+- :meth:`~gem.fragment.Lattice.load_lattice` — loads the lattice's parameters from a file.
+- 
 ``solvers``
 -----------
 
