@@ -97,6 +97,20 @@ option(Build_Documentation "Build documentation" OFF)
 option(Build_Tests "Build tests" ON)
 if(Build_Tests)
   enable_testing()
+
+  # Multi-rank tests need both a launcher and an importable mpi4py; either may
+  # be missing on a perfectly good serial install, so they are optional and the
+  # tests are simply not registered when they are.
+  find_package(MPI)
+  execute_process(COMMAND ${Python3_EXECUTABLE} -c "import mpi4py"
+                  RESULT_VARIABLE _mpi4py_missing OUTPUT_QUIET ERROR_QUIET)
+  if(MPI_FOUND AND _mpi4py_missing EQUAL 0)
+    set(GEM_MPI_TESTS ON)
+    message(STATUS "-------- MPI tests: enabled (${MPIEXEC_EXECUTABLE}) --------")
+  else()
+    set(GEM_MPI_TESTS OFF)
+    message(STATUS "-------- MPI tests: disabled, no MPI launcher or no mpi4py --------")
+  endif()
 endif()
 
 # #############
