@@ -22,6 +22,7 @@ set(all_tests
   test_delta_fit_packing
   test_lattice_mpi
   test_save_load_fragment
+  test_save_load_lattice
 )
 
 foreach(test ${all_tests})
