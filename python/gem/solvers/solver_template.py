@@ -138,7 +138,7 @@ class SolverTemplate(gemSolver): # MANDATORY: every GEM solver inherits from gem
                         ):
         '''
         Compute the double occupancy <n_up n_dn> of the impurity level i.
-        OPTIONAL: only needed by Gdmft.run.
+        OPTIONAL: only needed to report the double occupancy.
 
         :param i:   int. Index of the impurity level.
 

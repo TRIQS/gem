@@ -37,7 +37,7 @@ class gemSolver(object):
       Lattice.compute_functional;
     * ``self.type``, only used in the printouts;
     * optionally ``compute_E1loc(nimp)``, used by Fragment.compute_energy, and
-      ``calc_double_occ(i)``, used by Gdmft.run.
+      ``calc_double_occ(i)``, for the double occupancy.
 
     Everything else is up to the solver. In particular the constructor arguments
     (dimensions, symmetry sectors, whether the calculation is thermal, ...) are
@@ -98,6 +98,6 @@ class gemSolver(object):
             f"{self.type} does not implement compute_E1loc")
 
     def calc_double_occ(self, i):
-        '''Double occupancy of the impurity level i. Used by Gdmft.run.'''
+        '''Double occupancy of the impurity level i.'''
         raise NotImplementedError(
             f"{self.type} does not implement calc_double_occ")
