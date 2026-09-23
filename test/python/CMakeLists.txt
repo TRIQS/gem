@@ -39,7 +39,11 @@ set(mpi_tests
   test_mpi_fragment
   test_mpi_lattice
 )
-set(mpi_nprocs 2 4)
+# Open MPI refuses to start more ranks than it has slots, and the smallest CI
+# runner has 3 CPUs (GitHub's macOS arm64 images; the Ubuntu ones have 4), so
+# stay well inside that. Two ranks already make every split uneven and every
+# reduction non-trivial, which is all these tests need.
+set(mpi_nprocs 2)
 
 if(GEM_MPI_TESTS)
   foreach(test ${mpi_tests})
