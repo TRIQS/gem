@@ -113,8 +113,7 @@ Finally the quasiparticle weight and the filling are stored on the
             Lambda0 = fragment.Lambda.copy(); R0 = fragment.R.copy()
 
 The grids are written into the ``B<B>/`` subdirectory, one file each for
-``U_list``, ``JoverU_list``, ``Zgrid`` and ``ngrid``, and ``B1/plot.py`` reads
-them back to plot :math:`Z(U)` at each :math:`J/U`.
+``U_list``, ``JoverU_list``, ``Zgrid`` and ``ngrid``.
 
 
 Results

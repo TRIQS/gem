@@ -7,7 +7,7 @@ E1 — Thermodynamics of the Hubbard Model on the Bethe Lattice
 
 This example follows the half-filled single-orbital Hubbard model on the Bethe
 lattice (semicircular DOS, half-bandwidth :math:`D = 1`) at fixed :math:`U = 2`
-along a temperature scan, and extracts the thermodynamic quantities that the
+along a temperature scan, and extracts some of the thermodynamic quantities that the
 finite-temperature formulation gives access to: the total energy :math:`E(T)`,
 the entropy per site :math:`S(T)`, and the double occupancy
 :math:`\langle n_\uparrow n_\downarrow \rangle (T)`.
