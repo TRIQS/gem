@@ -100,7 +100,7 @@ Installation Steps
 #. Build and install::
 
      make
-     make test
+     make test # or 'ctest -j ${NPROC}' to run tests in parallel when MPI is enabled
      make install
 
 Custom CMake Options
