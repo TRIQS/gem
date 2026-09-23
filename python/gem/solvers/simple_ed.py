@@ -92,10 +92,8 @@ class SimpleED(gemSolver):
 
     **Precision.** ``dtype`` is a request, resolved into ``self.data_type`` at
     every ``build_Hemb``. A real one is honoured, and the whole solve then stays
-    real (operators, diagonalisation, eigenvectors, density matrix, at about
-    half the cost of the complex path in the stored branch), unless ``eloc``,
-    ``D``, ``Lambda_c``, ``V2E`` or the ``sy_pen`` penalty is complex — then the
-    solve is upcast to ``complex128`` and a warning is issued once.
+    real, unless ``eloc``, ``D``, ``Lambda_c``, ``V2E`` or the ``sy_pen`` penalty
+    is complex — then the solve is upcast to ``complex128`` and a warning is issued once.
     '''
 
     def __init__(self, norb, use_Ntot=False, use_Sz=False,
