@@ -62,7 +62,6 @@ class SolverTemplate(gemSolver): # MANDATORY: every GEM solver inherits from gem
 
     def solve_Hemb(self,
                    verbose=1, # MANDATORY: verbose level
-                   tol=1e-8,  # MANDATORY: tolerance for convergence
                    T=0.0 # MANDATORY: electronic temperature
                    ):
         '''
