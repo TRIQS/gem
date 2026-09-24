@@ -339,7 +339,7 @@ def jacobian_LR_movement(x, beta, Lambda_c, D, F22_target, RTF12_target, x0, alp
     return np.vstack([J, Jpen])
 
 def solve_F_dF_LR_with_movement(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target,
-                                alpha=1e-5, use_analytic_jac=True, max_nfev=200, verbose=0):
+                                alpha=1e-5, use_analytic_jac=True, max_nfev=200, verbose=0, tol=1e-9):
     """
     Least-squares solve with quadratic movement penalty around starting x0.
     alpha: penalty strength for sum_j (x_j-x0_j)^2 in objective.
@@ -355,9 +355,9 @@ def solve_F_dF_LR_with_movement(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF1
             method="trf",
             x_scale="jac",
             max_nfev=max_nfev,
-            ftol=1e-9,
-            xtol=1e-9,
-            gtol=1e-9,
+            ftol=tol,
+            xtol=tol,
+            gtol=tol,
             verbose=verbose
         )
     else:
@@ -369,16 +369,16 @@ def solve_F_dF_LR_with_movement(beta, Lambda_c, D, Lambda0, R0, F22_target, RTF1
             method="trf",
             x_scale="jac",
             max_nfev=max_nfev,
-            ftol=1e-9,
-            xtol=1e-9,
-            gtol=1e-9,
+            ftol=tol,
+            xtol=tol,
+            gtol=tol,
             verbose=verbose
         )
     Lambda_sol, R_sol = unpack_params(sol.x, Lambda0.shape[0], R0.shape[1])
     return sol, Lambda_sol, R_sol
 
 def update_self_energy_thermal_penalty(Lambda0, R0, Lambda_c, D, F22_target, RTF12_target,
-                             beta=200, alpha=1e-5, method="dF", verbose=0):
+                             beta=200, alpha=1e-5, method="dF", verbose=0, tol=1e-9):
     """
     Replacement of new_self_energy that includes movement penalty alpha * ||x-x0||^2.
     method is passed to choose between analytic/numeric jacobian inside the solver.
@@ -386,7 +386,7 @@ def update_self_energy_thermal_penalty(Lambda0, R0, Lambda_c, D, F22_target, RTF
     """
     sol, Lambda_sol, R_sol = solve_F_dF_LR_with_movement(
         beta, Lambda_c, D, Lambda0, R0, F22_target, RTF12_target,
-        alpha=alpha, use_analytic_jac=(method=="dF"), verbose=verbose
+        alpha=alpha, use_analytic_jac=(method=="dF"), verbose=verbose, tol=tol
     )
     return Lambda_sol, R_sol
 
@@ -410,7 +410,7 @@ def jacobian_LcD_movement(x, beta, Lambda, R, F11_target, F12D_target, x0, alpha
     return np.vstack([J, Jpen])
 
 def solve_F_dF_LcD_with_movement(beta, Lambda, R, Lambda_c0, D0, F11_target, F12D_target,
-                                 alpha=1e-5, use_analytic_jac=True, max_nfev=200, verbose=0):
+                                 alpha=1e-5, use_analytic_jac=True, max_nfev=200, verbose=0, tol=1e-9):
     x0 = pack_params(Lambda_c0, D0)
     if use_analytic_jac:
         sol = least_squares(
@@ -421,9 +421,9 @@ def solve_F_dF_LcD_with_movement(beta, Lambda, R, Lambda_c0, D0, F11_target, F12
             method="trf",
             x_scale="jac",
             max_nfev=max_nfev,
-            ftol=1e-9,
-            xtol=1e-9,
-            gtol=1e-9,
+            ftol=tol,
+            xtol=tol,
+            gtol=tol,
             verbose=verbose
         )
     else:
@@ -435,23 +435,23 @@ def solve_F_dF_LcD_with_movement(beta, Lambda, R, Lambda_c0, D0, F11_target, F12
             method="trf",
             x_scale="jac",
             max_nfev=max_nfev,
-            ftol=1e-9,
-            xtol=1e-9,
-            gtol=1e-9,
+            ftol=tol,
+            xtol=tol,
+            gtol=tol,
             verbose=verbose
         )
     Lambda_c_sol, D_sol = unpack_params(sol.x, D0.shape[0], D0.shape[1])
     return sol, Lambda_c_sol, D_sol
 
 def update_hybridization_thermal_penalty(Lambda_c0, D0, Lambda, R, F11_target, F12D_target,
-                               beta=200, alpha=1e-5, method="dF", verbose=0):
+                               beta=200, alpha=1e-5, method="dF", verbose=0, tol=1e-9):
     '''
     Function to update the hybridization function parameters D and Lambda_c.
     verbose: passed to least_squares (0=silent, 1=final, 2=per-iteration).
     '''
     sol, Lambda_c_sol, D_sol = solve_F_dF_LcD_with_movement(
         beta, Lambda, R, Lambda_c0, D0, F11_target, F12D_target,
-        alpha=alpha, use_analytic_jac=(method=="dF"), verbose=verbose
+        alpha=alpha, use_analytic_jac=(method=="dF"), verbose=verbose, tol=tol
     )
     return Lambda_c_sol, D_sol
 

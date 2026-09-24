@@ -26,6 +26,7 @@ Module containing GEM : Ghost Embedding Method
 """
 
 import warnings
+import gem.logo
 
 _warning_message = """
 ╔════════════════════════════════════════════════════════════════════════════════╗
@@ -39,3 +40,4 @@ _warning_message = """
 """
 
 warnings.warn(_warning_message, UserWarning, stacklevel=2)
+print(logo.logo())
