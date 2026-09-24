@@ -2,9 +2,9 @@
 
 # Changelog
 
-## Version 0.1.0
+## Version 1.0.0
 
-GEM version 0.1.0 is the first release for this project.
+GEM version 1.0.0 is the first release for this project.
 * Implementation of the ghost Gutzwiller Approximation, extended to finite temperature.
 * Support for multiple fragments.
 * MPI parallelization of the impurity solver sectors and of the k-point sums on the lattice. A serial installation without `mpi4py` is still supported.

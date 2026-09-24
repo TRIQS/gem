@@ -27,7 +27,7 @@ cmake_policy(VERSION 3.20)
 
 # ############
 # Define Project
-project(gem VERSION 0.1.0 LANGUAGES C CXX)
+project(gem VERSION 1.0.0 LANGUAGES C CXX)
 set(PROJECT_NAME_UPPERCASE "GEM")
 get_directory_property(IS_SUBPROJECT PARENT_DIRECTORY)
 if(POLICY CMP0144)

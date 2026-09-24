@@ -35,7 +35,7 @@ jobs:
         run: |
           GIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
           sed \
-            -e "s|@PROJECT_VERSION@|0.1.0|g" \
+            -e "s|@PROJECT_VERSION@|1.0.0|g" \
             -e "s|@PROJECT_GIT_HASH@|${GIT_HASH}|g" \
             -e "s|@PROJECT_NAME@|gem|g" \
             -e "s|@PROJECT_NAME_UPPERCASE@|GEM|g" \
@@ -49,7 +49,7 @@ jobs:
             -e "s|@CMAKE_CURRENT_SOURCE_DIR@|${DOC_DIR}|g" \
             -e "s|@PROJECT_NAME@|gem|g" \
             -e "s|@PROJECT_NAME_UPPERCASE@|GEM|g" \
-            -e "s|@PROJECT_VERSION@|0.1.0|g" \
+            -e "s|@PROJECT_VERSION@|1.0.0|g" \
             doc/conf.py.in > doc/conf.py
 
       - name: Build documentation
