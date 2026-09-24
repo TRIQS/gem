@@ -1,6 +1,6 @@
 #######################################################
 # Simple Exact Diagonalization solver
-# Author: Tsung-Han Lee, Samuele Giuli
+# Author: Tsung-Han Lee, Samuele Giuli, Olivier Gingras
 # Email:  henhans74716@gmail.com, samuele.giuli@gmail.com
 #######################################################
 
@@ -98,9 +98,16 @@ class SimpleED(gemSolver):
     solve is upcast to ``complex128`` and a warning is issued once.
     '''
 
-    def __init__(self, norb, use_Ntot=False, use_Sz=False,
-                 dtype=np.complex128, N_sector=None, Sz_sector=None,
-                 solver_params=None, comm=None, **kwargs):
+    def __init__(self,
+                 norb,
+                 use_Ntot=False,
+                 use_Sz=False,
+                 dtype=np.complex128,
+                 N_sector=None,
+                 Sz_sector=None,
+                 solver_params=None,
+                 comm=None,
+                 **kwargs):
         '''
         Initialize the solver with the given number of orbitals and symmetry settings.
 
@@ -233,6 +240,18 @@ class SimpleED(gemSolver):
         rather than sparse matrices.
 
         Collective: must be called by every rank.
+
+        :param D:           array. D matrix of the embedded Hamiltonian.
+        :param eloc:        array. Local part of the Hamiltonian.
+        :param Lambdac:     array. Lambda_c matrix of the embedded Hamiltonian.
+        :param V2E:         array. Two-particle interaction on the impurity degrees of freedom.
+        :param mu:          float. Chemical potential (default 0).
+        :param debug:       bool. Flag for debugging (default False). If True, returns the list of one-body terms.
+        :param verbose:     int. Level of verbosity (default 0).
+        :param spin_pen:    float. Penalty for states with non-zero <S^2> (default 0).
+        :param sz_pen:      float. Penalty for states with non-zero <S_z^2> (default 0).
+        :param sx_pen:      float. Penalty for states with non-zero <S_x^2> (default 0).
+        :param sy_pen:      float. Penalty for states with non-zero <S_y^2> (default 0).
         '''
         #Try to get penalties from solver_params if not given explicitly
         spin_pen = self.solver_params.get('spin_pen', 0) if spin_pen is None else spin_pen
@@ -329,7 +348,9 @@ class SimpleED(gemSolver):
 
     def solve_Hemb(self, num_eig=None, which=None, tol=None, dense_cutoff=None,
                    bw_cutoff=None, verbose=0, T=0.0):
-        '''Diagonalise each sector and build the global (thermal) partition function.
+        '''
+        Solve for the ground state, and some excited states if not all, of the embedded Hamiltonian of this fragment.
+        For thermal calculation, the global partition function is required.
 
         :param num_eig: int, optional. Number of eigenvalues to compute. Read
             from solver_params when not given; if it is None there too, only
@@ -342,6 +363,8 @@ class SimpleED(gemSolver):
             exp(-beta*(E-gs_ene)) falls below this are dropped from the
             partition function. Read from solver_params when not given,
             default 1e-8.
+        :param verbose:     int. Level of verbosity (default 0).
+        :param T:           float. Electronic temperature (default 0).
 
         Collective: every rank diagonalises its own sectors, then ``gs_ene``,
         ``Zpart``, ``Tstates``, ``deg``, ``bw_list`` and the returned
@@ -534,6 +557,9 @@ class SimpleED(gemSolver):
         across all active sectors, reduced over the MPI ranks.
 
         Collective: must be called by every rank.
+
+        Return:
+            array. One-body density-matrix.
         '''
         dm = np.zeros((self.norb, self.norb), dtype=self.data_type)
 
@@ -556,9 +582,16 @@ class SimpleED(gemSolver):
         return dm
 
     def compute_E1loc(self, nimp):
-        '''One-body local energy (impurity block) averaged across sectors.
+        '''
+        One-body local energy (impurity block) averaged across sectors.
+        Compute the one-body local energy (impurity block) averaged across sectors.
 
         Collective: must be called by every rank.
+
+        :param nimp:    int. Number of impurity orbitals in the block Hamiltonian.
+
+        Return:
+            float. One-body local energy.
         '''
         result = 0.0
         for s in range(self.nloc):
@@ -579,9 +612,14 @@ class SimpleED(gemSolver):
         return self.comm.allreduce(result, op=_MPI_SUM) / self.Zpart
 
     def compute_E2loc(self):
-        '''Two-body local energy averaged across sectors.
+        '''
+        Two-body local energy averaged across sectors.
+        Compute the two-body local energy averaged across sectors.
 
         Collective: must be called by every rank.
+
+        Return:
+            float. Two-body local energy.
         '''
         result = 0.0
         for s in range(self.nloc):
@@ -636,7 +674,12 @@ class SimpleED(gemSolver):
         return owner
 
     def _get_sectors(self):
-        '''Return the list of (N, Sz) pairs to solve given the symmetry flags.'''
+        '''
+        Return the list of (N, Sz) pairs to solve given the symmetry flags.
+
+        Return:
+            list of tuples. List of (N, Sz) sectors given the symmetry constraints.
+        '''
         norb   = self.norb
         n_half = norb // 2
 
@@ -658,7 +701,7 @@ class SimpleED(gemSolver):
                     sectors.append((N, (nup - (N - nup)) / 2.0))
                 return sectors
             if Sz is not None:          # all valid N for given Sz
-                return self._all_N_for_Sz(Sz, norb, n_half)
+                return self._all_N_for_Sz(Sz, norb)
             # both None: all (N, Sz) sectors
             sectors = []
             for n in range(norb + 1):
@@ -669,11 +712,22 @@ class SimpleED(gemSolver):
         # use_Sz only (useful only for superconductivity)
         if not self.use_Ntot and self.use_Sz:
             if self.Sz_sector is not None:
-                return self._all_N_for_Sz(self.Sz_sector, norb, n_half)
+                return self._all_N_for_Sz(self.Sz_sector, norb)
             return [(None, None)]
 
     @staticmethod
-    def _all_N_for_Sz(Sz, norb, n_half):
+    def _all_N_for_Sz(Sz, norb):
+        '''
+        Give all different N sectors for a given SZ.
+
+        :param Sz:      int. Value of Sz.
+        :param norb:    int. Number of total orbitals.
+
+        Return:
+            list. List of sectors (N) for a given Sz.
+        '''
+        n_half = norb // 2
+
         sz2 = round(2 * Sz)
         sectors = []
         for n in range(norb + 1):
@@ -686,7 +740,12 @@ class SimpleED(gemSolver):
         return sectors
 
     def _build_basis(self, N, Sz):
-        '''Build the Fock-state basis for sector (N, Sz).'''
+        '''
+        Build the Fock-state basis for sector (N, Sz).
+
+        Return:
+           array. List of states for a given (N, Sz) sector.
+        '''
         norb = self.norb
         if not self.use_Ntot and not self.use_Sz:
             return np.arange(2**norb)
@@ -698,7 +757,11 @@ class SimpleED(gemSolver):
         return table_es(norb, N, Sz)
 
     def _set_single_sector_aliases(self, s):
-        '''Expose per-sector attributes as flat attributes for single-sector use.'''
+        '''
+        Expose per-sector attributes as flat attributes for single-sector use.
+
+        :param s:   int. Sector.
+        '''
         self.basis     = self.basis_list[s]
         self.hsize     = self.hsize_list[s]
         if self.matrix_free:
@@ -715,7 +778,9 @@ class SimpleED(gemSolver):
 # -- operator builders (take basis/hsize explicitly) --
 
     def _build_denmat_op(self, basis, hsize):
-        '''Build c†_i c_j operators in the given basis.'''
+        '''
+        Build c^dag_i c_j operators in the given basis.
+        '''
         denmat_op = {}
         bit_max = 2**(self.norb - 1)
         for i in range(self.norb):
@@ -728,7 +793,9 @@ class SimpleED(gemSolver):
         return denmat_op
 
     def _build_S2_op(self, basis, hsize, denmat_op):
-        '''Build S², Sz, Sx, Sy in the given basis.'''
+        '''
+        Build S², Sz, Sx, Sy in the given basis.
+        '''
         Sp = csc_matrix((hsize, hsize), dtype=self.data_type)
         Sm = csc_matrix((hsize, hsize), dtype=self.data_type)
         Sz = csc_matrix((hsize, hsize), dtype=self.data_type)
@@ -749,7 +816,9 @@ class SimpleED(gemSolver):
         return S2, Sz, Sx, Sy
 
     def _build_one_body(self, H1E, hsize, denmat_op):
-        '''Build one-body Hamiltonian block in a given basis.'''
+        '''
+        Build one-body Hamiltonian block in a given basis.
+        '''
         Hone = csc_matrix((hsize, hsize), dtype=self.data_type)
         for i in range(self.norb):
             for j in range(self.norb):
@@ -759,7 +828,9 @@ class SimpleED(gemSolver):
         return Hone
 
     def _build_two_body(self, Umatrix, basis, hsize):
-        '''Build two-body Hamiltonian block in a given basis.'''
+        '''
+        Build two-body Hamiltonian block in a given basis.
+        '''
         bit_max = 2**(self.norb - 1)
         Htwo = csc_matrix((hsize, hsize), dtype=self.data_type)
         for i in range(Umatrix.shape[0]):
@@ -780,6 +851,9 @@ class SimpleED(gemSolver):
 # -- other auxiliary function --
 
     def build_h1e(self, eloc, D, Lambdac, mu, verbose=0):
+        '''
+        Build one-body part of the embedded Hamiltonian.
+        '''
         self.h1e = np.zeros((self.norb, self.norb), dtype=np.complex128)
         nimp = eloc.shape[0]
         self.h1e[:nimp, :nimp] = eloc - mu*np.eye(nimp)
@@ -878,7 +952,9 @@ class SimpleED(gemSolver):
 
 
 def table_ep(nstate, nparticle, dtype=np.int64):
-    '''Binary basis for fixed particle number (no Sz constraint).'''
+    '''
+    Binary basis for fixed particle number (no Sz constraint).
+    '''
     result = np.zeros(factorial(nstate) // factorial(nparticle) // factorial(nstate - nparticle),
                       dtype=dtype)
     for i, v in enumerate(combinations(range(nstate), nparticle)):
@@ -890,7 +966,9 @@ def table_ep(nstate, nparticle, dtype=np.int64):
     return result
 
 def table_es(nstate, nparticle, spinz, dtype=np.int64):
-    '''Binary basis for fixed particle number and Sz.'''
+    '''
+    Binary basis for fixed particle number and Sz.
+    '''
     n    = nstate // 2
     nup  = (nparticle + int(2*spinz)) // 2
     ndw  = (nparticle - int(2*spinz)) // 2

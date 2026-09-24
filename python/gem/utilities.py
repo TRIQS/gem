@@ -175,6 +175,12 @@ def dF(A, H, function, d_function):
     loewm = np.zeros(evecs.shape,dtype=A.dtype)#dtype=np.complex128)
     for i in range(loewm.shape[0]):
         for j in range(loewm.shape[1]):
+            # Stable divided difference for sqrt(x*(1-x) + eps),
+            # including equal eigenvalues; keeps the existing regularization.
+            if function is denRm1 and d_function is ddenRm1:
+                x, y = evals[i], evals[j]
+                loewm[i, j] = (1.0 - x - y) / (denRm1(x) + denRm1(y))
+                continue
             if i==j:
                 loewm[i,i] = d_function(evals[i]) # derivative(function, evals[i], dx=1e-12)
             if i!=j:
