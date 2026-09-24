@@ -7,7 +7,9 @@ energies, functional and entropy are compared against
 
 import unittest
 
-from gem.gdmft import *
+import scf
+from gem.fragment import Fragment
+from gem.lattice import Lattice
 import numpy as np
 from gem.solvers.simple_ed import SimpleED
 import os
@@ -16,7 +18,7 @@ import h5py
 
 class test_temperature(unittest.TestCase):
 
-    def test_gdmft_temperature(self):
+    def test_scf_temperature(self):
 
         # 1 orbital with 2 spins, 3 bath per orbital, total 8
         B = 3
@@ -55,8 +57,9 @@ class test_temperature(unittest.TestCase):
         edsolver = SimpleED(ntot, use_Ntot=False,
                       use_Sz=False, dtype=np.complex128)
 
-        grisb = Gdmft(ntot, nimp, nbath, eks, eloc, Utensor,
-                      wks=wks, R=R0, Lambda=Lambda0, edsolver=edsolver)
+        lattice = Lattice(eks, wk_list=wks, verbose=0)
+        fragment = Fragment(nimp, nbath, eloc, Utensor, edsolver, verbose=0,
+                            R=R0, Lambda=Lambda0)
 
         T_results = []
         docc_results = []
@@ -65,12 +68,13 @@ class test_temperature(unittest.TestCase):
 
         for iT, T in enumerate(T_list):
             print(f"\n***** T={T:.4e} ({iT+1}/{len(T_list)}) *****")
-            grisb.run(itmax=50, mix=0.05, tol=1e-4, T= T, silence=True)
+            mu, docc, _ = scf.run_scf(lattice, fragment,
+                                      itmax=50, mix=0.05, tol=1e-4, T=T)
             T_results.append(T)
-            docc_results.append(np.array(grisb.docc).real)
-            grisb.compute_energy(beta=1/T)
-            etot_results.append(grisb.etot.real)
-            func_results.append(grisb.get_functional().real)
+            docc_results.append(np.array(docc).real)
+            etot_results.append(scf.total_energy(lattice, fragment,
+                                                 beta=1/T, mu=mu).real)
+            func_results.append(lattice.compute_functional([fragment], T=T).real)
 
         T_results = np.array(T_results)
         docc_results = np.array(docc_results)  # shape: (n_T, n_orb)

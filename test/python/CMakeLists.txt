@@ -21,6 +21,8 @@ set(all_tests
   test_delta_fit_gradient
   test_delta_fit_packing
   test_lattice_mpi
+  test_save_load_fragment
+  test_save_load_lattice
 )
 
 foreach(test ${all_tests})
@@ -29,3 +31,32 @@ foreach(test ${all_tests})
   add_test(NAME Py_${test_name} COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/${test_dir}/${test_name}.py WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${test_dir})
   set_property(TEST Py_${test_name} APPEND PROPERTY ENVIRONMENT PYTHONPATH=${PROJECT_BINARY_DIR}/python:$ENV{PYTHONPATH})
 endforeach()
+
+# Tests that must run on several ranks. ctest launches them itself, one entry
+# per rank count, and PROCESSORS tells `ctest -j` how many slots each one takes
+# so that it does not oversubscribe the machine.
+set(mpi_tests
+  test_mpi_fragment
+  test_mpi_lattice
+)
+# Open MPI refuses to start more ranks than it has slots, and the smallest CI
+# runner has 3 CPUs (GitHub's macOS arm64 images; the Ubuntu ones have 4), so
+# stay well inside that. Two ranks already make every split uneven and every
+# reduction non-trivial, which is all these tests need.
+set(mpi_nprocs 2)
+
+if(GEM_MPI_TESTS)
+  foreach(test ${mpi_tests})
+    foreach(np ${mpi_nprocs})
+      add_test(NAME Py_${test}_np${np}
+               COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${np}
+                       ${MPIEXEC_PREFLAGS}
+                       ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/${test}.py
+                       ${MPIEXEC_POSTFLAGS}
+               WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+      set_property(TEST Py_${test}_np${np} APPEND PROPERTY
+                   ENVIRONMENT PYTHONPATH=${PROJECT_BINARY_DIR}/python:$ENV{PYTHONPATH})
+      set_tests_properties(Py_${test}_np${np} PROPERTIES PROCESSORS ${np})
+    endforeach()
+  endforeach()
+endif()

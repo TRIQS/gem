@@ -144,6 +144,19 @@ jobs:
           -DPython_EXECUTABLE=$VIRTUAL_ENV/bin/python
         cmake --build build --verbose
 
+    - name: Check the MPI tests were registered
+      run: |
+        source $HOME/install/share/triqs/triqsvars.sh
+        cd build
+        # They are registered only when CMake finds both an MPI launcher and an
+        # importable mpi4py, and they skip themselves on a single rank. Without
+        # this check, losing either one would quietly drop the multi-rank
+        # coverage instead of failing. One entry per module and rank count.
+        n=$(ctest -N | grep -c '_np[0-9]' || true)
+        echo "Registered MPI test entries: $n"
+        ctest -N | grep '_np[0-9]' || true
+        test "$n" -ge 2
+
     - name: Test GEM
       env:
         OPENBLAS_NUM_THREADS: "1"

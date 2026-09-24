@@ -6,7 +6,9 @@ Kanamori interaction; the reference is the ``2o2_ci`` group of
 
 import unittest
 
-from gem.gdmft import *
+import scf
+from gem.fragment import Fragment
+from gem.lattice import Lattice
 from gem.utilities import U_matrix_kanamori
 import numpy as np
 import h5py
@@ -16,7 +18,7 @@ import os
 
 class test_hemb_2o2_simple_ed(unittest.TestCase):
 
-    def test_gdmft_simple_ed(self):
+    def test_scf_simple_ed(self):
 
         # 2 orbital with 2 spins, 1 bath per orbital, total 4
         B=1
@@ -68,19 +70,21 @@ class test_hemb_2o2_simple_ed(unittest.TestCase):
         Utensor = U_matrix_kanamori(nimp//2, U, J)
 
         edsolver = SimpleED(ntot, use_Ntot=True, use_Sz=True, dtype=np.complex128)
-        grisb = Gdmft(ntot, nimp, nbath, eks, eloc, Utensor, wks=wks,
-                      R=R0, Lambda=L0, edsolver=edsolver, verbose=4,
-                      spin_sym=True, orb_sym=False)
+        lattice = Lattice(eks, wk_list=wks, verbose=4)
+        fragment = Fragment(nimp, nbath, eloc, Utensor, edsolver, verbose=4,
+                            R=R0, Lambda=L0)
         # the cycle oscillates for the first ~25 iterations before settling on
         # the symmetric fixed point, so itmax must be well above it
-        grisb.run(itmax=100, mix=0.5, tol=1e-5, T=1e-3, silence=False)
+        _, docc, _ = scf.run_scf(lattice, fragment, itmax=100, mix=0.5,
+                                 tol=1e-5, T=1e-3, spin_sym=True,
+                                 orb_sym=False, verbose=True)
 
         name = "2o2_ci"
         with h5py.File(os.path.dirname(os.path.abspath(__file__)) + "/result_tests.h5", "r") as A:
 
             print("Compare docc")
-            docc_true = [A[name]["docc"][str(i)][0] + 1j*A[name]["docc"][str(i)][1] for i in range(len(grisb.docc))]
-            np.testing.assert_allclose(grisb.docc, docc_true, atol=1e-3)
+            docc_true = [A[name]["docc"][str(i)][0] + 1j*A[name]["docc"][str(i)][1] for i in range(len(docc))]
+            np.testing.assert_allclose(docc, docc_true, atol=1e-3)
 
             print("Compare denMat")
             denmat_true = A[name]["denMat"][...,0] + 1j*A[name]["denMat"][...,1]
@@ -88,7 +92,7 @@ class test_hemb_2o2_simple_ed(unittest.TestCase):
             idx = ref_denM_eval.argsort()[::-1]
             ref_denM_eval = ref_denM_eval[idx]
 
-            test_denM_eval, test_denM_evec = np.linalg.eig(grisb.Fragment.denMat)
+            test_denM_eval, test_denM_evec = np.linalg.eig(fragment.denMat)
             idx = test_denM_eval.argsort()[::-1]
             test_denM_eval = test_denM_eval[idx]
 

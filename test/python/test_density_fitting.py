@@ -6,11 +6,13 @@ Checked both for the quasiparticle problem and for the impurity problem.
 import unittest
 import numpy as np
 
-from gem.gdmft import *
+import scf
+from gem.fragment import Fragment
+from gem.lattice import Lattice
 from gem.solvers.simple_ed import SimpleED
 
 
-def _make_grisb():
+def _make_system():
     B = 3
     nimp = 2
     nbath = nimp * B
@@ -36,22 +38,25 @@ def _make_grisb():
     Utensor[1, 1, 0, 0] = U
 
     edsolver = SimpleED(ntot, use_Ntot=True, use_Sz=True, dtype=np.complex128)
-    return Gdmft(ntot, nimp, nbath, eks, eloc, Utensor, wks=wks, edsolver=edsolver)
+    lattice = Lattice(eks, wk_list=wks, verbose=0)
+    fragment = Fragment(nimp, nbath, eloc, Utensor, edsolver, verbose=0)
+    return lattice, fragment
 
 
 N_TARGET = 0.85
 N_TOLERANCE = 1e-3
-RUN_KWARGS = dict(itmax=150, mix=0.2, tol=1e-5, T=2e-3, silence=True,
+RUN_KWARGS = dict(itmax=150, mix=0.2, tol=1e-5, T=2e-3,
                   n_target=N_TARGET, n_tolerance=N_TOLERANCE)
 
 
 class TestDensityFittingQP(unittest.TestCase):
 
     def test_density_fit_qp(self):
-        grisb = _make_grisb()
-        grisb.run(**RUN_KWARGS, n_fit_method='qp')
+        lattice, fragment = _make_system()
+        scf.run_scf(lattice, fragment, **RUN_KWARGS, n_fit_method='qp')
         np.testing.assert_allclose(
-            grisb.nfill, N_TARGET, atol=N_TOLERANCE,
+            np.trace(fragment.denMat[:fragment.nimp, :fragment.nimp]).real,
+            N_TARGET, atol=N_TOLERANCE,
             err_msg="QP density fitting did not converge to n_target"
         )
 
@@ -59,10 +64,11 @@ class TestDensityFittingQP(unittest.TestCase):
 class TestDensityFittingImp(unittest.TestCase):
 
     def test_density_fit_imp(self):
-        grisb = _make_grisb()
-        grisb.run(**RUN_KWARGS, n_fit_method='imp')
+        lattice, fragment = _make_system()
+        scf.run_scf(lattice, fragment, **RUN_KWARGS, n_fit_method='imp')
         np.testing.assert_allclose(
-            grisb.nfill, N_TARGET, atol=N_TOLERANCE,
+            np.trace(fragment.denMat[:fragment.nimp, :fragment.nimp]).real,
+            N_TARGET, atol=N_TOLERANCE,
             err_msg="Impurity density fitting did not converge to n_target"
         )
 

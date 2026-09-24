@@ -3,6 +3,9 @@
 # Author: Samuele Giuli
 # Email:  samuele.giuli@gmail.com
 ###########################################
+import os
+import h5py
+
 import numpy as np
 import warnings
 from scipy.linalg import block_diag
@@ -167,7 +170,7 @@ class Lattice():
         allreduce_array(self.comm, Gloc)
         return Gloc
 
-
+    ###### ROUTINES TO FIT CHEMICAL POTENTIAL #####
     def fit_mu(self, n_target, Fragments_list, T=0.0, mu_old=0.0, mode='qp', ntol=1e-4,Tsmearing=0.0):
         """
         Procedure to determine the chemical potential that achieves a target filling using either the quasiparticle or the fragment method.
@@ -246,8 +249,6 @@ class Lattice():
             mu_target=None
 
         return mu_target
-
-
 
     def fit_mu_fragment(self, n_target, Fragments_list, T=1e-2, nsteps=30, dmu0=1e-1,
                         ntol=1e-4, mu_old=0.0, max_expand=60, mu_tol=1e-8):
@@ -353,6 +354,7 @@ class Lattice():
         dens(mu)
         return mu
 
+    ###### ROUTINES TO COMPUTE OBSERVALES #####
     def compute_ekin(self, Fragments_list, T, Tsmearing=0.0):
         """
         Compute the kinetic energy from the quasiparticle part.
@@ -427,3 +429,47 @@ class Lattice():
 
         Omega_tot = Omega_qp+Omega_imps+Omega_mix
         return Omega_tot # , Omega_qp, Omega_imps, Omega_mix
+
+    ###### ROUTINES TO SAVE AND LOAD #####
+    def save_lattice(self,filename, overwrite=True):
+        '''
+        Save the lattice parameters to a file.
+
+        **Not collective, and not MPI-aware: guard it yourself.** The lattice is
+        replicated on every rank, so under MPI exactly one rank must call this::
+
+            if comm.Get_rank() == 0:
+                lattice.save_lattice('lattice.h5')
+
+        :param filename: str. Path to the file where the lattice parameters will be saved.
+        :param overwrite: bool, optional. Whether to overwrite the file if it already exists (default: True).
+        '''
+        if not overwrite and os.path.exists(filename):
+            raise FileExistsError(f'Lattice.save file {filename} already exists.'
+                                  f'Use overwrite=True to overwrite it.')
+
+        with h5py.File(filename,'w') as f:
+            f.create_dataset('ek_list', data=self.eks)
+            f.create_dataset('wk_list', data=self.wks)
+            f.create_dataset('verbose', data=self.verb)
+
+    @staticmethod
+    def load_lattice(filename, use_mpi=True, comm=None):
+        '''
+        Load the lattice parameters from a file.
+
+        Read-only, so unlike :meth:`save_lattice` it needs no rank guard: every
+        rank can call it and they all end up with the same lattice.
+
+        :param filename: str. Path to the file containing the lattice parameters.
+        :param use_mpi: bool, optional. Distribute the k-point sums over the
+            ranks of ``comm`` (default: True). Ignored when mpi4py is absent.
+        :param comm: mpi4py communicator, optional. Defaults to ``MPI.COMM_WORLD``.
+        '''
+               
+        with h5py.File(filename,'r') as f:
+            eks = f['ek_list'][()]
+            wks = f['wk_list'][()]
+            verbose = int(f['verbose'][()])
+        
+        return Lattice(eks, wks, verbose=verbose, use_mpi=use_mpi, comm=comm)

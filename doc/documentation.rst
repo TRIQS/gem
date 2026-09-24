@@ -24,7 +24,6 @@ Core Modules
 
    gem.fragment
    gem.lattice
-   gem.gdmft
    gem.solvers
 
 Everything is expressed in **spin-orbital** indices, with spin as the *fastest*
@@ -111,6 +110,13 @@ The key methods are:
   hybridisation parameters :math:`D` and :math:`\Lambda_c` by imposing the stationarity condition of the ghost-GA
   energy functional with respect to these parameters.
 
+- :meth:`~gem.fragment.Fragment.save_fragment` — saves the fragment's parameters to a file. This **Not MPI aware**:
+  only rank 0 should call it to write the file, and it is overwritten if it exists.
+
+- :meth:`~gem.fragment.Fragment.load_fragment` — loads the fragment's parameters from a file.
+
+
+
 ``lattice``
 -----------------------------------------
 
@@ -168,14 +174,11 @@ The key methods are:
 - :meth:`~gem.lattice.Lattice.fit_mu` — adjusts the chemical potential
   iteratively until the total lattice filling matches a prescribed target.
 
-``gdmft`` — Simple Self-Consistency Driver
-------------------------------------------
+- :meth:`~gem.fragment.Lattice.save_lattice` — saves the lattice's parameters to a file. This **Not MPI aware**:
+  only rank 0 should call it to write the file, and it is overwritten if it exists.
 
-The :mod:`gem.gdmft` module provides a legacy implementation of the :class:`~gem.gdmft.Gdmft`
-class, which drives the ghost-GA self-consistency loop for a simple single fragment case.
-It manages the exchange of hybridisation functions between the lattice and the impurity fragments and evaluates
-the total-energy functional.
-
+- :meth:`~gem.fragment.Lattice.load_lattice` — loads the lattice's parameters from a file.
+- 
 ``solvers``
 -----------
 
