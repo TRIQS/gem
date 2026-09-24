@@ -122,6 +122,6 @@ horizontal reference line.
 Results
 -------
 
-.. image:: ./images/figE1.pdf
+.. image:: ./images/figE1.png
    :width: 100%
    :align: center

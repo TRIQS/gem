@@ -136,6 +136,6 @@ The results of the temperature scan at fixed :math:`U` are plotted in the follow
 on the left the staggered magnetisation :math:`m` and on the right a comparison of the antiferromagnetic
 phase boundaries with DMFT from Phys. Rev. B 83, 085102
 
-.. image:: ./images/figE2.pdf
+.. image:: ./images/figE2.png
    :width: 100%
    :align: center

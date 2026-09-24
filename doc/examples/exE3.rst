@@ -123,6 +123,6 @@ Results are plotted in the following figure for B=1 (left) and B=3 (right).
 The effect of the ghost levels is to show a much stronger suppression
 of the quasiparticle weight at large :math:`U` when the Janus regime is entered.
 
-.. image:: ./images/figE3.pdf
+.. image:: ./images/figE3.png
    :width: 100%
    :align: center
