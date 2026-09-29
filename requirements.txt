@@ -4,3 +4,6 @@ numba
 numpy
 pytest
 scipy
+
+# Optional python packages
+mpi4py # For parallel processing with MPI
