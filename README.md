@@ -1,24 +1,13 @@
 # GEM - Ghost Embedding Method
 
-> **Disclaimer:** This software is in **beta stage**. It is provided as-is, and no guarantee is made that it works for your use case or is free from bugs.
->
-> Use at your own risk and verify results independently.
-
------
-
-> **Disclaimer:** The software will have soon a paper associated to it. In the meantime, if you use it for your own research, please cite Ref. [1,2]
->
-
 [![Documentation](https://img.shields.io/badge/docs-online-blue)](https://triqs.github.io/gem)
 [![docs](https://github.com/triqs/gem/actions/workflows/docs.yml/badge.svg)](https://github.com/triqs/gem/actions/workflows/docs.yml)
 
+GEM is an implement of the ghost-Gutwiller approximation (ghost-GA) and its finite temperature extension [1,2].
 Start to learn about GEM on our website at [https://triqs.github.io/gem/](triqs.github.io/gem).
+If you use GEM for your own research, please cite Ref. [3]
 
-About
------
-
-This is an implement of the ghost-Gutwiller approximation and its finite temperature extension [1,2] (ghost-GA).
-
+------------
 Dependencies
 ------------
 
@@ -30,6 +19,8 @@ Dependencies
 | scipy | Sparse matrices, linear algebra, optimization |
 | numba | JIT compilation for ED basis construction |
 | h5py | HDF5 file I/O |
+
+Optionally, GEM provides parallelization via mpi4py. More details are given in Ref. [3]
 
 ### Solvers (install only what you use)
 
@@ -79,6 +70,8 @@ References
 
 [2]: S. Giuli, T.-H. Lee, Y.-X. Yao, G. Kotliar, A. E. Ruckenstein, O. Gingras, and N. Lanatà, [Unifying Variational and Dynamical Quantum Embedding: From Ghost Gutzwiller Approximation to Dynamical Mean-Field Theory, arXiv:2603.20559.](https://doi.org/10.48550/arXiv.2603.20559)
 
+[3]: S. Giuli, T.-H. Lee, Y.-X. Yao, I. Park, H. LaBollita, I. Pasqua, N. Lanatà and O. Gingras, [GEM: An implementation of the ghost-Gutzwiller approximation for simulating interacting quantum systems, arXiv.2609.32633.](https://doi.org/10.48550/arXiv.2609.32633)
+
 
 Support
 -------
@@ -96,5 +89,10 @@ triqs/gem is supported by the [Flatiron Institute](https://www.simonsfoundation.
   <source media="(prefers-color-scheme: dark)" width="20%" srcset="doc/_static/logo_simons.png">
   <img alt="Simons Foundation logo." width="20%" src="doc/_static/logo_simons.png">
 </picture>
+
+----------------
+
+> **Disclaimer:** This software is provided as-is, and no guarantee is made that it works for your use case or is free from bugs.
+> Use at your own risk and verify results independently.
 
 ----------------
