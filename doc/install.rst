@@ -50,14 +50,8 @@ When using a solver different from ``SimpleED`` please make sure to cite the app
 Testing
 -------
 
-The following python packages are required to build and run the tests.
-To enable building and runnning the tests locally pass the appropriate flag to cmake (``cmake -DBuild_Tests=ON``):
-
-+--------+-----------------------------+
-| Package| Purpose                     |
-+========+=============================+
-| pytest | Test runner (``make test``) |
-+--------+-----------------------------+
+Tests run with ``make test`` (or ``ctest``) and need no extra packages.
+The serial tests can also be run with ``pytest test/python``.
 
 Documentation
 -------------

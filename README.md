@@ -30,9 +30,8 @@ Optionally, GEM provides parallelization via mpi4py. More details are given in R
 
 ### Testing
 
-| Package | Purpose |
-|---------|---------|
-| pytest | Test runner (`make test`) |
+Tests run with `make test` (or `ctest`) and need no extra packages.
+The serial tests can also be run with `pytest test/python`.
 
 Initial Setup
 -------------
