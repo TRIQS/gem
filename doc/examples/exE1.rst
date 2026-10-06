@@ -11,6 +11,7 @@ along a temperature scan, and extracts some of the thermodynamic quantities that
 finite-temperature formulation gives access to: the total energy :math:`E(T)`,
 the entropy per site :math:`S(T)`, and the double occupancy
 :math:`\langle n_\uparrow n_\downarrow \rangle (T)`.
+The same quantities are discussed in Ref. :cite:`Giuli2026`.
 
 Setup
 -----
