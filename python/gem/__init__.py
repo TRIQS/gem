@@ -25,19 +25,6 @@ Module containing GEM : Ghost Embedding Method
 
 """
 
-import warnings
 import gem.logo
 
-_warning_message = """
-╔════════════════════════════════════════════════════════════════════════════════╗
-║                                  ⚠️  WARNING  ⚠️                                 ║
-║                                                                                ║
-║  This software is in BETA STAGE and is provided as-is.                         ║
-║  No guarantee is made that it works for your use case or that it is            ║
-║  free from bugs. Use at your own risk and verify results independently.        ║
-║                                                                                ║
-╚════════════════════════════════════════════════════════════════════════════════╝
-"""
-
-warnings.warn(_warning_message, UserWarning, stacklevel=2)
 print(logo.logo())
