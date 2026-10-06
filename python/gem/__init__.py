@@ -26,5 +26,7 @@ Module containing GEM : Ghost Embedding Method
 """
 
 import gem.logo
+from gem.mpi import resolve_comm
 
-print(logo.logo())
+if resolve_comm(None).Get_rank() == 0:
+    print(gem.logo.logo())
