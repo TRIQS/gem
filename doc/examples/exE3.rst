@@ -3,7 +3,7 @@
 E3 — Hund's Physics in the Multi-Orbital Hubbard-Kanamori Model
 ===============================================================
 
-**Scripts:** ``examples/E3/Bethe_2orb_kanamori.py``
+**Scripts:** ``examples/E3/Bethe_3orb_kanamori.py``
 
 This example addresses the three-orbital Hubbard-Kanamori model on the Bethe
 lattice at fixed filling :math:`n = n_{orb} - 1` (two electrons in three
