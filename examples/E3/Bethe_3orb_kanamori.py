@@ -11,9 +11,9 @@ from gem.fragment import Fragment
 from gem.lattice import Lattice
 from gem.solvers.simple_ed import SimpleED
 from gem.utilities import U_matrix_kanamori
+import os
 
-
-n_orb, B = 3, 3 # B will be 1 or 3 in this example
+n_orb, B = 3, 1 # B will be 1 or 3 in this example
 nimp = 2 * n_orb
 nbath = nimp * B
 ntot = nimp + nbath
@@ -112,5 +112,6 @@ for iJ, JoverU in enumerate(JoverU_list):
         print(f'returning Z={np.diag(Z.real)}, mu={mu} and n={fragment.nfill.real}')
         print('--------------------------------------------------------')
 
-np.savetxt('B{B}/hund_Ulist.dat', U_list); np.savetxt('B{B}/hund_JoverU.dat', np.array(JoverU_list))
-np.savetxt('B{B}/hund_Zgrid.dat', Zgrid); np.savetxt('B{B}/hund_ngrid.dat', ngrid)
+os.makedirs(f'B{B}',exist_ok=True)
+np.savetxt(f'B{B}/hund_Ulist.dat', U_list); np.savetxt(f'B{B}/hund_JoverU.dat', np.array(JoverU_list))
+np.savetxt(f'B{B}/hund_Zgrid.dat', Zgrid); np.savetxt(f'B{B}/hund_ngrid.dat', ngrid)
