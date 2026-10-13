@@ -458,16 +458,11 @@ class Lattice():
         Dqp_local = np.zeros( (nimp_tot, nimp_tot), dtype=complex )
         Dimp_local = np.zeros( (nimp_tot, nimp_tot), dtype=complex )
 
-        RRdag = self.Rtot @ self.Rtot.T.conj()
-
-        Revals, Revecs = np.linalg.eigh(RRdag)
-        Revals = 1/np.sqrt(Revals)
-        invsRRd = Revecs @ np.diag(Revals) @ Revecs.T.conj()
-
         for i,(ek,wk) in enumerate(zip(self.eks,self.wks)):
             Hk_qp = self.Rtot @ ek @ self.Rtot.T.conj() + self.Ltot
-            Dk = self.Rtot.T.conj() @ calc_nf(Hk_qp,Tuse).T @ self.Rtot
-            Dk_tot[i,:,:] = invsRRd @ Dk @ invsRRd
+            # calc_nf(H)[a,b] = <f^dag_b f_a>, so R^dag nf R is <c^dag_b c_a>; transpose to the denMat order <c^dag_a c_b>
+            Dk = ( self.Rtot.T.conj() @ calc_nf(Hk_qp,Tuse) @ self.Rtot ).T
+            Dk_tot[i,:,:] = Dk
             Dk_local += wk*Dk_tot[i,:,:]
 
         #Get the Delta_k correction to preserve optical sum rule and mott in B=1 case
@@ -476,6 +471,7 @@ class Lattice():
             sslice=slice(stride,stride+F.nimp)
             Dimp_local[sslice,sslice] = F.denMat[:F.nimp,:F.nimp]
             Dqp_local[sslice,sslice] = Dk_local[sslice,sslice]
+            stride+=F.nimp
 
         for ik in range(Dk_tot.shape[0]):
             Dk_tot[ik,:,:] += Dimp_local - Dqp_local
