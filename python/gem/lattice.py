@@ -107,8 +107,8 @@ class Lattice():
         if( T==0.0 and Tsmearing==0.0):
             warnings.warn("Both T and Tsmearing are zero in solve_qp. This may lead to numerical instabilities. Consider using a small T or Tsmearing.")
         Tuse=Tsmearing if T==0 else T
-        self.Rtot = block_diag(*[F.R for F in Fragments_list])
-        self.Ltot = block_diag(*[F.Lambda for F in Fragments_list])
+
+        self.update_Rtot_Ltot(Fragments_list)
 
         self.Delta_p_tot = np.zeros( (nbath_tot,nbath_tot), dtype=complex )
         self.ERD_tot   = np.zeros( (nimp_tot ,nbath_tot), dtype=complex )
@@ -147,9 +147,7 @@ class Lattice():
         if self.eks.shape[1] != nimp_tot or self.eks.shape[2] != nimp_tot:
             raise ValueError(f"ek_list second and third dimensions must be {nimp_tot}, got {self.eks.shape}")
 
-        self.Rtot = block_diag(*[F.R for F in Fragments_list])
-        self.Ltot = block_diag(*[F.Lambda for F in Fragments_list])
-
+        self.update_Rtot_Ltot(Fragments_list)
 
         @jit(nopython=True)
         def compute_Gloc_at_w( w, Rtot, Ltot, eks, wks, eps):
@@ -215,8 +213,7 @@ class Lattice():
         if self.eks.shape[1] != nimp_tot or self.eks.shape[2] != nimp_tot:
             raise ValueError(f"ek_list second and third dimensions must be {nimp_tot}, got {self.eks.shape}")
 
-        self.Rtot = block_diag(*[F.R for F in Fragments_list])
-        self.Ltot = block_diag(*[F.Lambda for F in Fragments_list])
+        self.update_Rtot_Ltot(Fragments_list)
 
         #Check if can be jitted
         def qp_density( mu, T, Lqp, Rqp):
@@ -370,14 +367,14 @@ class Lattice():
         if( T==0.0 and Tsmearing==0.0):
             warnings.warn("Both T and Tsmearing are zero in compute_ekin. This may lead to numerical instabilities. Consider using a small T or Tsmearing.")
         Tuse=Tsmearing if T==0 else T
+
         nimp_tot = sum(F.nimp for F in Fragments_list)
         nbath_tot = sum(F.nbath for F in Fragments_list)
 
         if self.eks.shape[1] != nimp_tot or self.eks.shape[2] != nimp_tot:
             raise ValueError(f"ek_list second and third dimensions must be {nimp_tot}, got {self.eks.shape}")
 
-        self.Rtot = block_diag(*[F.R for F in Fragments_list])
-        self.Ltot = block_diag(*[F.Lambda for F in Fragments_list])
+        self.update_Rtot_Ltot(Fragments_list)
 
         ekin = 0.0
         for ek,wk in self._my_ks():
@@ -396,6 +393,8 @@ class Lattice():
         """
         if not isinstance(Fragments_list, list) or not all(isinstance(F, Fragment) for F in Fragments_list):
             raise TypeError(f"Fragments_list must be a list of Fragment objects")
+
+        self.update_Rtot_Ltot(Fragments_list)
 
         #Embedding part of the functional
         Omega_imps = 0.0
@@ -429,6 +428,62 @@ class Lattice():
 
         Omega_tot = Omega_qp+Omega_imps+Omega_mix
         return Omega_tot # , Omega_qp, Omega_imps, Omega_mix
+
+    def compute_deltak(self, Fragments_list):
+        """
+        Compute the k-resolved one-body density matrices from the QP problem
+        
+        :param Fragments_list: List of Fragment objects that contain the self-energies.
+        """
+        if not isinstance(Fragments_list, list) or not all(isinstance(F, Fragment) for F in Fragments_list):
+            raise TypeError(f"Fragments_list must be a list of Fragment objects")
+
+        self.update_Rtot_Ltot(Fragments_list)
+
+        nimp_tot = sum(F.nimp for F in Fragments_list)
+        nbath_tot = sum(F.nbath for F in Fragments_list)
+
+        if self.eks.shape[1] != nimp_tot or self.eks.shape[2] != nimp_tot:
+            raise ValueError(f"ek_list second and third dimensions must be {nimp_tot}, got {self.eks.shape}")
+
+        Dk_tot = np.zeros( (self.eks.shape[0], nimp_tot, nimp_tot), dtype=complex )
+
+        RRdag = self.Rtot @ self.Rtot.T.conj()
+
+        Revals, Revecs = np.linalg.eigh(RRdag)
+        Revals = 1/np.sqrt(Revals)
+        invsRRd = Revecs @ np.diag(Revals) @ Revecs.T.conj()
+
+        for i,(ek,wk) in enumerate(zip(self.eks,self.wks)):
+            Hk_qp = self.Rtot @ ek @ self.Rtot.T.conj() + self.Ltot
+            Dk = self.Rtot.T.conj() @ calc_nf(Hk_qp,0.0).T @ self.Rtot
+            Dk_tot[i,:,:] = invsRRd @ Dk @ invsRRd
+
+        return Dk_tot
+
+
+    ###### AUXILIARY QP ROUTINES #####
+    def update_Rtot_Ltot(self, Fragments_list):
+        """
+        Update the total R and Lambda matrices from a list of Fragment objects.
+
+        :param Fragments_list: List of Fragment objects that contain the self-energies parameters.
+        """
+        if not isinstance(Fragments_list, list) or not all(isinstance(F, Fragment) for F in Fragments_list):
+            raise TypeError(f"Fragments_list must be a list of Fragment objects")
+        nimp_tot = sum(F.nimp for F in Fragments_list)
+        nbath_tot = sum(F.nbath for F in Fragments_list)
+
+        if self.eks.shape[1] != nimp_tot or self.eks.shape[2] != nimp_tot:
+            raise ValueError(f"ek_list second and third dimensions must be {nimp_tot}, got {self.eks.shape}")
+
+        self.Rtot = block_diag(*[F.R for F in Fragments_list])
+        self.Ltot = block_diag(*[F.Lambda for F in Fragments_list])
+
+        return self.Rtot, self.Ltot
+        
+        
+
 
     ###### ROUTINES TO SAVE AND LOAD #####
     def save_lattice(self,filename, overwrite=True):
