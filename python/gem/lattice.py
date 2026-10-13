@@ -429,14 +429,21 @@ class Lattice():
         Omega_tot = Omega_qp+Omega_imps+Omega_mix
         return Omega_tot # , Omega_qp, Omega_imps, Omega_mix
 
-    def compute_deltak(self, Fragments_list):
+    def compute_deltak(self, Fragments_list,T=0.0, Tsmearing=0.0):
         """
-        Compute the k-resolved one-body density matrices from the QP problem
+        Compute the k-resolved one-body density matrices from the QP problem with the impurity correction
+        for charge self-consistent DFT+GEM calculations.
         
         :param Fragments_list: List of Fragment objects that contain the self-energies.
         """
         if not isinstance(Fragments_list, list) or not all(isinstance(F, Fragment) for F in Fragments_list):
             raise TypeError(f"Fragments_list must be a list of Fragment objects")
+        if(T<0.0): raise ValueError("Temperature T must be non-negative")
+        if(Tsmearing<0.0): raise ValueError("Temperature Tsmearing must be non-negative")
+        if(T==0.0 and Tsmearing==0.0):
+            warnings.warn("Both T and Tsmearing are zero in compute_functional. This may lead to numerical instabilities. Consider using a small T or Tsmearing.")
+        # If T=0.0, use a small T to compute the functional
+        Tuse=Tsmearing if T==0 else T
 
         self.update_Rtot_Ltot(Fragments_list)
 
@@ -447,6 +454,9 @@ class Lattice():
             raise ValueError(f"ek_list second and third dimensions must be {nimp_tot}, got {self.eks.shape}")
 
         Dk_tot = np.zeros( (self.eks.shape[0], nimp_tot, nimp_tot), dtype=complex )
+        Dk_local = np.zeros( (nimp_tot, nimp_tot), dtype=complex )
+        Dqp_local = np.zeros( (nimp_tot, nimp_tot), dtype=complex )
+        Dimp_local = np.zeros( (nimp_tot, nimp_tot), dtype=complex )
 
         RRdag = self.Rtot @ self.Rtot.T.conj()
 
@@ -456,8 +466,19 @@ class Lattice():
 
         for i,(ek,wk) in enumerate(zip(self.eks,self.wks)):
             Hk_qp = self.Rtot @ ek @ self.Rtot.T.conj() + self.Ltot
-            Dk = self.Rtot.T.conj() @ calc_nf(Hk_qp,0.0).T @ self.Rtot
+            Dk = self.Rtot.T.conj() @ calc_nf(Hk_qp,Tuse).T @ self.Rtot
             Dk_tot[i,:,:] = invsRRd @ Dk @ invsRRd
+            Dk_local += wk*Dk_tot[i,:,:]
+
+        #Get the Delta_k correction to preserve optical sum rule and mott in B=1 case
+        stride=0
+        for F in Fragments_list:
+            sslice=slice(stride,stride+F.nimp)
+            Dimp_local[sslice,sslice] = F.denMat[:F.nimp,:F.nimp]
+            Dqp_local[sslice,sslice] = Dk_local[sslice,sslice]
+
+        for ik in range(Dk_tot.shape[0]):
+            Dk_tot[ik,:,:] += Dimp_local - Dqp_local
 
         return Dk_tot
 
