@@ -4,7 +4,7 @@
 [![docs](https://github.com/triqs/gem/actions/workflows/docs.yml/badge.svg)](https://github.com/triqs/gem/actions/workflows/docs.yml)
 
 GEM is an implement of the ghost-Gutwiller approximation (ghost-GA) and its finite temperature extension [1,2].
-Start to learn about GEM on our website at [https://triqs.github.io/gem/](triqs.github.io/gem).
+Start to learn about GEM on our website at [https://triqs.github.io/gem/](https://triqs.github.io/gem/).
 If you use GEM for your own research, please cite Ref. [3]
 
 ------------
