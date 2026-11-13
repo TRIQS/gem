@@ -8,7 +8,7 @@ On-the-fly application of the embedding Hamiltonian, so that ARPACK never needs
 the matrix.
 
 ``SimpleED`` normally stores, per symmetry sector, ``norb**2`` sparse ``c^dag_i
-c_j`` operators plus ``Hone``, ``Htwo`` and ``Ham``. That is ``O(dim * norb**2)``
+c_j`` operators plus ``Htwo`` and ``Ham``. That is ``O(dim * norb**2)``
 memory and it, not ARPACK, sets the largest reachable sector. The kernels here
 recompute the Fock-space bit algebra on every application instead, so the only
 per-sector storage left is the basis array (and the eigenvectors that are kept).
@@ -106,27 +106,6 @@ def two_body_target(i, j, k, l, bsr, bit_max, norb):
     Returns ``(bsl, sign)``, with ``sign == 0`` when the state is annihilated.
     Callers must skip ``l == j`` and ``i == k`` (those terms vanish by Pauli and
     are not handled here), exactly as ``_build_two_body`` does.
-
-    Known pre-existing limitation, kept verbatim from the stored builder so the
-    two paths agree. The two creation operators use ``|`` without checking that
-    the orbital is empty, so ``c^dag_k`` (or ``c^dag_i``) acting on an occupied
-    orbital yields a state with the wrong particle number instead of zero. The
-    term is handled correctly iff ``{i, k} == {j, l}``, i.e. iff both created
-    orbitals are ones that ``c_l c_j`` has just emptied; density-density
-    (``j == i``, ``l == k``) and exchange (``j == k``, ``l == i``) terms satisfy
-    this, the Kanamori spin-flip and pair-hopping terms do not.
-
-    It is harmless whenever the basis has a fixed particle number, which is
-    every ``use_Ntot=True`` sector and every ``(N, Sz)`` sector: the bad target
-    state has ``N-1`` or ``N-2`` particles, so it is not in the basis, the
-    lookup discards it, and zero is the right answer. Verified against a
-    brute-force fermionic reference: ``use_Ntot=True`` reproduces the exact
-    ground state to 1e-15 with a Kanamori ``V2E``.
-
-    It does bite in the ``use_Ntot=False`` full Fock space, where every state is
-    present so the spurious element survives: there a Kanamori ``V2E`` gives an
-    ``Htwo`` that is non-Hermitian by ``J`` and a ground-state energy wrong at
-    the 1e-2 level. Use ``use_Ntot=True`` with such interactions.
     '''
     tmp_bit1 = bit_max >> j
     tmp_bit2 = bit_max >> l
@@ -136,7 +115,11 @@ def two_body_target(i, j, k, l, bsr, bit_max, norb):
         return np.int64(0), 0
     bsltmp1 = bsr     ^ tmp_bit1
     bsltmp2 = bsltmp1 ^ tmp_bit2
+    if bsltmp2 & tmp_bit3:
+        return np.int64(0), 0
     bsltmp3 = bsltmp2 | tmp_bit3
+    if bsltmp3 & tmp_bit4:
+        return np.int64(0), 0
     bsl     = bsltmp3 | tmp_bit4
     count = 0
     for (bits, shift) in [(bsr, j), (bsltmp1, l), (bsltmp2, k), (bsltmp3, i)]:
