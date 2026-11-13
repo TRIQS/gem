@@ -5,8 +5,8 @@
 #######################################################
 
 import warnings
-from scipy.sparse import csc_matrix
-from scipy.sparse.linalg import eigsh
+from scipy.sparse import csc_matrix, coo_matrix, triu
+from scipy.sparse.linalg import eigsh, LinearOperator
 from scipy.linalg import eigh
 import numpy as np
 from numba import jit
@@ -179,7 +179,6 @@ class SimpleED(gemSolver):
         self.Sx_list        = []
         self.Sy_list        = []
         self.index_list     = []
-        self.Hone_list      = [None] * self.nloc
         self.Htwo_list      = [None] * self.nloc
         self.V2E            = None  # cached interaction tensor for rebuild check
         self.prev_gs_list   = [None] * self.nloc
@@ -211,7 +210,7 @@ class SimpleED(gemSolver):
             denmat_op_s = self._build_denmat_op(basis_s, hsize_s)
             self.denmat_op_list.append(denmat_op_s)
 
-            S2_s, Sz_s, Sx_s, Sy_s = self._build_S2_op(basis_s, hsize_s, denmat_op_s)
+            S2_s = Sz_s = Sx_s = Sy_s = None   # built on first use by _spin_ops
             self.S2_list.append(S2_s)
             self.Sz_list.append(Sz_s)
             self.Sx_list.append(Sx_s)
@@ -314,30 +313,29 @@ class SimpleED(gemSolver):
 
         if(verbose > 1): print('one-body + two-body')
         self.Ham_list = []
+        self.Ham = None   # free the previous Hamiltonian before building the new one
         for s in range(self.nloc):
             basis_s     = self.basis_list[s]
             hsize_s     = self.hsize_list[s]
             denmat_op_s = self.denmat_op_list[s]
-
-            Hone_s = self._build_one_body(self.h1e, hsize_s, denmat_op_s)
-            self.Hone_list[s] = Hone_s
 
             if rebuild_two:
                 self.Htwo_list[s] = self._build_two_body(V2E, basis_s, hsize_s)
 
             # add only the penalties switched on: a zero coefficient would
             # still drag its operator's dtype into Ham (Sy is complex)
-            Ham_s = Hone_s + self.Htwo_list[s]
-            if spin_pen: Ham_s = Ham_s + spin_pen * self.S2_list[s]
+            Ham_s = (self._build_one_body(self.h1e, hsize_s, denmat_op_s, upper=True)
+                     + triu(self.Htwo_list[s]))
+            if spin_pen or sz_pen or sx_pen or sy_pen: self._spin_ops(s)
+            if spin_pen: Ham_s = Ham_s + spin_pen * triu(self.S2_list[s])
             for pen, op in ((sz_pen, self.Sz_list[s]), (sx_pen, self.Sx_list[s]),
                             (sy_pen, self.Sy_list[s])):
-                if pen: Ham_s = Ham_s + pen * op.dot(op)
-            self.Ham_list.append(Ham_s)
+                if pen: Ham_s = Ham_s + pen * triu(op.dot(op))
+            self.Ham_list.append(UpperHermitian(Ham_s))
 
 
         # single-sector backward compat
         if len(self.sectors) == 1 and self.nloc == 1:
-            self.Hone = self.Hone_list[0]
             self.Htwo = self.Htwo_list[0]
             self.Ham  = self.Ham_list[0]
 
@@ -496,6 +494,7 @@ class SimpleED(gemSolver):
                         S2v = Szv = complex(np.nan)
                     else:
                         vec = self.evecs_list[s][:, n]
+                        self._spin_ops(s)
                         S2v = complex(vec.conj() @ self.S2_list[s].dot(vec))
                         Szv = complex(vec.conj() @ self.Sz_list[s].dot(vec))
                     rows.append((self.my_sectors[s], n, self.evals_list[s][n],
@@ -785,42 +784,54 @@ class SimpleED(gemSolver):
             for j in range(self.norb):
                 row_ind, col_ind, data = build_cid_cj_csc(
                     i, j, basis, bit_max, self.norb, debug=False)
-                denmat_op[(i, j)] = csc_matrix(
+                denmat_op[(i, j)] = coo_matrix(
                     (data, (row_ind, col_ind)),
-                    shape=(hsize, hsize), dtype=self.data_type)
+                    shape=(hsize, hsize), dtype=np.int8)
         return denmat_op
 
     def _build_S2_op(self, basis, hsize, denmat_op):
         '''
         Build S², Sz, Sx, Sy in the given basis.
         '''
+        def op(i, j):
+            return denmat_op[(i, j)].astype(self.data_type)
+
         Sp = csc_matrix((hsize, hsize), dtype=self.data_type)
         Sm = csc_matrix((hsize, hsize), dtype=self.data_type)
         Sz = csc_matrix((hsize, hsize), dtype=self.data_type)
         for i in range(self.norb // 2):
-            Sp += denmat_op[(2*i,   2*i+1)]
-            Sm += denmat_op[(2*i+1, 2*i  )]
-            Sz += 0.5*denmat_op[(2*i, 2*i)] - 0.5*denmat_op[(2*i+1, 2*i+1)]
+            Sp += op(2*i,   2*i+1)
+            Sm += op(2*i+1, 2*i  )
+            Sz += 0.5*op(2*i, 2*i) - 0.5*op(2*i+1, 2*i+1)
         SmSp = csc_matrix((hsize, hsize), dtype=self.data_type)
         for i in range(self.norb // 2):
-            SmSp += denmat_op[(2*i+1, 2*i+1)]
+            SmSp += op(2*i+1, 2*i+1)
             for j in range(self.norb // 2):
-                SmSp -= denmat_op[(2*i+1, 2*j+1)].dot(
-                    denmat_op[(2*j, 2*i)])
+                SmSp -= op(2*i+1, 2*j+1).dot(op(2*j, 2*i))
 
         S2 = SmSp + Sz.dot(Sz) + Sz
         Sx = 0.5*(Sp + Sm)
         Sy = 0.5*(Sp - Sm) / 1j
         return S2, Sz, Sx, Sy
 
-    def _build_one_body(self, H1E, hsize, denmat_op):
+    def _spin_ops(self, s):
+        if self.S2_list[s] is None:
+            ops = self._build_S2_op(self.basis_list[s], self.hsize_list[s],
+                                    self.denmat_op_list[s])
+            self.S2_list[s], self.Sz_list[s], self.Sx_list[s], self.Sy_list[s] = ops
+            if len(self.sectors) == 1 and self.nloc == 1:
+                self.S2, self.Sz, self.Sx, self.Sy = ops
+        return self.S2_list[s], self.Sz_list[s], self.Sx_list[s], self.Sy_list[s]
+
+    def _build_one_body(self, H1E, hsize, denmat_op, upper=False):
         '''
         Build one-body Hamiltonian block in a given basis.
         '''
         Hone = csc_matrix((hsize, hsize), dtype=self.data_type)
         for i in range(self.norb):
             for j in range(self.norb):
-                if np.abs(H1E[i, j]) < 1e-8:
+                # c^dag_i c_j with i > j is strictly upper triangular (sorted basis)
+                if np.abs(H1E[i, j]) < 1e-8 or (upper and i < j):
                     continue
                 Hone += H1E[i, j] * denmat_op[(i, j)]
         return Hone
@@ -925,7 +936,6 @@ class SimpleED(gemSolver):
     def build_one_body(self, H1E):
         self._reject_if_matrix_free('build_one_body')
         self.Hone = self._build_one_body(H1E, self.hsize_list[0], self.denmat_op_list[0])
-        self.Hone_list[0] = self.Hone
 
     def build_two_body(self, Umatrix, debug=False):
         self._reject_if_matrix_free('build_two_body')
@@ -944,6 +954,23 @@ class SimpleED(gemSolver):
     def h5read_state(self, filename, group_path, name):
         with h5py.File(filename, "r") as f:
             return f[group_path][name][:]
+
+
+class UpperHermitian(LinearOperator):
+    '''Hermitian H stored as its upper triangle U (diagonal included).'''
+
+    def __init__(self, U):
+        self.U = U
+        self.d = U.diagonal()
+        super().__init__(dtype=U.dtype, shape=U.shape)
+
+    def _matvec(self, x):
+        x = np.ravel(x)
+        return self.U @ x + (self.U.T @ x.conj()).conj() - self.d * x
+
+    def toarray(self):
+        A = self.U.toarray()
+        return A + np.triu(A, 1).conj().T
 
 
 # -- binary basis utilities --
